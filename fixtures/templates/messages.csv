@@ -1,0 +1,2 @@
+platform,account_id,conversation_id,conversation_name,sender_id,source_id,sent_at,type,content,capture_mode,demo
+wechat,my-account,contact-id,示例联系人,contact-id,message-001,2026-10-26T10:00:00+08:00,text,明天下午提交报价。,import,true

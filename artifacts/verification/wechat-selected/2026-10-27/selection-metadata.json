@@ -1,0 +1,18 @@
+{
+  "metadata_only": true,
+  "selected_conversations": [
+    {
+      "alias": "private_test",
+      "selected_message_table_present": true,
+      "selected_identity_present": true,
+      "expected_sender_present": true
+    },
+    {
+      "alias": "group_test",
+      "selected_message_table_present": false,
+      "selected_identity_present": false,
+      "expected_sender_present": true
+    }
+  ],
+  "wechat_main_process_count": 1
+}

@@ -1,0 +1,27 @@
+// Electron DOM latency measurement. Fictional import events, never real client capture.
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const pause=ms=>new Promise(r=>setTimeout(r,ms));const out=path.resolve(__dirname,'../docs/evidence');
+(async()=>{
+ const list=await(await fetch('http://127.0.0.1:9224/json/list')).json();const ws=new WebSocket(list.find(x=>x.type==='page').webSocketDebuggerUrl);await new Promise(r=>ws.onopen=r);let seq=0;const waits=new Map();ws.onmessage=e=>{const m=JSON.parse(e.data);if(waits.has(m.id)){const [r,j]=waits.get(m.id);waits.delete(m.id);m.error?j(Error(m.error.message)):r(m.result);}};
+ function send(method,params={}){return new Promise((r,j)=>{const id=++seq;waits.set(id,[r,j]);ws.send(JSON.stringify({id,method,params}));});}
+ async function evaluate(expression){const r=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;}
+ async function until(expression,timeout=15000){const begun=Date.now();while(Date.now()-begun<timeout){if(await evaluate(expression))return Date.now();await pause(80);}throw Error('DOM condition timeout: '+expression);}
+ const run=Date.now();const conversation='perf-'+run;const name='演示 · DOM性能验证';const message=(n,content,ms)=>({platform:'wechat',account_id:'performance-fictional',conversation_id:conversation,conversation_name:name,conversation_type:'direct',sender_id:n%2?'虚构乙':'虚构甲',source_id:'p-'+n,sent_at:new Date(ms).toISOString(),observed_at:new Date(ms).toISOString(),type:'text',content,demo:true,capture_mode:'import'});
+ await evaluate(`(async()=>{await window.chatlens.api('POST','/settings',{model_mode:'rules',analysis_window_seconds:2});await window.chatlens.api('POST','/resume',{});return true;})()`);
+ await evaluate(`(()=>{document.querySelector('.modal-header .icon-btn')?.click();})()`);
+ const seed=Array.from({length:119},(_,i)=>message(i,'虚构历史样本 '+i,run-120000+i*100));
+ await evaluate(`window.chatlens.api('POST','/import',${JSON.stringify({text:seed.map(m=>JSON.stringify(m)).join('\n'),format:'jsonl'})})`);
+ await until(`[...document.querySelectorAll('.conversation')].some(e=>e.textContent.includes(${JSON.stringify(name)}))`);
+ await evaluate(`(()=>{[...document.querySelectorAll('.conversation')].find(e=>e.textContent.includes(${JSON.stringify(name)})).click();[...document.querySelectorAll('.analysis-tabs button')].find(e=>e.textContent==='实时摘要').click();const q=document.querySelector('input[aria-label="搜索聊天原文"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(q,'');q.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+ await pause(1700);await evaluate(`(()=>{const b=[...document.querySelectorAll('.pagination button')].find(e=>e.textContent.includes('下一页'));b.click();})()`);await pause(1800);
+ const display=[],analysis=[],submissions=[],pending=[];const epoch=Date.now();
+ for(let i=0;i<30;i++){
+  const scheduled=epoch+i*1000;await pause(Math.max(0,scheduled-Date.now()));const marker='DOM性能消息-'+run+'-'+String(i).padStart(2,'0');const submitted=Date.now();const m=message(119+i,marker,submitted);
+  await evaluate(`window.chatlens.api('POST','/import',${JSON.stringify({text:JSON.stringify(m),format:'jsonl'})})`);submissions.push(submitted);
+  pending.push(until(`[...document.querySelectorAll('.message .bubble')].some(e=>e.textContent.includes(${JSON.stringify(marker)}))`,10000).then(visible=>display.push({event:i,submitted_at:submitted,visible_at:visible,latency_ms:visible-submitted})));
+  if((i+1)%6===0)pending.push(until(`[...document.querySelectorAll('.analysis-panel .claim')].some(e=>e.textContent.includes(${JSON.stringify(marker)}))`,15000).then(visible=>analysis.push({batch:(i+1)/6,last_submitted_at:submitted,visible_at:visible,latency_ms:visible-submitted})));
+ }
+ await Promise.all(pending);const percentile=arr=>arr.slice().sort((a,b)=>a-b)[Math.ceil(arr.length*.95)-1];
+ const result={tested_at:new Date().toISOString(),product:'利明智耀.Chatlens',platform:process.platform,os:os.release(),architecture:os.arch(),cpu:os.cpus()[0].model,ram_gb:Math.round(os.totalmem()/1073741824),mode:'Electron production assets + local deterministic rules + synthetic JSONL events',input:'119 fictional seed history + 30 measured events at 1 event/second',boundary:'API submit/observed_at to rendered Electron DOM; analysis batch last submit to summary claim DOM visible. No real client screenshot or VLM latency is measured.',display_p95_ms:percentile(display.map(x=>x.latency_ms)),display_target_ms:3000,analysis_p95_ms:percentile(analysis.map(x=>x.latency_ms)),analysis_target_ms:15000,submission_intervals_ms:submissions.slice(1).map((x,i)=>x-submissions[i]),display_samples:display.sort((a,b)=>a.event-b.event),analysis_samples:analysis,status:'pending'};
+ result.status=result.display_p95_ms<=3000&&result.analysis_p95_ms<=15000?'passed':'target_missed';fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,'desktop-performance.json'),JSON.stringify(result,null,2));const im=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'desktop-performance.png'),Buffer.from(im.data,'base64'));console.log(JSON.stringify({status:result.status,display_p95_ms:result.display_p95_ms,analysis_p95_ms:result.analysis_p95_ms,display_samples:display.length,analysis_samples:analysis.length},null,2));ws.close();
+})().catch(e=>{console.error(e);process.exit(1);});

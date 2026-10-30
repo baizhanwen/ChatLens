@@ -1,0 +1,34 @@
+{
+  "status": "通过",
+  "matched_counts": [
+    1,
+    1
+  ],
+  "all_exact": true,
+  "background_verified": true,
+  "duplicate_count": 0,
+  "message_shards": 1,
+  "baseline_completed_at": "2026-10-26T09:34:42.974321+00:00",
+  "observations": [
+    {
+      "observed_at": "2026-10-26T09:38:05.730403+00:00",
+      "source_create_time": 1793007484,
+      "before_frontmost": false,
+      "after_frontmost": false,
+      "before_hidden": true,
+      "after_hidden": true,
+      "client_version": "4.1.11"
+    },
+    {
+      "observed_at": "2026-10-26T09:38:24.922333+00:00",
+      "source_create_time": 1793007503,
+      "before_frontmost": false,
+      "after_frontmost": false,
+      "before_hidden": true,
+      "after_hidden": true,
+      "client_version": "4.1.11"
+    }
+  ],
+  "original_signature_verifies": true,
+  "original_executable_unchanged": true
+}

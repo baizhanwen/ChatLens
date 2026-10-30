@@ -1,0 +1,11 @@
+{
+  "scope": "new_repository_staged_sources_docs_assets_and_redacted_evidence_only",
+  "status": "通过",
+  "staged_files": 155,
+  "utf8_files": 141,
+  "brand_binary_assets": 14,
+  "explicit_synthetic_identifier_occurrences": 13,
+  "findings": [],
+  "private_data_or_deliverable_staged": false,
+  "remote_publication_performed": false
+}

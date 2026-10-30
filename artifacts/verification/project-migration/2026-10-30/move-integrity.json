@@ -1,0 +1,17 @@
+{
+  "recorded_at_utc": "2026-10-30T02:02:50.533043+00:00",
+  "status": "通过",
+  "method": "same_volume_directory_rename",
+  "original_regular_files": 12357,
+  "original_entries": 14117,
+  "original_bytes": 1061026747,
+  "non_finder_files_sha256_verified": 12354,
+  "code_tests_evidence_deliverables_and_private_files_preserved": true,
+  "all_original_modes_and_inodes_match": true,
+  "old_directory_absent": true,
+  "product_file_mismatch_count": 0,
+  "finder_metadata_changes": [
+    "artifacts/deliverables/.DS_Store"
+  ],
+  "finder_metadata_note": "Finder updated one .DS_Store; all product files retained their original content hashes."
+}

@@ -1,0 +1,10 @@
+{
+  "capture_stopped_at": "2026-10-27T02:50:23.203561+00:00",
+  "stopped_verified_at": "2026-10-27T02:51:36.995528+00:00",
+  "checkpoint_lock_available": true,
+  "committed_live_observations": 4,
+  "paused_message_target": 2,
+  "user_confirmed_sent_at": "2026-10-27T02:52:54.132915+00:00",
+  "resume_started_at": "2026-10-27T02:52:54.133130+00:00",
+  "user_confirmed_paused_messages_sent": true
+}

@@ -1,0 +1,36 @@
+{
+  "checks": [
+    {
+      "name": "python-tests",
+      "returncode": 0,
+      "status": "通过",
+      "seconds": 14.834
+    },
+    {
+      "name": "frontend-build",
+      "returncode": 0,
+      "status": "通过",
+      "seconds": 0.651
+    },
+    {
+      "name": "shell-syntax",
+      "returncode": 0,
+      "status": "通过",
+      "seconds": 0.004
+    },
+    {
+      "name": "electron-syntax",
+      "returncode": 0,
+      "status": "通过",
+      "seconds": 0.033
+    },
+    {
+      "name": "dev-entry-syntax",
+      "returncode": 0,
+      "status": "通过",
+      "seconds": 0.03
+    }
+  ],
+  "scope": "relocated_local_synthetic_tests_build_and_syntax_only",
+  "real_wechat_or_cloud_service_started": false
+}

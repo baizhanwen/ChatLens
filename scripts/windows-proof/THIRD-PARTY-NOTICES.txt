@@ -1,0 +1,39 @@
+Third-party notices for ChatLens Windows KeyProof
+
+1. Python runtime
+Python 3.15.2 Windows x64 embeddable from the Python Software Foundation.
+Official release: https://www.python.org/downloads/release/python-3152/
+The original runtime license is included as runtime/LICENSE.txt.
+Only python315._pth is modified to add the package root (..); site stays disabled.
+
+2. Config.Cipher object-layout algorithm reference
+Project: TANGandXUE/wcdb-key-tool
+Commit: 79f1b5b92e12c66aa281b4a60a3c478b5f547dfa
+Source: https://github.com/TANGandXUE/wcdb-key-tool/blob/79f1b5b92e12c66aa281b4a60a3c478b5f547dfa/wcdb_key_tool_windows.py
+Only the published Windows Config.Cipher layout/XOR and SQLCipher page-authentication
+algorithm are adapted in independently scoped code. No third-party CLI is executed.
+No automatic account discovery, raw-key fallback, debugger capture, database
+decryption or export is included. Compatibility with Weixin 4.1.15.56 is unverified.
+The upstream MIT license follows:
+
+MIT License
+
+Copyright (c) 2025 CloudDreamAI / TANGandXUE
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

@@ -1,0 +1,353 @@
+{
+  "recorded_at": "2026-10-27T02:52:54.196827+00:00",
+  "phase": "resume",
+  "scope": "two_selected_conversations_controlled_new_text_only",
+  "status": "通过",
+  "reason": "phase_controlled_samples_verified",
+  "stop_after_total": 6,
+  "resumed": true,
+  "restored_observations": 4,
+  "new_observations": [
+    {
+      "alias": "private_test",
+      "token_index": 3,
+      "event_id_digest": "ac67218051a22e24425c5194859769a190d8cffdaee0b6f8f25a67cbec415a49",
+      "source_id_kind": "message_shard_local_id",
+      "server_id_available": true,
+      "sender_digest": "559e1c9c1bc80157671f64983cc6901451bdab2cbdc0f4e960761f99b7c9201b",
+      "sender_source": "name2id_rowid",
+      "expected_sender_match": true,
+      "group_prefix_removed": false,
+      "body_exact_match": true,
+      "source_create_time": 1793069533,
+      "observed_at": "2026-10-27T02:52:54.391180+00:00",
+      "background_confirmed": true,
+      "native_before": {
+        "probe_succeeded": true,
+        "running": true,
+        "frontmost": false,
+        "hidden": false,
+        "screen_locked": false,
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11"
+      },
+      "native_after": {
+        "probe_succeeded": true,
+        "running": true,
+        "frontmost": false,
+        "hidden": false,
+        "screen_locked": false,
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11"
+      }
+    },
+    {
+      "alias": "group_test",
+      "token_index": 3,
+      "event_id_digest": "a8184a2c5664d998d6adbd59dd459f8f0ca4809638dc37914510cfaffcc0400a",
+      "source_id_kind": "message_shard_local_id",
+      "server_id_available": true,
+      "sender_digest": "559e1c9c1bc80157671f64983cc6901451bdab2cbdc0f4e960761f99b7c9201b",
+      "sender_source": "name2id_rowid",
+      "expected_sender_match": true,
+      "group_prefix_removed": true,
+      "body_exact_match": true,
+      "source_create_time": 1793069552,
+      "observed_at": "2026-10-27T02:52:54.391452+00:00",
+      "background_confirmed": true,
+      "native_before": {
+        "probe_succeeded": true,
+        "running": true,
+        "frontmost": false,
+        "hidden": false,
+        "screen_locked": false,
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11"
+      },
+      "native_after": {
+        "probe_succeeded": true,
+        "running": true,
+        "frontmost": false,
+        "hidden": false,
+        "screen_locked": false,
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11"
+      }
+    }
+  ],
+  "replayed_committed_event_count": 0,
+  "summary": {
+    "status": "通过",
+    "scope": "selected_controlled_new_text_only",
+    "reason": "controlled_selected_text_verified",
+    "resumed": true,
+    "restored_observations": 4,
+    "baseline_completed_at": "2026-10-27T02:47:02.077961+00:00",
+    "last_commit_at": "2026-10-27T02:52:54.539212+00:00",
+    "message_shards": 1,
+    "observed_events": 6,
+    "unique_source_messages": 6,
+    "all_expected_tokens_observed": true,
+    "any_test_message_observed": true,
+    "configured_sender_expectation_unverified": false,
+    "conversations": [
+      {
+        "alias": "private_test",
+        "tokens": [
+          {
+            "token_index": 1,
+            "matched_count": 1,
+            "body_exact_match": true,
+            "background_confirmed": true,
+            "expected_sender_match": true
+          },
+          {
+            "token_index": 2,
+            "matched_count": 1,
+            "body_exact_match": true,
+            "background_confirmed": true,
+            "expected_sender_match": true
+          },
+          {
+            "token_index": 3,
+            "matched_count": 1,
+            "body_exact_match": true,
+            "background_confirmed": true,
+            "expected_sender_match": true
+          }
+        ]
+      },
+      {
+        "alias": "group_test",
+        "tokens": [
+          {
+            "token_index": 1,
+            "matched_count": 1,
+            "body_exact_match": true,
+            "background_confirmed": true,
+            "expected_sender_match": true
+          },
+          {
+            "token_index": 2,
+            "matched_count": 1,
+            "body_exact_match": true,
+            "background_confirmed": true,
+            "expected_sender_match": true
+          },
+          {
+            "token_index": 3,
+            "matched_count": 1,
+            "body_exact_match": true,
+            "background_confirmed": true,
+            "expected_sender_match": true
+          }
+        ]
+      }
+    ]
+  },
+  "errors": [],
+  "cumulative_observations": [
+    {
+      "alias": "private_test",
+      "background_confirmed": true,
+      "body_exact_match": true,
+      "event_id_digest": "3bd3bd133e99acc7e380a55c597805ed69e8f4c5346f7e54ccc316a5b3f6f45a",
+      "expected_sender_match": true,
+      "group_prefix_removed": false,
+      "native_after": {
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11",
+        "frontmost": false,
+        "hidden": false,
+        "probe_succeeded": true,
+        "running": true,
+        "screen_locked": false
+      },
+      "native_before": {
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11",
+        "frontmost": false,
+        "hidden": false,
+        "probe_succeeded": true,
+        "running": true,
+        "screen_locked": false
+      },
+      "observed_at": "2026-10-27T02:49:09.265594+00:00",
+      "sender_digest": "559e1c9c1bc80157671f64983cc6901451bdab2cbdc0f4e960761f99b7c9201b",
+      "sender_source": "name2id_rowid",
+      "server_id_available": true,
+      "source_create_time": 1793069348,
+      "source_id_kind": "message_shard_local_id",
+      "token_index": 1
+    },
+    {
+      "alias": "group_test",
+      "background_confirmed": true,
+      "body_exact_match": true,
+      "event_id_digest": "7d4d1aff5323b320faa3f0ec87b1f75ee0d2b893635e2f3119a0c069157abbb6",
+      "expected_sender_match": true,
+      "group_prefix_removed": true,
+      "native_after": {
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11",
+        "frontmost": false,
+        "hidden": false,
+        "probe_succeeded": true,
+        "running": true,
+        "screen_locked": false
+      },
+      "native_before": {
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11",
+        "frontmost": false,
+        "hidden": false,
+        "probe_succeeded": true,
+        "running": true,
+        "screen_locked": false
+      },
+      "observed_at": "2026-10-27T02:49:45.420260+00:00",
+      "sender_digest": "559e1c9c1bc80157671f64983cc6901451bdab2cbdc0f4e960761f99b7c9201b",
+      "sender_source": "name2id_rowid",
+      "server_id_available": true,
+      "source_create_time": 1793069384,
+      "source_id_kind": "message_shard_local_id",
+      "token_index": 1
+    },
+    {
+      "alias": "private_test",
+      "background_confirmed": true,
+      "body_exact_match": true,
+      "event_id_digest": "9b93481c0a6c58ddd44ed307a771b3f3828c6a007f2741d82cdc7be6dac6c044",
+      "expected_sender_match": true,
+      "group_prefix_removed": false,
+      "native_after": {
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11",
+        "frontmost": false,
+        "hidden": false,
+        "probe_succeeded": true,
+        "running": true,
+        "screen_locked": false
+      },
+      "native_before": {
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11",
+        "frontmost": false,
+        "hidden": false,
+        "probe_succeeded": true,
+        "running": true,
+        "screen_locked": false
+      },
+      "observed_at": "2026-10-27T02:50:06.213235+00:00",
+      "sender_digest": "559e1c9c1bc80157671f64983cc6901451bdab2cbdc0f4e960761f99b7c9201b",
+      "sender_source": "name2id_rowid",
+      "server_id_available": true,
+      "source_create_time": 1793069405,
+      "source_id_kind": "message_shard_local_id",
+      "token_index": 2
+    },
+    {
+      "alias": "group_test",
+      "background_confirmed": true,
+      "body_exact_match": true,
+      "event_id_digest": "dfd2a84cb3c6a4b643b51395c501511293dd825e2cac56b8dc896cc369f7c6f9",
+      "expected_sender_match": true,
+      "group_prefix_removed": true,
+      "native_after": {
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11",
+        "frontmost": false,
+        "hidden": false,
+        "probe_succeeded": true,
+        "running": true,
+        "screen_locked": false
+      },
+      "native_before": {
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11",
+        "frontmost": false,
+        "hidden": false,
+        "probe_succeeded": true,
+        "running": true,
+        "screen_locked": false
+      },
+      "observed_at": "2026-10-27T02:50:23.065933+00:00",
+      "sender_digest": "559e1c9c1bc80157671f64983cc6901451bdab2cbdc0f4e960761f99b7c9201b",
+      "sender_source": "name2id_rowid",
+      "server_id_available": true,
+      "source_create_time": 1793069422,
+      "source_id_kind": "message_shard_local_id",
+      "token_index": 2
+    },
+    {
+      "alias": "private_test",
+      "token_index": 3,
+      "event_id_digest": "ac67218051a22e24425c5194859769a190d8cffdaee0b6f8f25a67cbec415a49",
+      "source_id_kind": "message_shard_local_id",
+      "server_id_available": true,
+      "sender_digest": "559e1c9c1bc80157671f64983cc6901451bdab2cbdc0f4e960761f99b7c9201b",
+      "sender_source": "name2id_rowid",
+      "expected_sender_match": true,
+      "group_prefix_removed": false,
+      "body_exact_match": true,
+      "source_create_time": 1793069533,
+      "observed_at": "2026-10-27T02:52:54.391180+00:00",
+      "background_confirmed": true,
+      "native_before": {
+        "probe_succeeded": true,
+        "running": true,
+        "frontmost": false,
+        "hidden": false,
+        "screen_locked": false,
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11"
+      },
+      "native_after": {
+        "probe_succeeded": true,
+        "running": true,
+        "frontmost": false,
+        "hidden": false,
+        "screen_locked": false,
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11"
+      }
+    },
+    {
+      "alias": "group_test",
+      "token_index": 3,
+      "event_id_digest": "a8184a2c5664d998d6adbd59dd459f8f0ca4809638dc37914510cfaffcc0400a",
+      "source_id_kind": "message_shard_local_id",
+      "server_id_available": true,
+      "sender_digest": "559e1c9c1bc80157671f64983cc6901451bdab2cbdc0f4e960761f99b7c9201b",
+      "sender_source": "name2id_rowid",
+      "expected_sender_match": true,
+      "group_prefix_removed": true,
+      "body_exact_match": true,
+      "source_create_time": 1793069552,
+      "observed_at": "2026-10-27T02:52:54.391452+00:00",
+      "background_confirmed": true,
+      "native_before": {
+        "probe_succeeded": true,
+        "running": true,
+        "frontmost": false,
+        "hidden": false,
+        "screen_locked": false,
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11"
+      },
+      "native_after": {
+        "probe_succeeded": true,
+        "running": true,
+        "frontmost": false,
+        "hidden": false,
+        "screen_locked": false,
+        "all_ax_windows_minimized": null,
+        "client_version": "4.1.11"
+      }
+    }
+  ],
+  "unexpected_repeated_test_token_count": 0,
+  "phase_plan_verified": true,
+  "finished_at": "2026-10-27T02:52:54.542059+00:00",
+  "elapsed_seconds": 0.345
+}

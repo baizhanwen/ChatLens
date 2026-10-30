@@ -1,0 +1,18 @@
+
+> chatlens-desktop@0.1.0 build
+> vite build --outDir ../../.build/migration-ui-build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 16 modules transformed.
+rendering chunks...
+computing gzip size...
+../../.build/migration-ui-build/index.html                   0.62 kB │ gzip:  0.44 kB
+../../.build/migration-ui-build/assets/index-UYK45OV2.css   20.84 kB │ gzip:  5.51 kB
+../../.build/migration-ui-build/assets/index-B8SNtZ0U.js   265.32 kB │ gzip: 83.16 kB
+
+✓ built in 111ms
+
+(!) outDir <project-root>/.build/migration-ui-build is not inside project root and will not be emptied.
+Use --emptyOutDir to override.
+

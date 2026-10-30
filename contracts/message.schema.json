@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:chatlens:message:v1",
+  "title": "ChatLens readable message input v1",
+  "description": "JSONL object contract. CSV parser coerces revision/boolean columns before validation. Source IDs identify events independently of text; same text with different source IDs remains separate. Unknown message types are preserved as unknown with reason. Runtime validation additionally checks timezone-aware ISO timestamps and IANA timezone names.",
+  "type": "object",
+  "required": ["platform", "account_id", "conversation_id", "sender_id", "source_id", "sent_at", "type", "content"],
+  "properties": {
+    "platform": {"enum": ["wechat", "qq"]},
+    "account_id": {"type": "string", "minLength": 1},
+    "conversation_id": {"type": "string", "minLength": 1},
+    "source_conversation_id": {"type": "string", "minLength": 1},
+    "conversation_name": {"type": "string"},
+    "conversation_type": {"enum": ["direct", "group", "unknown"]},
+    "timezone": {"type": "string", "default": "Asia/Shanghai"},
+    "sender_id": {"type": "string", "minLength": 1, "description": "Use unknown if identity cannot be established."},
+    "source_id": {"type": "string", "minLength": 1},
+    "sent_at": {"type": "string", "format": "date-time"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "type": {"type": "string", "minLength": 1},
+    "content": {"type": "string", "maxLength": 1000000},
+    "revision": {"type": "integer", "minimum": 0, "default": 0},
+    "deleted": {"type": "boolean", "default": false},
+    "demo": {"type": "boolean", "default": false},
+    "capture_mode": {"enum": ["import", "replay", "accessibility", "ocr", "local_source", "uia", "vision_window", "accessibility_visible_fragment", "ocr_visible_fragment"], "default": "import"},
+    "reference_id": {"type": ["string", "null"]},
+    "attachment_name": {"type": ["string", "null"]},
+    "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "source_fragment": {"type": ["string", "null"]},
+    "metadata": {"type": "object"}
+  },
+  "additionalProperties": true
+}

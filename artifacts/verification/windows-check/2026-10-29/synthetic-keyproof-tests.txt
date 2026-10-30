@@ -1,0 +1,28 @@
+test_authenticates_independently_created_sqlcipher4_fixture (test_windows_keyproof_core.KeyproofTests.test_authenticates_independently_created_sqlcipher4_fixture) ... ok
+test_bad_pointer_or_hmac_never_returns_key (test_windows_keyproof_core.KeyproofTests.test_bad_pointer_or_hmac_never_returns_key) ... ok
+test_byte_budget_counts_failed_reads (test_windows_keyproof_core.KeyproofTests.test_byte_budget_counts_failed_reads) ... ok
+test_candidate_is_salt_bound_and_exact_literal (test_windows_keyproof_core.KeyproofTests.test_candidate_is_salt_bound_and_exact_literal) ... ok
+test_cli_success_saves_key_only_in_private_output (test_windows_keyproof_core.KeyproofTests.test_cli_success_saves_key_only_in_private_output) ... ok
+test_complete_lookup_and_image_marker (test_windows_keyproof_core.KeyproofTests.test_complete_lookup_and_image_marker) ... ok
+test_existing_output_is_never_modified (test_windows_keyproof_core.KeyproofTests.test_existing_output_is_never_modified) ... ok
+test_full_page_authentication (test_windows_keyproof_core.KeyproofTests.test_full_page_authentication) ... ok
+test_marker_straddles_chunk_boundary (test_windows_keyproof_core.KeyproofTests.test_marker_straddles_chunk_boundary) ... ok
+test_no_marker_no_candidates (test_windows_keyproof_core.KeyproofTests.test_no_marker_no_candidates) ... ok
+test_pair_straddles_chunk_boundary (test_windows_keyproof_core.KeyproofTests.test_pair_straddles_chunk_boundary) ... ok
+test_partial_reads_do_not_join_unread_gap (test_windows_keyproof_core.KeyproofTests.test_partial_reads_do_not_join_unread_gap) ... ok
+test_report_contains_no_candidates_or_memory_addresses (test_windows_keyproof_core.KeyproofTests.test_report_contains_no_candidates_or_memory_addresses) ... ok
+test_time_budget (test_windows_keyproof_core.KeyproofTests.test_time_budget) ... ok
+test_exact_current_user_acl_protected_one_ace_only (test_windows_keyproof_platform.PlatformTests.test_exact_current_user_acl_protected_one_ace_only) ... ok
+test_import_struct_layout_and_native_signatures (test_windows_keyproof_platform.PlatformTests.test_import_struct_layout_and_native_signatures) ... ok
+test_page_only_4096_shared_read_final_path_and_pin (test_windows_keyproof_platform.PlatformTests.test_page_only_4096_shared_read_final_path_and_pin) ... ok
+test_paths_reject_network_reparse_removable_and_require_dir (test_windows_keyproof_platform.PlatformTests.test_paths_reject_network_reparse_removable_and_require_dir) ... ok
+test_pid_reuse_path_and_architecture_rejected_and_closed (test_windows_keyproof_platform.PlatformTests.test_pid_reuse_path_and_architecture_rejected_and_closed) ... ok
+test_private_write_checks_acl_before_any_bytes_no_overwrite (test_windows_keyproof_platform.PlatformTests.test_private_write_checks_acl_before_any_bytes_no_overwrite) ... ok
+test_process_access_identity_and_same_handle (test_windows_keyproof_platform.PlatformTests.test_process_access_identity_and_same_handle) ... ok
+test_read_limit_guard_and_partial_are_gaps (test_windows_keyproof_platform.PlatformTests.test_read_limit_guard_and_partial_are_gaps) ... ok
+test_region_filter_private_image_guard_and_sparse_limit (test_windows_keyproof_platform.PlatformTests.test_region_filter_private_image_guard_and_sparse_limit) ... ok
+
+----------------------------------------------------------------------
+Ran 23 tests in 0.208s
+
+OK

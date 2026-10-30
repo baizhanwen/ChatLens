@@ -1,0 +1,45 @@
+{
+  "recorded_at_utc": "2026-10-29T05:49:28.187916+00:00",
+  "scope": "static_source_archive_and_explicit_synthetic_tests_only",
+  "package": "artifacts/deliverables/windows-check/ChatLens-Windows-KeyProof-20261029.zip",
+  "sha256": "01316297161c51517cdffbe7b777d7deee646b6131c75043ded99e8297b882a4",
+  "bytes": 13459576,
+  "files": 46,
+  "checks": {
+    "explicit_payload_allowlist": "通过",
+    "zip_crc": "通过",
+    "manifest_hashes_and_sizes": "通过",
+    "sources_match": "通过",
+    "runtime_matches_official_archive_except_documented_pth": "通过",
+    "powershell_bom_crlf": "通过",
+    "cmd_ascii_crlf": "通过",
+    "private_material_pattern_scan": "通过",
+    "upstream_license_inclusion": "通过",
+    "two_independent_static_reviews": "通过"
+  },
+  "synthetic_tests": {
+    "status": "通过",
+    "count": 23,
+    "includes_independently_created_sqlcipher4_fixture": true,
+    "actual_windows_api_execution": false
+  },
+  "runtime": {
+    "version": "3.15.2",
+    "architecture": "x64",
+    "source": "https://www.python.org/ftp/python/3.15.2/python-3.15.2-embed-amd64.zip",
+    "upstream_sha256": "d012f3aa29cf07436dae8aea1fec0fd195c2612a0b059b1f915ae0afb9ad1f62",
+    "verification": "official_release_sha256_matches_download; signature_trust_chain_not_verified",
+    "pth_modification": "Add .. for package-local modules; site remains disabled"
+  },
+  "powershell_parser_execution": "未验证",
+  "windows_portable_runtime_execution": "未验证",
+  "windows_key_authentication": "未验证",
+  "windows_background_chat_reading": "未验证",
+  "privacy_scope": "Selected process memory may include chat bytes; only key structures are interpreted. No memory dump or decrypted page is saved. Authenticated key is private to the local Windows user.",
+  "limits": {
+    "scan_seconds": 90,
+    "total_memory_request_bytes": 2147483648,
+    "single_read_bytes": 1048576
+  },
+  "known_compatibility_limit": "Object layout is derived from 4.1.11; 4.1.15.56 still needs real-device validation."
+}

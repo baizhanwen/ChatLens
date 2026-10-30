@@ -1,0 +1,38 @@
+{
+  "recorded_at": "2026-10-26T09:14:43.114964+00:00",
+  "system": "macOS-27.0-arm64-arm-64bit",
+  "machine": "arm64",
+  "python": "3.9.6",
+  "probe_kind": "read-only metadata, no original text",
+  "clients": [
+    {
+      "accessibility_trusted": false,
+      "ax_error": -25211,
+      "bundle_id": "com.tencent.xinWeChat",
+      "capture_mode": "accessibility_visible",
+      "frontmost": false,
+      "hidden": false,
+      "onscreen_windows": [
+        {
+          "alpha": 1,
+          "bounds": {
+            "Height": 628,
+            "Width": 1214,
+            "X": 132,
+            "Y": 227
+          },
+          "window_id": 5106
+        }
+      ],
+      "os": "macOS",
+      "platform": "wechat",
+      "running": true,
+      "scope": "selected visible window only; no history or background guarantee",
+      "screen_capture_permission": true,
+      "screen_locked": false,
+      "version": "4.1.11",
+      "window_count": 0,
+      "windows": []
+    }
+  ]
+}

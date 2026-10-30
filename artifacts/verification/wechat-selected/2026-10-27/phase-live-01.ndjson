@@ -1,0 +1,6 @@
+{"event": "ready", "phase": "live", "resumed": false, "restored_observations": 0, "stop_after_total": 4, "baseline_completed_at": "2026-10-27T02:47:02.077961+00:00"}
+{"event": "controlled_message_observed", "alias": "private_test", "token_index": 1, "body_exact_match": true, "expected_sender_match": true, "background_confirmed": true}
+{"event": "controlled_message_observed", "alias": "group_test", "token_index": 1, "body_exact_match": true, "expected_sender_match": true, "background_confirmed": true}
+{"event": "controlled_message_observed", "alias": "private_test", "token_index": 2, "body_exact_match": true, "expected_sender_match": true, "background_confirmed": true}
+{"event": "controlled_message_observed", "alias": "group_test", "token_index": 2, "body_exact_match": true, "expected_sender_match": true, "background_confirmed": true}
+{"event": "complete", "phase": "live", "status": "通过", "reason": "phase_controlled_samples_verified", "new_observation_count": 4, "restored_observations": 0}

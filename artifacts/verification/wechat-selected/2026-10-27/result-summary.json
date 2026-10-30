@@ -1,0 +1,50 @@
+{
+  "status": "通过",
+  "scope": "two_user_selected_conversations_six_controlled_incoming_texts",
+  "live_samples": 4,
+  "restored_prior_samples": 4,
+  "paused_samples_caught_up": 2,
+  "total_samples": 6,
+  "unique_source_messages": 6,
+  "all_body_exact": true,
+  "all_expected_sender_match": true,
+  "all_background_before_and_after": true,
+  "each_expected_token_once": true,
+  "replayed_committed_events": 0,
+  "paused_source_timestamps_within_stopped_window": [
+    true,
+    true
+  ],
+  "source_timestamp_precision_seconds": 1,
+  "phase_plans_verified": true,
+  "client_versions": [
+    "4.1.11"
+  ],
+  "main_wechat_process_count": 1,
+  "original_signature_verifies": true,
+  "original_executable_unchanged": true,
+  "collector_stopped_and_checkpoint_lock_released": true,
+  "routes": [
+    {
+      "alias": "private_test",
+      "counts": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "alias": "group_test",
+      "counts": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "strict_end_to_end_latency_ms": null,
+  "windows_status": "未验证",
+  "minimized_status": "未验证",
+  "hundred_message_status": "未验证",
+  "long_running_status": "未验证"
+}

@@ -1,0 +1,21 @@
+{"event": "test_copy_launched", "pid": 16117, "expected_databases": 1, "database_scope": "contact_metadata_only", "breakpoint_locations": 1, "launch_flags": 134}
+{"event": "test_copy_stopped", "stop_reason_codes": [5], "breakpoint_locations": 1}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "test_copy_stopped", "stop_reason_codes": [3], "breakpoint_locations": 1}
+{"event": "validated_database_keys", "count": 1, "expected": 1, "database_scope": "contact_metadata_only"}
+{"event": "capture_finished", "validated_message_databases": 1, "expected": 1, "observed_derivations": 1}
+{"event": "original_launch_requested", "pid": 16425, "original_signature_unchanged": true, "original_executable_unchanged": true}

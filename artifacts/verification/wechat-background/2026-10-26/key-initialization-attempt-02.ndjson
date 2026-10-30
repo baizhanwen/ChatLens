@@ -1,0 +1,13 @@
+{"event": "test_copy_launched", "pid": 99101, "expected_message_databases": 3, "breakpoint_locations": 1, "launch_flags": 134}
+{"event": "test_copy_stopped", "stop_reason_codes": [5], "breakpoint_locations": 1}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "waiting_for_local_login", "validated_message_databases": 0, "observed_derivations": 0}
+{"event": "test_copy_stopped", "stop_reason_codes": [3], "breakpoint_locations": 1}
+{"event": "validated_message_keys", "count": 1, "expected": 3}
+{"event": "validated_message_keys", "count": 2, "expected": 3}
+{"event": "validated_message_keys", "count": 3, "expected": 3}
+{"event": "capture_finished", "validated_message_databases": 3, "expected": 3, "observed_derivations": 32}
+{"event": "original_launch_requested", "pid": 99213, "original_signature_unchanged": true, "original_executable_unchanged": true}

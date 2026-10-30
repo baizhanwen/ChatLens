@@ -1,0 +1,57 @@
+{
+  "recorded_at": "2026-10-26T17:14:43.114976+08:00",
+  "system": "macOS-27.0-arm64-arm-64bit",
+  "architecture": "arm64",
+  "probe_kind": "read_only_metadata_and_16_byte_file_headers",
+  "scope": "prerequisites_only_no_chat_query_no_key_extraction",
+  "host_apps": [
+    "Python.app",
+    "CodexCLI.app",
+    "ChatGPT.app"
+  ],
+  "running_clients": [
+    {
+      "version": "4.1.11",
+      "build": "269136",
+      "bundle_id": "com.tencent.xinWeChat",
+      "signature": [
+        "Authority=Apple Mac OS Application Signing",
+        "Authority=Apple Worldwide Developer Relations Certification Authority",
+        "Authority=Apple Root CA",
+        "TeamIdentifier=5A4RE8SF68"
+      ],
+      "pid": 72527,
+      "location": "desktop_copy"
+    }
+  ],
+  "storage": {
+    "root_exists": true,
+    "account_count": 0,
+    "database_count": 0,
+    "wal_count": 0,
+    "plaintext_sqlite_headers": 0,
+    "other_headers": 0,
+    "unreadable_files": 0,
+    "directory_access": "失败",
+    "error_code": "macos_privacy_access_denied"
+  },
+  "real_messages_read": 0,
+  "background_reading": "未验证",
+  "windows_reading": "未验证",
+  "missed_messages": null,
+  "duplicate_messages": null,
+  "latency_ms": null,
+  "applications_copy": {
+    "version": "4.1.13",
+    "build": "269602",
+    "bundle_id": "com.tencent.xinWeChat",
+    "signature": [
+      "Authority=Apple Mac OS Application Signing",
+      "Authority=Apple Worldwide Developer Relations Certification Authority",
+      "Authority=Apple Root CA",
+      "TeamIdentifier=5A4RE8SF68"
+    ]
+  },
+  "preflight_status": "待外部条件",
+  "note": "File-header access is not database decryption or background message verification."
+}

@@ -1,0 +1,3032 @@
+{
+  "dataset_version": "v1",
+  "synthetic": true,
+  "privacy": "entirely fictional",
+  "annotation_origin": "construction-authored expected labels before evaluator execution; not user annotations or blind real-world validation",
+  "samples": [
+    {
+      "id": "group-01",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-01",
+          "sender_id": "context",
+          "source_id": "group-01-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-01",
+          "sender_id": "speaker",
+          "source_id": "group-01-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "请明天提交活动预算表。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-01",
+          "sender_id": "listener",
+          "source_id": "group-01-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "group-01-1",
+          "owner": null,
+          "due_at": "2026-10-27"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-02",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-02",
+          "sender_id": "context",
+          "source_id": "group-02-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-02",
+          "sender_id": "speaker",
+          "source_id": "group-02-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "@小林 请后天完成展板文案。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-02",
+          "sender_id": "listener",
+          "source_id": "group-02-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "group-02-1",
+          "owner": "小林",
+          "due_at": "2026-10-28"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-03",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-03",
+          "sender_id": "context",
+          "source_id": "group-03-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-03",
+          "sender_id": "speaker",
+          "source_id": "group-03-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我会今天下午3点发送报名名单。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-03",
+          "sender_id": "listener",
+          "source_id": "group-03-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "group-03-1",
+          "owner": "speaker",
+          "due_at": "2026-10-26T15:00:00+08:00"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-04",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-04",
+          "sender_id": "context",
+          "source_id": "group-04-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-04",
+          "sender_id": "speaker",
+          "source_id": "group-04-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我们需要整理本周的签到记录。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-04",
+          "sender_id": "listener",
+          "source_id": "group-04-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "group-04-1",
+          "owner": null,
+          "due_at": null
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-05",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-05",
+          "sender_id": "context",
+          "source_id": "group-05-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-05",
+          "sender_id": "speaker",
+          "source_id": "group-05-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "请在11月2日提供志愿者名单。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-05",
+          "sender_id": "listener",
+          "source_id": "group-05-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "group-05-1",
+          "owner": null,
+          "due_at": "2026-11-02"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-06",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-06",
+          "sender_id": "context",
+          "source_id": "group-06-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-06",
+          "sender_id": "speaker",
+          "source_id": "group-06-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "@小周 请下周一更新排班。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-06",
+          "sender_id": "listener",
+          "source_id": "group-06-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "group-06-1",
+          "owner": "小周",
+          "due_at": "2026-11-02"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-07",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-07",
+          "sender_id": "context",
+          "source_id": "group-07-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-07",
+          "sender_id": "speaker",
+          "source_id": "group-07-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我负责准备开场演示。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-07",
+          "sender_id": "listener",
+          "source_id": "group-07-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "group-07-1",
+          "owner": "speaker",
+          "due_at": null
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-08",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-08",
+          "sender_id": "context",
+          "source_id": "group-08-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-08",
+          "sender_id": "speaker",
+          "source_id": "group-08-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "明天请给大家发会议链接。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-08",
+          "sender_id": "listener",
+          "source_id": "group-08-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "group-08-1",
+          "owner": null,
+          "due_at": "2026-10-27"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-09",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-09",
+          "sender_id": "context",
+          "source_id": "group-09-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-09",
+          "sender_id": "speaker",
+          "source_id": "group-09-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "张工，请在明天下午4点前提交修改版。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-09",
+          "sender_id": "listener",
+          "source_id": "group-09-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "group-09-1",
+          "owner": "张工",
+          "due_at": "2026-10-27T16:00:00+08:00"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-10",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-10",
+          "sender_id": "context",
+          "source_id": "group-10-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-10",
+          "sender_id": "speaker",
+          "source_id": "group-10-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "场地已经确认，请明天发送海报。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-10",
+          "sender_id": "listener",
+          "source_id": "group-10-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "group-10-1",
+          "owner": null,
+          "due_at": "2026-10-27"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-11",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-11",
+          "sender_id": "context",
+          "source_id": "group-11-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-11",
+          "sender_id": "speaker",
+          "source_id": "group-11-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "请不要忘了明天提交授权书。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-11",
+          "sender_id": "listener",
+          "source_id": "group-11-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "group-11-1",
+          "owner": null,
+          "due_at": "2026-10-27"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-12",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-12",
+          "sender_id": "context",
+          "source_id": "group-12-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-12",
+          "sender_id": "speaker",
+          "source_id": "group-12-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "请大后天上午9点准备会议室。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-12",
+          "sender_id": "listener",
+          "source_id": "group-12-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "group-12-1",
+          "owner": null,
+          "due_at": "2026-10-29T09:00:00+08:00"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-13",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-13",
+          "sender_id": "context",
+          "source_id": "group-13-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-13",
+          "sender_id": "speaker",
+          "source_id": "group-13-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "如果校方同意，请明天提交方案。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-13",
+          "sender_id": "listener",
+          "source_id": "group-13-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-14",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-14",
+          "sender_id": "context",
+          "source_id": "group-14-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-14",
+          "sender_id": "speaker",
+          "source_id": "group-14-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "昨天已经提交活动预算表。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-14",
+          "sender_id": "listener",
+          "source_id": "group-14-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-15",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-15",
+          "sender_id": "context",
+          "source_id": "group-15-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-15",
+          "sender_id": "speaker",
+          "source_id": "group-15-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "要不要明天发通知？",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-15",
+          "sender_id": "listener",
+          "source_id": "group-15-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-16",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-16",
+          "sender_id": "context",
+          "source_id": "group-16-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-16",
+          "sender_id": "speaker",
+          "source_id": "group-16-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "明天提交吗？我只是问一下安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-16",
+          "sender_id": "listener",
+          "source_id": "group-16-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-17",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-17",
+          "sender_id": "context",
+          "source_id": "group-17-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-17",
+          "sender_id": "speaker",
+          "source_id": "group-17-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "不用准备纸质版。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-17",
+          "sender_id": "listener",
+          "source_id": "group-17-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-18",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-18",
+          "sender_id": "context",
+          "source_id": "group-18-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-18",
+          "sender_id": "speaker",
+          "source_id": "group-18-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我建议下周一联系后勤。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-18",
+          "sender_id": "listener",
+          "source_id": "group-18-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-19",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-19",
+          "sender_id": "context",
+          "source_id": "group-19-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-19",
+          "sender_id": "speaker",
+          "source_id": "group-19-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "这次活动的签到人数是42。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-19",
+          "sender_id": "listener",
+          "source_id": "group-19-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "group-20",
+      "category": "group",
+      "messages": [
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-20",
+          "sender_id": "context",
+          "source_id": "group-20-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "校园活动小组正在讨论协作安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-20",
+          "sender_id": "speaker",
+          "source_id": "group-20-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "请参考上周的文件，这句话没有新的执行任务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        },
+        {
+          "platform": "qq",
+          "account_id": "fictional-quality",
+          "conversation_id": "group-20",
+          "sender_id": "listener",
+          "source_id": "group-20-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "group"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-01",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-01",
+          "sender_id": "context",
+          "source_id": "customer-01-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-01",
+          "sender_id": "speaker",
+          "source_id": "customer-01-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "请明天提供企业版报价。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-01",
+          "sender_id": "listener",
+          "source_id": "customer-01-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "customer-01-1",
+          "owner": null,
+          "due_at": "2026-10-27"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-02",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-02",
+          "sender_id": "context",
+          "source_id": "customer-02-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-02",
+          "sender_id": "speaker",
+          "source_id": "customer-02-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我会后天确认合同条款。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-02",
+          "sender_id": "listener",
+          "source_id": "customer-02-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "customer-02-1",
+          "owner": "speaker",
+          "due_at": "2026-10-28"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-03",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-03",
+          "sender_id": "context",
+          "source_id": "customer-03-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-03",
+          "sender_id": "speaker",
+          "source_id": "customer-03-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "@商务 请今天发送含税报价单。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-03",
+          "sender_id": "listener",
+          "source_id": "customer-03-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "customer-03-1",
+          "owner": "商务",
+          "due_at": "2026-10-26"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-04",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-04",
+          "sender_id": "context",
+          "source_id": "customer-04-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-04",
+          "sender_id": "speaker",
+          "source_id": "customer-04-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "请在2026-11-03之前回复是否能交付。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-04",
+          "sender_id": "listener",
+          "source_id": "customer-04-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "customer-04-1",
+          "owner": null,
+          "due_at": "2026-11-03"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-05",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-05",
+          "sender_id": "context",
+          "source_id": "customer-05-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-05",
+          "sender_id": "speaker",
+          "source_id": "customer-05-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我们需要整理客户反馈。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-05",
+          "sender_id": "listener",
+          "source_id": "customer-05-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "customer-05-1",
+          "owner": null,
+          "due_at": null
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-06",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-06",
+          "sender_id": "context",
+          "source_id": "customer-06-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-06",
+          "sender_id": "speaker",
+          "source_id": "customer-06-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我负责联系财务核对发票。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-06",
+          "sender_id": "listener",
+          "source_id": "customer-06-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "customer-06-1",
+          "owner": "speaker",
+          "due_at": null
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-07",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-07",
+          "sender_id": "context",
+          "source_id": "customer-07-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-07",
+          "sender_id": "speaker",
+          "source_id": "customer-07-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "请下周二准备演示环境。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-07",
+          "sender_id": "listener",
+          "source_id": "customer-07-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "customer-07-1",
+          "owner": null,
+          "due_at": "2026-11-03"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-08",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-08",
+          "sender_id": "context",
+          "source_id": "customer-08-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-08",
+          "sender_id": "speaker",
+          "source_id": "customer-08-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "客户王经理负责明天提供样品。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-08",
+          "sender_id": "listener",
+          "source_id": "customer-08-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "customer-08-1",
+          "owner": "王经理",
+          "due_at": "2026-10-27"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-09",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-09",
+          "sender_id": "context",
+          "source_id": "customer-09-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-09",
+          "sender_id": "speaker",
+          "source_id": "customer-09-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "预算已确认，请明天下午2点发送合同。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-09",
+          "sender_id": "listener",
+          "source_id": "customer-09-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "customer-09-1",
+          "owner": null,
+          "due_at": "2026-10-27T14:00:00+08:00"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-10",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-10",
+          "sender_id": "context",
+          "source_id": "customer-10-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-10",
+          "sender_id": "speaker",
+          "source_id": "customer-10-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "请把最终清单发给我。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-10",
+          "sender_id": "listener",
+          "source_id": "customer-10-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "customer-10-1",
+          "owner": null,
+          "due_at": null
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-11",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-11",
+          "sender_id": "context",
+          "source_id": "customer-11-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-11",
+          "sender_id": "speaker",
+          "source_id": "customer-11-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "预算大约两万元，具体还没定。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-11",
+          "sender_id": "listener",
+          "source_id": "customer-11-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-12",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-12",
+          "sender_id": "context",
+          "source_id": "customer-12-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-12",
+          "sender_id": "speaker",
+          "source_id": "customer-12-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "如果能优惠，我们明天再确认订单。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-12",
+          "sender_id": "listener",
+          "source_id": "customer-12-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-13",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-13",
+          "sender_id": "context",
+          "source_id": "customer-13-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-13",
+          "sender_id": "speaker",
+          "source_id": "customer-13-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "这套报价太贵，我担心后续维护成本。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-13",
+          "sender_id": "listener",
+          "source_id": "customer-13-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-14",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-14",
+          "sender_id": "context",
+          "source_id": "customer-14-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-14",
+          "sender_id": "speaker",
+          "source_id": "customer-14-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我已经发送报价了。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-14",
+          "sender_id": "listener",
+          "source_id": "customer-14-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-15",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-15",
+          "sender_id": "context",
+          "source_id": "customer-15-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-15",
+          "sender_id": "speaker",
+          "source_id": "customer-15-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "是否需要我明天联系您？",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-15",
+          "sender_id": "listener",
+          "source_id": "customer-15-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-16",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-16",
+          "sender_id": "context",
+          "source_id": "customer-16-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-16",
+          "sender_id": "speaker",
+          "source_id": "customer-16-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "明天发报价？这不是确定承诺。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-16",
+          "sender_id": "listener",
+          "source_id": "customer-16-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-17",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-17",
+          "sender_id": "context",
+          "source_id": "customer-17-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-17",
+          "sender_id": "speaker",
+          "source_id": "customer-17-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "可能下周一准备试点，等董事会决定。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-17",
+          "sender_id": "listener",
+          "source_id": "customer-17-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-18",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-18",
+          "sender_id": "context",
+          "source_id": "customer-18-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-18",
+          "sender_id": "speaker",
+          "source_id": "customer-18-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我有兴趣了解高级版。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-18",
+          "sender_id": "listener",
+          "source_id": "customer-18-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-19",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-19",
+          "sender_id": "context",
+          "source_id": "customer-19-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-19",
+          "sender_id": "speaker",
+          "source_id": "customer-19-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "这个功能在上周已经完成。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-19",
+          "sender_id": "listener",
+          "source_id": "customer-19-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "customer-20",
+      "category": "customer",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-20",
+          "sender_id": "context",
+          "source_id": "customer-20-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "双方正在沟通一项虚构软件服务。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-20",
+          "sender_id": "speaker",
+          "source_id": "customer-20-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "先别发合同，价格还要讨论。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "customer-20",
+          "sender_id": "listener",
+          "source_id": "customer-20-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-01",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-01",
+          "sender_id": "context",
+          "source_id": "direct-01-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-01",
+          "sender_id": "speaker",
+          "source_id": "direct-01-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我会明天提交实习申请。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-01",
+          "sender_id": "listener",
+          "source_id": "direct-01-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "direct-01-1",
+          "owner": "speaker",
+          "due_at": "2026-10-27"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-02",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-02",
+          "sender_id": "context",
+          "source_id": "direct-02-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-02",
+          "sender_id": "speaker",
+          "source_id": "direct-02-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "请今天晚上8点回复聚会人数。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-02",
+          "sender_id": "listener",
+          "source_id": "direct-02-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "direct-02-1",
+          "owner": null,
+          "due_at": "2026-10-26T20:00:00+08:00"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-03",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-03",
+          "sender_id": "context",
+          "source_id": "direct-03-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-03",
+          "sender_id": "speaker",
+          "source_id": "direct-03-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "@小陈 请后天提供课程笔记。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-03",
+          "sender_id": "listener",
+          "source_id": "direct-03-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "direct-03-1",
+          "owner": "小陈",
+          "due_at": "2026-10-28"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-04",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-04",
+          "sender_id": "context",
+          "source_id": "direct-04-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-04",
+          "sender_id": "speaker",
+          "source_id": "direct-04-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我来整理共享文件。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-04",
+          "sender_id": "listener",
+          "source_id": "direct-04-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "direct-04-1",
+          "owner": "speaker",
+          "due_at": null
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-05",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-05",
+          "sender_id": "context",
+          "source_id": "direct-05-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-05",
+          "sender_id": "speaker",
+          "source_id": "direct-05-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "明天下午请帮我发车票截图。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-05",
+          "sender_id": "listener",
+          "source_id": "direct-05-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "direct-05-1",
+          "owner": null,
+          "due_at": "2026-10-27"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-06",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-06",
+          "sender_id": "context",
+          "source_id": "direct-06-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-06",
+          "sender_id": "speaker",
+          "source_id": "direct-06-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "请11月5日确认订票结果。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-06",
+          "sender_id": "listener",
+          "source_id": "direct-06-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "direct-06-1",
+          "owner": null,
+          "due_at": "2026-11-05"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-07",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-07",
+          "sender_id": "context",
+          "source_id": "direct-07-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-07",
+          "sender_id": "speaker",
+          "source_id": "direct-07-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我们将准备这次汇报。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-07",
+          "sender_id": "listener",
+          "source_id": "direct-07-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "direct-07-1",
+          "owner": null,
+          "due_at": null
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-08",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-08",
+          "sender_id": "context",
+          "source_id": "direct-08-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-08",
+          "sender_id": "speaker",
+          "source_id": "direct-08-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "记得把书带来。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-08",
+          "sender_id": "listener",
+          "source_id": "direct-08-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "direct-08-1",
+          "owner": null,
+          "due_at": null
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-09",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-09",
+          "sender_id": "context",
+          "source_id": "direct-09-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-09",
+          "sender_id": "speaker",
+          "source_id": "direct-09-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "请别忘记后天给我回复。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-09",
+          "sender_id": "listener",
+          "source_id": "direct-09-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "direct-09-1",
+          "owner": null,
+          "due_at": "2026-10-28"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-10",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-10",
+          "sender_id": "context",
+          "source_id": "direct-10-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-10",
+          "sender_id": "speaker",
+          "source_id": "direct-10-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我会在明天提交报告，但今天已经整理完资料。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-10",
+          "sender_id": "listener",
+          "source_id": "direct-10-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "direct-10-1",
+          "owner": "speaker",
+          "due_at": "2026-10-27"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-11",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-11",
+          "sender_id": "context",
+          "source_id": "direct-11-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-11",
+          "sender_id": "speaker",
+          "source_id": "direct-11-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "小许，明天请提供收货地址。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-11",
+          "sender_id": "listener",
+          "source_id": "direct-11-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "direct-11-1",
+          "owner": "小许",
+          "due_at": "2026-10-27"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-12",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-12",
+          "sender_id": "context",
+          "source_id": "direct-12-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-12",
+          "sender_id": "speaker",
+          "source_id": "direct-12-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "请今晚完成预约。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-12",
+          "sender_id": "listener",
+          "source_id": "direct-12-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [
+        {
+          "source_id": "direct-12-1",
+          "owner": null,
+          "due_at": "2026-10-26"
+        }
+      ],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-13",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-13",
+          "sender_id": "context",
+          "source_id": "direct-13-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-13",
+          "sender_id": "speaker",
+          "source_id": "direct-13-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "我已经准备好行李。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-13",
+          "sender_id": "listener",
+          "source_id": "direct-13-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-14",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-14",
+          "sender_id": "context",
+          "source_id": "direct-14-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-14",
+          "sender_id": "speaker",
+          "source_id": "direct-14-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "不必明天回复，等确定后再说。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-14",
+          "sender_id": "listener",
+          "source_id": "direct-14-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-15",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-15",
+          "sender_id": "context",
+          "source_id": "direct-15-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-15",
+          "sender_id": "speaker",
+          "source_id": "direct-15-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "假如天气好，我会明天联系你。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-15",
+          "sender_id": "listener",
+          "source_id": "direct-15-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-16",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-16",
+          "sender_id": "context",
+          "source_id": "direct-16-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-16",
+          "sender_id": "speaker",
+          "source_id": "direct-16-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "明天发给你可以吗？尚未确认。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-16",
+          "sender_id": "listener",
+          "source_id": "direct-16-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-17",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-17",
+          "sender_id": "context",
+          "source_id": "direct-17-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-17",
+          "sender_id": "speaker",
+          "source_id": "direct-17-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "建议我们下周一整理相册。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-17",
+          "sender_id": "listener",
+          "source_id": "direct-17-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-18",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-18",
+          "sender_id": "context",
+          "source_id": "direct-18-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-18",
+          "sender_id": "speaker",
+          "source_id": "direct-18-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "周末一起喝咖啡怎么样？",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-18",
+          "sender_id": "listener",
+          "source_id": "direct-18-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-19",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-19",
+          "sender_id": "context",
+          "source_id": "direct-19-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-19",
+          "sender_id": "speaker",
+          "source_id": "direct-19-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "这份截图是昨天发的。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-19",
+          "sender_id": "listener",
+          "source_id": "direct-19-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    },
+    {
+      "id": "direct-20",
+      "category": "direct",
+      "messages": [
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-20",
+          "sender_id": "context",
+          "source_id": "direct-20-0",
+          "sent_at": "2026-10-26T10:00:00+08:00",
+          "type": "text",
+          "content": "两位同学正在沟通日常安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-20",
+          "sender_id": "speaker",
+          "source_id": "direct-20-1",
+          "sent_at": "2026-10-26T10:01:00+08:00",
+          "type": "text",
+          "content": "取消明天的提交安排。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        },
+        {
+          "platform": "wechat",
+          "account_id": "fictional-quality",
+          "conversation_id": "direct-20",
+          "sender_id": "listener",
+          "source_id": "direct-20-2",
+          "sent_at": "2026-10-26T10:02:00+08:00",
+          "type": "text",
+          "content": "收到这条信息，我先核对上下文。",
+          "capture_mode": "import",
+          "demo": true,
+          "conversation_type": "direct"
+        }
+      ],
+      "expected_todos": [],
+      "annotation_method": "explicit definite future action only; conditional/proposed/question/completed statements excluded; owner/date only when explicit"
+    }
+  ]
+}

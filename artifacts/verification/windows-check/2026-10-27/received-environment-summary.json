@@ -1,0 +1,61 @@
+{
+  "source_kind": "user_returned_windows_environment_report",
+  "source_sha256": "e0b13e563c9c9e8300dbb2519b1a10b6785a86f4cab9e4ea202f5f28e8fc6039",
+  "recorded_at_utc": "2026-10-27T03:36:55.8118318Z",
+  "environment_status": "通过",
+  "scope": "environment_metadata_only",
+  "os": {
+    "caption": "Microsoft Windows 11 家庭版 中文版",
+    "version": "10.0.26200",
+    "build": "26200",
+    "native_architecture": "x64",
+    "process_architecture": "x64",
+    "is_64bit_os": true,
+    "is_64bit_process": true
+  },
+  "powershell": {
+    "version": "5.1.26100.9444",
+    "edition": "Desktop"
+  },
+  "administrator": false,
+  "matching_wechat_process_count": 5,
+  "processes": [
+    {
+      "name": "Weixin",
+      "pid": 264296,
+      "product_version": "4.1.15.56",
+      "version_status": "通过"
+    },
+    {
+      "name": "Weixin",
+      "pid": 280476,
+      "product_version": "4.1.15.56",
+      "version_status": "通过"
+    },
+    {
+      "name": "Weixin",
+      "pid": 286212,
+      "product_version": "4.1.15.56",
+      "version_status": "通过"
+    },
+    {
+      "name": "Weixin",
+      "pid": 290224,
+      "product_version": "4.1.15.56",
+      "version_status": "通过"
+    },
+    {
+      "name": "Weixin",
+      "pid": 293924,
+      "product_version": "4.1.15.56",
+      "version_status": "通过"
+    }
+  ],
+  "process_roles_verified": false,
+  "logged_in_account_count": null,
+  "python_runtime_status": "未验证",
+  "data_directory_status": "未验证",
+  "business_read_status": "未验证",
+  "chat_messages_read": 0,
+  "errors": []
+}

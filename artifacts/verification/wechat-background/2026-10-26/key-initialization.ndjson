@@ -1,0 +1,3 @@
+{"event": "test_copy_launched", "pid": 98670, "expected_message_databases": 3}
+{"event": "capture_finished", "validated_message_databases": 0, "expected": 3}
+{"event": "original_launch_requested", "pid": 98694, "original_signature_unchanged": true, "original_executable_unchanged": true}

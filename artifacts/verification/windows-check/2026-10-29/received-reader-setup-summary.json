@@ -1,0 +1,58 @@
+{
+  "recorded_at_utc": "2026-10-29T05:26:12.6681332Z",
+  "scope": "received_windows_reader_setup_metadata",
+  "status": "通过",
+  "business_read_status": "未验证",
+  "chat_messages_read": 0,
+  "os": {
+    "version": "10.0.26200",
+    "build": "26200",
+    "native_architecture": "x64",
+    "process_architecture": "x64"
+  },
+  "powershell": {
+    "version": "5.1.26100.9444",
+    "edition": "Desktop"
+  },
+  "process_candidate_count": 5,
+  "selected_process": {
+    "candidate_kind": "main_with_window_candidate",
+    "has_main_window_handle": true,
+    "is_minimized": false,
+    "product_version": "4.1.15.56",
+    "exe_architecture": "x64",
+    "query_vm_read_access": true,
+    "open_process_win32_error": 0
+  },
+  "account_count_status": "未验证",
+  "process_selection_status": "通过",
+  "db_storage_selection_status": "通过",
+  "database_metadata": {
+    "message_db_count": 2,
+    "wal_count": 2,
+    "contact_db_exists": true
+  },
+  "python_selection_status": "未验证",
+  "python_metadata": {
+    "file_version": null,
+    "architecture": "unknown",
+    "executable_started": false,
+    "signature_verified": false
+  },
+  "private_config_saved": true,
+  "private_acl_verified": true,
+  "operations": {
+    "process_memory_read": false,
+    "keys_read": false,
+    "database_headers_read": false,
+    "network_requested": false,
+    "installed_dependencies": false,
+    "privileges_elevated": false,
+    "processes_changed": false
+  },
+  "error_count": 0,
+  "limitations": [
+    "Process access is not memory key acquisition, database decryption or background text reading.",
+    "No logged-in account count is inferred from process count."
+  ]
+}

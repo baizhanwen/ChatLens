@@ -1,0 +1,13 @@
+{
+  "temporary_app_copy_removed": true,
+  "private_key_file_mode": "0o600",
+  "private_directory_mode": "0o700",
+  "watcher_finished": true,
+  "pre_watch_hidden": false,
+  "raw_chat_export_created": false,
+  "cloud_model_calls": 0,
+  "agent_sent_wechat_messages": 0,
+  "post_test_client_running": true,
+  "post_test_hidden": false,
+  "post_test_version": "4.1.11"
+}

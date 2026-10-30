@@ -1,0 +1,492 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-10-26T15:39:08.116828+08:00",
+  "release_status": "待四端真实验收，不宣称完整支持",
+  "validation_status_vocabulary": [
+    "未验证",
+    "开发中",
+    "模拟验证通过",
+    "真实验证通过",
+    "受限",
+    "不支持"
+  ],
+  "host": {
+    "system": "macOS-27.0-arm64-arm-64bit",
+    "machine": "arm64",
+    "python": "3.9.6",
+    "hardware": "Apple M1 Pro / 16 GB"
+  },
+  "adapters": [
+    {
+      "id": "macos-wechat",
+      "os": "macOS",
+      "client": "wechat",
+      "client_version": "4.1.11",
+      "verified_at": "2026-10-26T07:16:18.842822+00:00",
+      "status": "受限",
+      "primary_route": "selected_window_screenshot_to_vision_model",
+      "trigger_policy": {
+        "default": "manual/foreground_transition + opt-in local ROI changes + debounce + max_wait + cooldown + hash skip",
+        "periodic_fallback_seconds": 0,
+        "content_change_native_observer": "macOS ScreenCaptureKit local ROI hash opt-in; synthetic AppKit window tested",
+        "scroll_idle_native_observer": "未验证",
+        "watch_changes_default": false,
+        "max_wait_seconds": 5,
+        "vision_crop_default": [
+          0.25,
+          0,
+          0.75,
+          0.85
+        ],
+        "vision_crop_confirmation_required": true
+      },
+      "code_status": "模拟验证通过",
+      "real_client_status": "受限",
+      "real_vision_model_status": "未验证",
+      "reasons": [
+        "AX permission unavailable; auxiliary only",
+        "no visible target windows in read-only probe",
+        "vision model not configured",
+        "no personal screenshot or message ingestion performed per user preference"
+      ],
+      "native_probe": {
+        "accessibility_trusted": false,
+        "ax_error": -25211,
+        "bundle_id": "com.tencent.xinWeChat",
+        "capture_mode": "accessibility_visible",
+        "frontmost": false,
+        "hidden": false,
+        "onscreen_windows": [],
+        "os": "macOS",
+        "platform": "wechat",
+        "running": true,
+        "scope": "selected visible window only; no history or background guarantee",
+        "screen_capture_permission": true,
+        "screen_locked": false,
+        "version": "4.1.11",
+        "window_count": 0,
+        "windows": []
+      },
+      "capabilities": {
+        "history": {
+          "status": "不支持",
+          "reason": "window visibility cannot establish complete history"
+        },
+        "current_conversation": {
+          "status": "受限",
+          "reason": "implementation available; no controlled 100-message VLM validation"
+        },
+        "background": {
+          "status": "不支持",
+          "reason": "foreground-only capture gate"
+        },
+        "multi_conversation": {
+          "status": "不支持",
+          "reason": "one explicit window and expected conversation whitelist per session"
+        },
+        "attachments": {
+          "status": "未验证",
+          "reason": "visible metadata/placeholder only; no full attachment extraction"
+        },
+        "edits": {
+          "status": "不支持",
+          "reason": "no platform-stable message identity"
+        },
+        "recalls": {
+          "status": "不支持",
+          "reason": "no platform-stable message identity"
+        },
+        "ocr": {
+          "status": "未验证",
+          "reason": "optional fallback code; not VLM and not exercised on personal chats"
+        },
+        "accessibility": {
+          "status": "受限",
+          "reason": "AX error -25211"
+        },
+        "voice_transcription": {
+          "status": "不支持",
+          "reason": "not implemented; retain placeholders"
+        },
+        "local_roi_change_monitor": {
+          "status": "真实验证通过",
+          "scope": "macOS synthetic AppKit window only; not WeChat/QQ VLM acceptance",
+          "evidence": [
+            "docs/evidence/native-watch-selftest.ndjson",
+            "docs/evidence/native-watch-pause-selftest.ndjson"
+          ]
+        },
+        "vision_crop": {
+          "status": "真实验证通过",
+          "scope": "synthetic local pixel crop helper only; real client layout requires confirmation",
+          "evidence": [
+            "docs/evidence/native-crop-selftest.json"
+          ]
+        },
+        "native_window_dock": {
+          "status": "受限",
+          "scope": "system-native side-by-side positioning, not embedding",
+          "evidence": [
+            "docs/evidence/macos-dock-preflight-wechat.json"
+          ]
+        },
+        "cloud_vision": {
+          "status": "未验证",
+          "reason": "requires local exact title OCR before upload; no real provider/client acceptance"
+        }
+      },
+      "reproduction": [
+        "python3 scripts/probe_clients.py --platform wechat",
+        "docs/接入验证记录.md"
+      ],
+      "evidence": [
+        "docs/evidence/m0-native-probe.json"
+      ],
+      "controlled_message_count": 0,
+      "miss_rate": null,
+      "duplicate_rate": null,
+      "ocr_error_rate": null
+    },
+    {
+      "id": "macos-qq",
+      "os": "macOS",
+      "client": "qq",
+      "client_version": "7.0.2",
+      "verified_at": "2026-10-26T07:16:18.842822+00:00",
+      "status": "受限",
+      "primary_route": "selected_window_screenshot_to_vision_model",
+      "trigger_policy": {
+        "default": "manual/foreground_transition + opt-in local ROI changes + debounce + max_wait + cooldown + hash skip",
+        "periodic_fallback_seconds": 0,
+        "content_change_native_observer": "macOS ScreenCaptureKit local ROI hash opt-in; synthetic AppKit window tested",
+        "scroll_idle_native_observer": "未验证",
+        "watch_changes_default": false,
+        "max_wait_seconds": 5,
+        "vision_crop_default": [
+          0.25,
+          0,
+          0.75,
+          0.85
+        ],
+        "vision_crop_confirmation_required": true
+      },
+      "code_status": "模拟验证通过",
+      "real_client_status": "受限",
+      "real_vision_model_status": "未验证",
+      "reasons": [
+        "AX permission unavailable; auxiliary only",
+        "no visible target windows in read-only probe",
+        "vision model not configured",
+        "no personal screenshot or message ingestion performed per user preference"
+      ],
+      "native_probe": {
+        "accessibility_trusted": false,
+        "ax_error": -25211,
+        "bundle_id": "com.tencent.qq",
+        "capture_mode": "accessibility_visible",
+        "frontmost": false,
+        "hidden": false,
+        "onscreen_windows": [],
+        "os": "macOS",
+        "platform": "qq",
+        "running": true,
+        "scope": "selected visible window only; no history or background guarantee",
+        "screen_capture_permission": true,
+        "screen_locked": false,
+        "version": "7.0.2",
+        "window_count": 0,
+        "windows": []
+      },
+      "capabilities": {
+        "history": {
+          "status": "不支持",
+          "reason": "window visibility cannot establish complete history"
+        },
+        "current_conversation": {
+          "status": "受限",
+          "reason": "implementation available; no controlled 100-message VLM validation"
+        },
+        "background": {
+          "status": "不支持",
+          "reason": "foreground-only capture gate"
+        },
+        "multi_conversation": {
+          "status": "不支持",
+          "reason": "one explicit window and expected conversation whitelist per session"
+        },
+        "attachments": {
+          "status": "未验证",
+          "reason": "visible metadata/placeholder only; no full attachment extraction"
+        },
+        "edits": {
+          "status": "不支持",
+          "reason": "no platform-stable message identity"
+        },
+        "recalls": {
+          "status": "不支持",
+          "reason": "no platform-stable message identity"
+        },
+        "ocr": {
+          "status": "未验证",
+          "reason": "optional fallback code; not VLM and not exercised on personal chats"
+        },
+        "accessibility": {
+          "status": "受限",
+          "reason": "AX error -25211"
+        },
+        "voice_transcription": {
+          "status": "不支持",
+          "reason": "not implemented; retain placeholders"
+        },
+        "local_roi_change_monitor": {
+          "status": "真实验证通过",
+          "scope": "macOS synthetic AppKit window only; not WeChat/QQ VLM acceptance",
+          "evidence": [
+            "docs/evidence/native-watch-selftest.ndjson",
+            "docs/evidence/native-watch-pause-selftest.ndjson"
+          ]
+        },
+        "vision_crop": {
+          "status": "真实验证通过",
+          "scope": "synthetic local pixel crop helper only; real client layout requires confirmation",
+          "evidence": [
+            "docs/evidence/native-crop-selftest.json"
+          ]
+        },
+        "native_window_dock": {
+          "status": "受限",
+          "scope": "system-native side-by-side positioning, not embedding",
+          "evidence": [
+            "docs/evidence/macos-dock-preflight-qq.json"
+          ]
+        },
+        "cloud_vision": {
+          "status": "未验证",
+          "reason": "requires local exact title OCR before upload; no real provider/client acceptance"
+        }
+      },
+      "reproduction": [
+        "python3 scripts/probe_clients.py --platform qq",
+        "docs/接入验证记录.md"
+      ],
+      "evidence": [
+        "docs/evidence/m0-native-probe.json"
+      ],
+      "controlled_message_count": 0,
+      "miss_rate": null,
+      "duplicate_rate": null,
+      "ocr_error_rate": null
+    },
+    {
+      "id": "windows-wechat",
+      "os": "Windows",
+      "client": "wechat",
+      "client_version": null,
+      "verified_at": null,
+      "status": "未验证",
+      "primary_route": "selected_window_screenshot_to_vision_model",
+      "trigger_policy": {
+        "default": "manual/foreground_transition + opt-in local ROI changes + debounce + max_wait + cooldown + hash skip",
+        "periodic_fallback_seconds": 0,
+        "content_change_native_observer": "不支持：Windows本地变化watcher尚未实现",
+        "scroll_idle_native_observer": "未验证",
+        "watch_changes_default": false,
+        "max_wait_seconds": 5,
+        "vision_crop_default": [
+          0.25,
+          0,
+          0.75,
+          0.85
+        ],
+        "vision_crop_confirmation_required": true
+      },
+      "code_status": "模拟验证通过",
+      "real_client_status": "未验证",
+      "real_vision_model_status": "未验证",
+      "reasons": [
+        "Windows environment unavailable; scripts and interfaces only"
+      ],
+      "native_probe": null,
+      "capabilities": {
+        "history": {
+          "status": "不支持",
+          "reason": "window visibility cannot establish complete history"
+        },
+        "current_conversation": {
+          "status": "未验证",
+          "reason": "implementation available; no controlled 100-message VLM validation"
+        },
+        "background": {
+          "status": "不支持",
+          "reason": "foreground-only capture gate"
+        },
+        "multi_conversation": {
+          "status": "不支持",
+          "reason": "one explicit window and expected conversation whitelist per session"
+        },
+        "attachments": {
+          "status": "未验证",
+          "reason": "visible metadata/placeholder only; no full attachment extraction"
+        },
+        "edits": {
+          "status": "不支持",
+          "reason": "no platform-stable message identity"
+        },
+        "recalls": {
+          "status": "不支持",
+          "reason": "no platform-stable message identity"
+        },
+        "ocr": {
+          "status": "未验证",
+          "reason": "optional fallback code; not VLM and not exercised on personal chats"
+        },
+        "accessibility": {
+          "status": "未验证",
+          "reason": "UIA target not tested"
+        },
+        "voice_transcription": {
+          "status": "不支持",
+          "reason": "not implemented; retain placeholders"
+        },
+        "local_roi_change_monitor": {
+          "status": "不支持",
+          "scope": "Windows interface only; no implementation or real environment",
+          "evidence": []
+        },
+        "vision_crop": {
+          "status": "未验证",
+          "scope": "in-memory crop code only; Windows unavailable",
+          "evidence": []
+        },
+        "native_window_dock": {
+          "status": "未验证",
+          "scope": "system-native side-by-side positioning, not embedding",
+          "evidence": []
+        },
+        "cloud_vision": {
+          "status": "不支持",
+          "reason": "no local title verification implementation"
+        }
+      },
+      "reproduction": [
+        "python3 scripts/probe_clients.py --platform wechat",
+        "docs/接入验证记录.md"
+      ],
+      "evidence": [],
+      "controlled_message_count": 0,
+      "miss_rate": null,
+      "duplicate_rate": null,
+      "ocr_error_rate": null
+    },
+    {
+      "id": "windows-qq",
+      "os": "Windows",
+      "client": "qq",
+      "client_version": null,
+      "verified_at": null,
+      "status": "未验证",
+      "primary_route": "selected_window_screenshot_to_vision_model",
+      "trigger_policy": {
+        "default": "manual/foreground_transition + opt-in local ROI changes + debounce + max_wait + cooldown + hash skip",
+        "periodic_fallback_seconds": 0,
+        "content_change_native_observer": "不支持：Windows本地变化watcher尚未实现",
+        "scroll_idle_native_observer": "未验证",
+        "watch_changes_default": false,
+        "max_wait_seconds": 5,
+        "vision_crop_default": [
+          0.25,
+          0,
+          0.75,
+          0.85
+        ],
+        "vision_crop_confirmation_required": true
+      },
+      "code_status": "模拟验证通过",
+      "real_client_status": "未验证",
+      "real_vision_model_status": "未验证",
+      "reasons": [
+        "Windows environment unavailable; scripts and interfaces only"
+      ],
+      "native_probe": null,
+      "capabilities": {
+        "history": {
+          "status": "不支持",
+          "reason": "window visibility cannot establish complete history"
+        },
+        "current_conversation": {
+          "status": "未验证",
+          "reason": "implementation available; no controlled 100-message VLM validation"
+        },
+        "background": {
+          "status": "不支持",
+          "reason": "foreground-only capture gate"
+        },
+        "multi_conversation": {
+          "status": "不支持",
+          "reason": "one explicit window and expected conversation whitelist per session"
+        },
+        "attachments": {
+          "status": "未验证",
+          "reason": "visible metadata/placeholder only; no full attachment extraction"
+        },
+        "edits": {
+          "status": "不支持",
+          "reason": "no platform-stable message identity"
+        },
+        "recalls": {
+          "status": "不支持",
+          "reason": "no platform-stable message identity"
+        },
+        "ocr": {
+          "status": "未验证",
+          "reason": "optional fallback code; not VLM and not exercised on personal chats"
+        },
+        "accessibility": {
+          "status": "未验证",
+          "reason": "UIA target not tested"
+        },
+        "voice_transcription": {
+          "status": "不支持",
+          "reason": "not implemented; retain placeholders"
+        },
+        "local_roi_change_monitor": {
+          "status": "不支持",
+          "scope": "Windows interface only; no implementation or real environment",
+          "evidence": []
+        },
+        "vision_crop": {
+          "status": "未验证",
+          "scope": "in-memory crop code only; Windows unavailable",
+          "evidence": []
+        },
+        "native_window_dock": {
+          "status": "未验证",
+          "scope": "system-native side-by-side positioning, not embedding",
+          "evidence": []
+        },
+        "cloud_vision": {
+          "status": "不支持",
+          "reason": "no local title verification implementation"
+        }
+      },
+      "reproduction": [
+        "python3 scripts/probe_clients.py --platform qq",
+        "docs/接入验证记录.md"
+      ],
+      "evidence": [],
+      "controlled_message_count": 0,
+      "miss_rate": null,
+      "duplicate_rate": null,
+      "ocr_error_rate": null
+    }
+  ],
+  "note": "代码、模拟、真实客户端、真实模型均独立记录。主路线为视觉模型；AX仅状态辅助，OCR为显式降级。",
+  "product": "利明智耀.Chatlens",
+  "privacy": {
+    "vision_crop_requires_local_preview": true,
+    "cloud_requires_local_title_gate": true,
+    "macos_title_gate_scope": "OCR only on top 10 percent of confirmed crop; actual client layout unverified",
+    "windows_cloud_vision": "不支持",
+    "real_chat_uploaded": false
+  }
+}

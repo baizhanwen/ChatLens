@@ -1,0 +1,27 @@
+{
+  "recorded_at_utc": "2026-10-27T03:52:49.056238+00:00",
+  "scope": "static_source_and_archive_review_only",
+  "package": "artifacts/deliverables/windows-check/ChatLens-Windows-ReaderSetup-20261027.zip",
+  "sha256": "1fc9dee7432e28b34c6161a7afe672f2a12819e22567ef4a5311da80d881b56d",
+  "bytes": 8495,
+  "checks": {
+    "four_file_whitelist": "通过",
+    "zip_crc": "通过",
+    "manifest_hashes": "通过",
+    "matches_current_sources": "通过",
+    "powershell_bom_crlf": "通过",
+    "cmd_ascii_crlf": "通过",
+    "private_material_pattern_scan": "通过",
+    "no_process_memory_read_api": "通过",
+    "private_file_exclusive_creation": "通过",
+    "peer_static_review": "通过"
+  },
+  "peer_review_scope": "PowerShell 5.1 and x64 PInvoke static review; no Windows execution",
+  "powershell_parser_execution": "未验证",
+  "windows_reader_setup_execution": "未验证",
+  "windows_chat_reading": "未验证",
+  "limitations": [
+    "Foreground boolean compares the main window handle only and is not background collection evidence.",
+    "Python file metadata does not verify executable authenticity or runtime readiness."
+  ]
+}

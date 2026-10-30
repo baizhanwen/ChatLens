@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="利明智耀 Chatlens 开发版品牌图形">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#24334e"/><stop offset="1" stop-color="#111b30"/></linearGradient><linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f8e0a0"/><stop offset="1" stop-color="#d3a34d"/></linearGradient></defs>
+  <rect width="1024" height="1024" rx="222" fill="url(#bg)"/>
+  <g fill="none" stroke="url(#gold)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256 687V493c0-141 114-255 256-255s256 114 256 255-114 255-256 255H370l-114 76V687Z" stroke-width="46"/>
+    <path d="M379 507a133 133 0 0 1 266 0" stroke-width="35"/>
+    <path d="M374 555h276M425 612h174" stroke-width="31"/>
+    <path d="M512 148V109M316 205l-28-32M708 205l28-32M235 379l-42-12M789 379l42-12" stroke-width="28"/>
+  </g>
+  <circle cx="512" cy="506" r="22" fill="#f2d18a"/>
+</svg>

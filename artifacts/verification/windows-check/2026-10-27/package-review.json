@@ -1,0 +1,15 @@
+{
+  "static_source_review": "通过",
+  "archive_allowlist_crc_hashes": "通过",
+  "powershell_parser_executed": "未验证",
+  "windows_environment_execution": "未验证",
+  "windows_chat_reading": "未验证",
+  "contains_mac_database_or_keys": false,
+  "files": [
+    "ChatLens-Windows-Check/Check-Windows.ps1",
+    "ChatLens-Windows-Check/PACKAGE-MANIFEST.json",
+    "ChatLens-Windows-Check/README-FIRST.txt",
+    "ChatLens-Windows-Check/Start-Check.cmd"
+  ],
+  "package_sha256": "b746971d2ded133a076d5e715e8baef87ae2cfa54efe6627e735016ef87f9fda"
+}

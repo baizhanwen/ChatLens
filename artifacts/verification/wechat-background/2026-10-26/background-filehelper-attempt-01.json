@@ -1,0 +1,90 @@
+{
+  "recorded_at": "2026-10-26T09:34:42.933228+00:00",
+  "scope": "filehelper_new_text_test_tokens_only",
+  "status": "通过",
+  "reason": "controlled_new_text_read_while_client_background",
+  "capture_mode": "sqlcipher_database_and_wal_readonly",
+  "baseline_completed_at": "2026-10-26T09:34:42.974321+00:00",
+  "message_shards": 1,
+  "requested_seconds": 300,
+  "elapsed_seconds": 221.988,
+  "background_verified": true,
+  "duplicate_count": 0,
+  "tokens": [
+    {
+      "index": 1,
+      "matched_count": 1,
+      "body_exact_match": true,
+      "observations": [
+        {
+          "observed_at": "2026-10-26T09:38:05.730403+00:00",
+          "source_create_time": 1793007484,
+          "event_id_digest": "3274ad5fc7c964d220f382514042171cd47ffcc6cb073b895bd948a632d7cd9b",
+          "body_exact_match": true,
+          "background_confirmed": true,
+          "native_before": {
+            "probe_succeeded": true,
+            "running": true,
+            "frontmost": false,
+            "hidden": true,
+            "screen_locked": false,
+            "all_ax_windows_minimized": null,
+            "client_version": "4.1.11"
+          },
+          "native_after": {
+            "probe_succeeded": true,
+            "running": true,
+            "frontmost": false,
+            "hidden": true,
+            "screen_locked": false,
+            "all_ax_windows_minimized": null,
+            "client_version": "4.1.11"
+          }
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "matched_count": 1,
+      "body_exact_match": true,
+      "observations": [
+        {
+          "observed_at": "2026-10-26T09:38:24.922333+00:00",
+          "source_create_time": 1793007503,
+          "event_id_digest": "6d06cc3956de4b9585eeaa9682e649dc5070b049d960921755096c8d9383372f",
+          "body_exact_match": true,
+          "background_confirmed": true,
+          "native_before": {
+            "probe_succeeded": true,
+            "running": true,
+            "frontmost": false,
+            "hidden": true,
+            "screen_locked": false,
+            "all_ax_windows_minimized": null,
+            "client_version": "4.1.11"
+          },
+          "native_after": {
+            "probe_succeeded": true,
+            "running": true,
+            "frontmost": false,
+            "hidden": true,
+            "screen_locked": false,
+            "all_ax_windows_minimized": null,
+            "client_version": "4.1.11"
+          }
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "initial_native_state": {
+    "probe_succeeded": true,
+    "running": true,
+    "frontmost": false,
+    "hidden": false,
+    "screen_locked": false,
+    "all_ax_windows_minimized": null,
+    "client_version": "4.1.11"
+  },
+  "watch_elapsed_seconds": 221.618
+}

@@ -1,0 +1,23 @@
+{
+  "python": "3.12.14",
+  "packages": {
+    "sqlcipher3-wheels": "0.5.7",
+    "zstandard": "0.25.0"
+  },
+  "source_sha256": {
+    "scripts/prepare_wechat_read_test.py": "6f14dd2f500e1282b51f9fe4604b35186828be04e66bad072bc62f0707b5bf71",
+    "scripts/configure_wechat_selected_test.py": "c0116d8d381d051f670b56e701ec041318d2826fe37c10893797c221032904f7",
+    "scripts/wechat_selected_reader.py": "638b05bfe283937a24eed281ceb4fa330e060f525c1697f36323e2a9f464e45c",
+    "scripts/run_wechat_selected_test.py": "0a9620721c60171afe9bd7a2bf3f8c1176a567db183cc02de3d181fbaca58b47",
+    "tests/test_wechat_selected_reader.py": "d2f4f7854dea3eae402e23906edb73acd2b9a8f73bee6109b4ac57b2f2efbb4f",
+    "tests/test_wechat_selected_resolver.py": "bc9d1eec97a3f982f972aee18920584f586f0ae84db15d7cefce5fbb25ff69bd",
+    "tests/test_wechat_selected_runner.py": "9446805fde5a95164483661608ecd5a62b843c77f8b8f5c878334579b7b2ab71"
+  },
+  "temporary_app_copy_removed": true,
+  "checkpoint_permissions": "0o600",
+  "private_directory_permissions": "0o700",
+  "key_file_permissions": "0o600",
+  "agent_sent_messages": 0,
+  "cloud_model_calls": 0,
+  "external_service_started": false
+}
