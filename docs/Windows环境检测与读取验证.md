@@ -19,8 +19,9 @@
 | 第二版前提检测包静态审查与 ZIP 检查 | 通过 | 四文件白名单、CRC、清单哈希和 BOM／CRLF 检查；不代表 PowerShell 解析或 Windows 执行 |
 | 第二版进程／资料位置／Python 前提检测实际执行 | 通过 | 2026-10-29 实机回传：选定主窗口候选与只读访问通过，所选账号目录含 2 个消息分库、2 个 WAL 与联系人库，私有配置及 ACL 通过；可选 Python 未选择 |
 | 第三包源码／合成测试／ZIP 检查 | 通过 | 23 项合成／WinAPI mock，46 文件白名单、CRC、清单哈希、编码和官方运行时摘要；没有执行 Windows API |
-| 第三包便携运行与真实密钥首页校验 | 未验证 | 等待用户 Windows 实机回传；不等同聊天读取 |
-| Windows 解密能力初始化 | 未验证 | 需根据实机架构、微信版本和访问条件选择窄化方案 |
+| 第三包便携运行与真实密钥首页校验 | 通过 | 2026-10-30 用户回传 Python 3.15.2／微信 4.1.15.56，message_0 首页 HMAC 和本机私有保存成功；不等同聊天读取 |
+| Windows SQLCipher 正文／WAL 读取前提 | 未验证 | 第四包提供独立匹配驱动，实际加载、三库及正文由实机继续验证 |
+| 第四包源码、合成与 ZIP 检查 | 通过 | 新增 30 项合成／WinAPI mock、全套 169 项通过，66 文件完整性校验通过 |
 | Windows 后台新文字读取 | 未验证 | 没有取得任何 Windows 真实消息证据 |
 | Windows 私聊／群聊、停止后恢复 | 未验证 | 后续按与 Mac 分开的受控用例实测 |
 
@@ -71,3 +72,25 @@ Windows 读取不能直接照搬本机 Mac 初始化或 POSIX 文件锁。当前
 处理：保持当前微信登录，重新运行已有的 `Start-ReaderSetup.cmd`，按最新列表选择主窗口候选，选择同一授权账号目录，Python 可继续取消；随后运行第三包并选择本次新生成的 `private/config.json`。两个步骤之间保持微信运行。配置和密钥留在 Windows 本机，不回传。本次不重打历史包、不更改扫描范围、不自动切换账号或提权。
 
 脱敏记录为 `artifacts/verification/windows-check/2026-10-30/keyproof-process-refresh-required.json`，原始截图仅存私有目录。此失败不能作为密钥、解密或后台读取能力已通过／不支持的依据。
+
+## 2026-10-30：密钥校验成功回传
+
+用户刷新配置后回传 2026-10-30 10:44:08（Asia/Shanghai）生成的第三包报告。Python 3.15.2、微信 4.1.15.56，进程身份与首页读取成功，`key_verification_status=通过`，`private_key_saved=true`、`private_acl_verified=true`。源码成功路径仅在完整首页 HMAC 和受保护文件写入均成功后返回通过；本轮支持选定 message_0 的直接密钥认证和本机保存结论。
+
+仅 1 个候选通过；实际请求读取约 880 MB 进程内存，未保存转储、未解密或解析聊天。进程修改、提权、联网均为 false，消息读取数为 0，业务读取状态仍未验证。不能把这一库的密钥当作其他库的有效密钥，也不能将其视为 SQLCipher 查询、WAL、两会话、后台读取或所有 Windows 版本支持。
+
+脱敏报告为 `artifacts/verification/windows-check/2026-10-30/received-keyproof-success-summary.json`。原始报告仅作私有归档，没有请求或取得用户的私有配置、密钥或数据库。用户下一轮明确选择继续一处私聊与一处测试群；需先验证相关库的密钥、Windows SQLCipher 加载与按名称定位，再建立基线并开始受控发送。
+
+## 第四包：选定私聊和测试群的四条新文字
+
+交付为 `artifacts/deliverables/windows-check/ChatLens-Windows-SelectedTest-20261030.zip`，入口 `Start-SelectedTest.cmd`。ZIP 为 15,448,424 字节、66 文件，SHA256 为 `a72598ff86a7cd18fd89a6f134551369423af9935934d9587c4de014fa4f9e7f`。源码及静态审查、66 文件白名单／CRC／清单哈希、编码和私人材料扫描通过，证据为 `artifacts/verification/windows-selected/2026-10-30/package-review.json`。实际 Windows 读取待用户回传，不能把本机测试替代实机。
+
+本包单独使用 [Python 3.14.10 官方 x64 embed](https://www.python.org/downloads/release/python-31410/)、[sqlcipher3 0.6.4 上游 cp314 Windows wheel](https://pypi.org/project/sqlcipher3/0.6.4/) 和 [zstandard 0.25.0](https://pypi.org/project/zstandard/0.25.0/)，三个原文件的固定摘要在 `SELECTED-MANIFEST.json`。没有把 cp314 扩展放入第三包 Python 3.15；新包自带完整匹配环境，不安装 pip 或修改全局环境，保留 Python、wrapper、SQLCipher BSD3、OpenSSL Apache2.0 和 Zstandard 许可。包构建入口为 `scripts/build_windows_selected_package.py`，既有目标不会覆盖。
+
+运行在本机选择第三包的 `private/validated-message0-key.json`，仅用其中的程序路径和账号目录；启动器重新匹配同路径、4.1.15.56 的当前主窗口，多候选需要本机选择，并用创建时间绑定句柄。本机私有新目录先做与账号无关的加密 DB、已提交／未提交 WAL、只读拒写和压缩冒烟，再认证固定 message_0、message_1、contact 三个首页，内存定位仍限 90 秒／2 GiB。没有扩到其他账号或自动新增库；两个消息分库的集合变化会停止。
+
+两个名称由用户在 Windows 输入，仅通过联系人四字段精确 BINARY 唯一匹配，群和私聊类型分开确认。正式读取只打开两个选定 hash 表和新消息发送人映射；先 MAX(local_id) 建基线，不读取旧正文。程序显示 READY 和四个随机测试码后，用户回车并让同一位受控发送人在私聊和群各发两条。正文、发送人、会话归属、唯一事件和读取前后及最终的后台／未锁屏状态都参与通过判定。后台按前台窗口所属进程判断，包含同 PID 弹窗；未知状态不能确认后台。
+
+本轮只持有 RAM 游标，不提供停止／崩溃恢复。每轮短事务和 ASC 分页，全部查询和状态采样完成后才推进 RAM 游标；忙锁重试不先提交部分进度。基线时不存在的所选表在另一固定分库新建后会从零处理，不查询其他会话正文。正文原值和身份只在内存，公开结果仅 alias、测试编号、匹配布尔、时间和不可逆事件摘要；密钥／配置使用当前用户受保护私有文件。本机 SQLCipher 正常 WAL 锁可能更新 SHM 元信息；非空 WAL 缺 SHM 时预检拒绝，不主动重建 SHM、checkpoint、改源库记录或复制活库当一致快照。
+
+新增 30 项合成测试覆盖实际 SQLCipher／WAL、范围隔离、605 条分页、忙锁回滚、压缩类型、群发送人前缀、新表出现、桌面锁／前台保守判断、固定三库预检、三库密钥筛选及最终背景门控。全套 169 项通过，记录为同目录 `synthetic-validation.json` 和测试日志。Windows 驱动加载、新增两库密钥、联系人解析、四条真实文字及 WAL 实机场景仍待回传；不存在“已全会话实时接入”的结论。

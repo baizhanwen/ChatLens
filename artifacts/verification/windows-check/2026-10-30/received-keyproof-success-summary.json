@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "stage": "keyproof",
+  "recorded_at_utc": "2026-10-30T02:44:08.260576+00:00",
+  "scope": "selected_process_config_lookup_and_message_0_first_page_hmac_only",
+  "status": "通过",
+  "reason": "selected_first_page_key_authenticated_only",
+  "business_read_status": "未验证",
+  "key_verification_status": "通过",
+  "chat_messages_read": 0,
+  "private_acl_verified": true,
+  "operations": {
+    "process_memory_read": true,
+    "database_decrypted": false,
+    "chat_contents_parsed": false,
+    "processes_changed": false,
+    "privileges_elevated": false,
+    "network_requested": false
+  },
+  "python_version": "3.15.2",
+  "target_client_version": "4.1.15.56",
+  "target_database": "message/message_0.db",
+  "source_process_identity_verified": true,
+  "first_page_read": true,
+  "private_key_saved": true,
+  "scan_limits": {
+    "seconds": 90,
+    "read_request_bytes": 2147483648,
+    "chunk_bytes": 1048576
+  },
+  "scan_stats": {
+    "marker_search_region_count": 2147,
+    "readable_private_region_count": 606,
+    "marker_count": 2,
+    "string_reference_count": 85,
+    "config_blob_count": 27,
+    "candidate_count": 1,
+    "read_calls": 3164,
+    "read_request_bytes": 880486713,
+    "read_returned_bytes": 880486713
+  },
+  "note": "Process memory may contain conversations; only key structures are interpreted. No memory dump or page bytes are saved.",
+  "evidence_kind": "user_returned_real_windows_keyproof_result",
+  "evidence_boundary": "One direct key authenticated the first page of message_0 and was saved locally; no SQLCipher schema, WAL, text row or other database validated."
+}

@@ -1,0 +1,19 @@
+{
+  "scope": "synthetic_sqlcipher_and_mock_windows_only",
+  "checks": [
+    {
+      "name": "selected-tests",
+      "status": "通过",
+      "count": 30,
+      "seconds": 0.254
+    },
+    {
+      "name": "full-python-tests",
+      "status": "通过",
+      "count": 169,
+      "seconds": 15.306
+    }
+  ],
+  "real_wechat_data_accessed": false,
+  "windows_selected_live_status": "未验证"
+}

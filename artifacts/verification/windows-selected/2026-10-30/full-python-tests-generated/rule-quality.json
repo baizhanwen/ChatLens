@@ -1,0 +1,730 @@
+{
+  "dataset": "fixtures/quality/annotated-60.json",
+  "dataset_version": "v1",
+  "generated_at": "2026-10-30T03:13:51.264209+00:00",
+  "sample_count": 60,
+  "category_counts": {
+    "group": 20,
+    "customer": 20,
+    "direct": 20
+  },
+  "model": "deterministic-rules-v1",
+  "real_model_verified": false,
+  "annotation_origin": "construction-authored expected labels before evaluator execution; not user annotations or blind real-world validation",
+  "evaluation_scope": "synthetic fixed-label development test; not real-model quality or human blind review",
+  "counts": {
+    "true_positive": 29,
+    "false_positive": 3,
+    "false_negative": 5,
+    "invalid_evidence": 0
+  },
+  "precision": 0.90625,
+  "recall": 0.852941,
+  "targets": {
+    "precision": 0.9,
+    "recall": 0.8,
+    "invalid_evidence": 0
+  },
+  "targets_met": {
+    "precision": true,
+    "recall": true,
+    "invalid_evidence": true
+  },
+  "field_accuracy_on_matched": {
+    "sample_count": 29,
+    "owner": 0.896552,
+    "due_at": 1.0
+  },
+  "failures": [
+    {
+      "id": "group-09",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": [
+        {
+          "field": "owner",
+          "expected": "张工",
+          "actual": null
+        }
+      ],
+      "text": "张工，请在明天下午4点前提交修改版。"
+    },
+    {
+      "id": "group-10",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 1,
+      "field_errors": [],
+      "text": "场地已经确认，请明天发送海报。"
+    },
+    {
+      "id": "group-11",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 1,
+      "field_errors": [],
+      "text": "请不要忘了明天提交授权书。"
+    },
+    {
+      "id": "group-16",
+      "category": "group",
+      "expected_count": 0,
+      "predicted_count": 1,
+      "false_positive": 1,
+      "false_negative": 0,
+      "field_errors": [],
+      "text": "明天提交吗？我只是问一下安排。"
+    },
+    {
+      "id": "customer-04",
+      "category": "customer",
+      "expected_count": 1,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 1,
+      "field_errors": [],
+      "text": "请在2026-11-03之前回复是否能交付。"
+    },
+    {
+      "id": "customer-08",
+      "category": "customer",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": [
+        {
+          "field": "owner",
+          "expected": "王经理",
+          "actual": null
+        }
+      ],
+      "text": "客户王经理负责明天提供样品。"
+    },
+    {
+      "id": "customer-16",
+      "category": "customer",
+      "expected_count": 0,
+      "predicted_count": 1,
+      "false_positive": 1,
+      "false_negative": 0,
+      "field_errors": [],
+      "text": "明天发报价？这不是确定承诺。"
+    },
+    {
+      "id": "direct-08",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 1,
+      "field_errors": [],
+      "text": "记得把书带来。"
+    },
+    {
+      "id": "direct-10",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 1,
+      "field_errors": [],
+      "text": "我会在明天提交报告，但今天已经整理完资料。"
+    },
+    {
+      "id": "direct-11",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": [
+        {
+          "field": "owner",
+          "expected": "小许",
+          "actual": null
+        }
+      ],
+      "text": "小许，明天请提供收货地址。"
+    },
+    {
+      "id": "direct-16",
+      "category": "direct",
+      "expected_count": 0,
+      "predicted_count": 1,
+      "false_positive": 1,
+      "false_negative": 0,
+      "field_errors": [],
+      "text": "明天发给你可以吗？尚未确认。"
+    }
+  ],
+  "samples": [
+    {
+      "id": "group-01",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-02",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-03",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-04",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-05",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-06",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-07",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-08",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-09",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": [
+        {
+          "field": "owner",
+          "expected": "张工",
+          "actual": null
+        }
+      ]
+    },
+    {
+      "id": "group-10",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 1,
+      "field_errors": []
+    },
+    {
+      "id": "group-11",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 1,
+      "field_errors": []
+    },
+    {
+      "id": "group-12",
+      "category": "group",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-13",
+      "category": "group",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-14",
+      "category": "group",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-15",
+      "category": "group",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-16",
+      "category": "group",
+      "expected_count": 0,
+      "predicted_count": 1,
+      "false_positive": 1,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-17",
+      "category": "group",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-18",
+      "category": "group",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-19",
+      "category": "group",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "group-20",
+      "category": "group",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-01",
+      "category": "customer",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-02",
+      "category": "customer",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-03",
+      "category": "customer",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-04",
+      "category": "customer",
+      "expected_count": 1,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 1,
+      "field_errors": []
+    },
+    {
+      "id": "customer-05",
+      "category": "customer",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-06",
+      "category": "customer",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-07",
+      "category": "customer",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-08",
+      "category": "customer",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": [
+        {
+          "field": "owner",
+          "expected": "王经理",
+          "actual": null
+        }
+      ]
+    },
+    {
+      "id": "customer-09",
+      "category": "customer",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-10",
+      "category": "customer",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-11",
+      "category": "customer",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-12",
+      "category": "customer",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-13",
+      "category": "customer",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-14",
+      "category": "customer",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-15",
+      "category": "customer",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-16",
+      "category": "customer",
+      "expected_count": 0,
+      "predicted_count": 1,
+      "false_positive": 1,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-17",
+      "category": "customer",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-18",
+      "category": "customer",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-19",
+      "category": "customer",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "customer-20",
+      "category": "customer",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-01",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-02",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-03",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-04",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-05",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-06",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-07",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-08",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 1,
+      "field_errors": []
+    },
+    {
+      "id": "direct-09",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-10",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 1,
+      "field_errors": []
+    },
+    {
+      "id": "direct-11",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": [
+        {
+          "field": "owner",
+          "expected": "小许",
+          "actual": null
+        }
+      ]
+    },
+    {
+      "id": "direct-12",
+      "category": "direct",
+      "expected_count": 1,
+      "predicted_count": 1,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-13",
+      "category": "direct",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-14",
+      "category": "direct",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-15",
+      "category": "direct",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-16",
+      "category": "direct",
+      "expected_count": 0,
+      "predicted_count": 1,
+      "false_positive": 1,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-17",
+      "category": "direct",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-18",
+      "category": "direct",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-19",
+      "category": "direct",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    },
+    {
+      "id": "direct-20",
+      "category": "direct",
+      "expected_count": 0,
+      "predicted_count": 0,
+      "false_positive": 0,
+      "false_negative": 0,
+      "field_errors": []
+    }
+  ],
+  "system": "macOS-27.0-arm64-arm-64bit",
+  "python": "3.12.14"
+}

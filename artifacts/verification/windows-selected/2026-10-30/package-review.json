@@ -1,0 +1,58 @@
+{
+  "recorded_at_utc": "2026-10-30T03:19:26.068159+00:00",
+  "scope": "local_static_archive_synthetic_sqlcipher_and_mock_winapi_only",
+  "package": "artifacts/deliverables/windows-check/ChatLens-Windows-SelectedTest-20261030.zip",
+  "bytes": 15448424,
+  "sha256": "a72598ff86a7cd18fd89a6f134551369423af9935934d9587c4de014fa4f9e7f",
+  "file_count": 66,
+  "checks": {
+    "explicit_payload_whitelist": "通过",
+    "zip_crc": "通过",
+    "manifest_sizes_and_sha256": "通过",
+    "sources_match_frozen_modules": "通过",
+    "official_runtime_and_pinned_wheels_match": "通过",
+    "documented_pth_only_change": "通过",
+    "powershell_bom_crlf": "通过",
+    "cmd_ascii_crlf": "通过",
+    "licenses_included": "通过",
+    "private_material_scan": "通过",
+    "independent_static_reviews": "通过"
+  },
+  "new_synthetic_tests": 30,
+  "all_synthetic_tests": 169,
+  "windows_selected_test_runtime": "未验证",
+  "windows_extra_database_keys": "未验证",
+  "windows_contact_resolution": "未验证",
+  "windows_selected_background_text": "未验证",
+  "restart_recovery": "未验证",
+  "pinned_dependencies": [
+    {
+      "name": "python-3.14.10-embed-amd64.zip",
+      "kind": "runtime",
+      "version": "3.14.10",
+      "bytes": 12619664,
+      "url": "https://www.python.org/ftp/python/3.14.10/python-3.14.10-embed-amd64.zip",
+      "sha256": "90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159"
+    },
+    {
+      "name": "sqlcipher3-0.6.4-cp314-cp314-win_amd64.whl",
+      "kind": "wheel",
+      "version": "0.6.4",
+      "bytes": 2626446,
+      "url": "https://files.pythonhosted.org/packages/f1/eb/b243c4233f5487a1acf1810ac53bde439c3f11b606a4641328adc43d41b8/sqlcipher3-0.6.4-cp314-cp314-win_amd64.whl",
+      "sha256": "33a4bb79d5bffbdcc1443ff7fd10556ad781fd4986a710c0c577b817b06e11ac"
+    },
+    {
+      "name": "zstandard-0.25.0-cp314-cp314-win_amd64.whl",
+      "kind": "wheel",
+      "version": "0.25.0",
+      "bytes": 516118,
+      "url": "https://files.pythonhosted.org/packages/3a/43/241f9615bcf8ba8903b3f0432da069e857fc4fd1783bd26183db53c4804b/zstandard-0.25.0-cp314-cp314-win_amd64.whl",
+      "sha256": "c19bcdd826e95671065f8692b5a4aa95c52dc7a02a4c5a0cac46deb879a017a2"
+    }
+  ],
+  "target_scope": "two names entered on the Windows computer; controlled new text only",
+  "source_db_record_writes": false,
+  "shm_note": "Normal SQLite WAL locking can affect SHM metadata; no promise of zero SHM writes.",
+  "windows_keyproof_already_verified": "message_0 first-page HMAC only; separate evidence received-keyproof-success-summary.json"
+}
