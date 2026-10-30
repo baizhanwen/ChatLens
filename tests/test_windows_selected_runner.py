@@ -51,6 +51,32 @@ class Memory:
 
 
 class SelectedRunnerTests(unittest.TestCase):
+    @unittest.skipIf(sys.platform=='win32','POSIX PTY regression; Windows console remains device validation')
+    def test_visible_prompt_with_terminal_io_and_stderr_discarded(self):
+        import os,pty,select,subprocess,time
+        master,slave=pty.openpty()
+        process=None
+        try:
+            code='import sys;sys.path.insert(0,'+repr(str(SCRIPTS))+');from windows_selected_runner import visible_input;v=visible_input("VISIBLE_PROMPT_SENTINEL");print("VALUE="+v,flush=True)'
+            process=subprocess.Popen([sys.executable,'-B','-c',code],stdin=slave,stdout=slave,stderr=subprocess.DEVNULL)
+            os.close(slave);slave=None
+            received=b'';deadline=time.monotonic()+5
+            while b'VISIBLE_PROMPT_SENTINEL' not in received and time.monotonic()<deadline:
+                if select.select([master],[],[],0.1)[0]:received+=os.read(master,4096)
+            self.assertIn(b'VISIBLE_PROMPT_SENTINEL',received)
+            self.assertIsNone(process.poll(),'must still be waiting for the local input')
+            os.write(master,b'SYNTHETIC_INPUT\n')
+            while b'VALUE=SYNTHETIC_INPUT' not in received and time.monotonic()<deadline:
+                if select.select([master],[],[],0.1)[0]:
+                    try:received+=os.read(master,4096)
+                    except OSError:break
+            self.assertIn(b'VALUE=SYNTHETIC_INPUT',received)
+            self.assertEqual(process.wait(timeout=2),0)
+        finally:
+            if slave is not None:os.close(slave)
+            os.close(master)
+            if process is not None and process.poll() is None:process.kill();process.wait()
+
     def test_three_selected_keys_authenticate_and_other_salt_is_not_kept(self):
         memory=Memory();stats={};budget=R.proof.Budget(memory)
         result=R.selected_keys(memory,{rel:page(i) for i,rel in enumerate(RELS)},KEYS[0],budget,stats)

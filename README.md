@@ -51,9 +51,11 @@ Windows 先运行独立环境检测包，入口 `scripts/windows-proof/Start-Che
 
 2026-10-30 实机回传已确认：Windows 微信 4.1.15.56、包内 Python 3.15.2 上，选定 `message/message_0.db` 的直接密钥通过完整首页 HMAC 校验，且成功保存到当前用户 ACL 保护的本机私有文件。没有解密数据库、查询聊天、修改进程、提权或联网，消息读取 0。该结果不涵盖其他消息分库、联系人库或后台读取；下一轮按用户选择，仅验证一处私聊和一处测试群的受控新文字。
 
-第四包为 `artifacts/deliverables/windows-check/ChatLens-Windows-SelectedTest-20261030.zip`，入口 `Start-SelectedTest.cmd`。在 Windows 本机选择第三包 `private/validated-message0-key.json`；工具会匹配当前同路径、同版本的微信主窗口，避免直接复用旧 PID。先验证包内 SQLCipher／WAL／压缩合成样本，再仅校验本账号 message_0、message_1、contact 三库的所需密钥；会话名称由用户本机输入，联系人只作精确元信息定位。建立两个会话的新消息基线并显示 READY 后，按回车开始五分钟测试，让同一位受控发送人各发两条屏幕指定文字。只回传本次 `result-to-send.json`，密钥和私人配置留在 Windows。
+第四包当前重试版本为 `artifacts/deliverables/windows-check/ChatLens-Windows-SelectedTest-20261030-r2.zip`，入口 `Start-SelectedTest.cmd`，原版 ZIP 保留作历史记录。在 Windows 本机选择第三包 `private/validated-message0-key.json`；工具会匹配当前同路径、同版本的微信主窗口，避免直接复用旧 PID。先验证包内 SQLCipher／WAL／压缩合成样本，再仅校验本账号 message_0、message_1、contact 三库的所需密钥；会话名称由用户本机输入，联系人只作精确元信息定位。建立两个会话的新消息基线并显示 READY 后，按回车开始五分钟测试，让同一位受控发送人各发两条屏幕指定文字。回传本次 `result-to-send.json` 与 `supervisor.json`，若另有 `supervisor-result-to-send.json` 则一并回传；密钥和私人配置留在 Windows。
 
 第四包的 30 项新增合成／WinAPI mock、全套 169 项自动测试及 ZIP 完整性检查通过；尚未在用户 Windows 验证新驱动、联系人解析、两个消息分库及四条受控新文字。只读 SQLite WAL 使用正常锁，可能更新 SHM 锁元信息，不承诺 SHM 零写入；不会写源库记录、主动 checkpoint、重启微信或自动发消息。此包不含停止后恢复、100 条规模或长期稳定性验收。详见 Windows 验证文档及 `artifacts/verification/windows-selected/2026-10-30/`。
+
+r2 修复旧包控制台输入提示可能被 stderr 重定向隐藏的问题：所有提示改由 stdout 明确显示，另记录固定阶段和终端状态。独立父进程监督本次测试子进程，初始化累计 120 秒、输入后定位与基线累计 120 秒、收取阶段 330 秒、最终保存 30 秒；输入等待不计入这些时限。非等待阶段每十秒显示进度，超时仅停止自己启动的测试子进程，不关闭微信。内存扫描原有 90 秒协作式预算仍保留。r2 的 57 项相关测试、全套 196 项通过，含 stderr 隐藏下的终端提示与真实虚构 sleep 子进程硬超时；Windows r2 实机效果及四条真实消息仍未验证。证据在 `artifacts/verification/windows-selected/2026-10-30-r2/`。
 
 ## 启动
 

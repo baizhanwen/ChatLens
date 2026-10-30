@@ -1,0 +1,12 @@
+{
+  "recorded_at_utc": "2026-10-30T04:02:02.686324+00:00",
+  "source": "user_text_description_and_manual_interrupt_reason",
+  "last_visible_stage": "after_driver_smoke_before_visible_contact_input",
+  "reported_silent_wait_seconds_approx": 300,
+  "user_reported_end_reason": "selected_test_interrupted",
+  "exact_stopped_stage": "未验证",
+  "known_code_defect": "TTY input(prompt) may use C stderr, suppressed by the launcher; stdout prompts are now explicit.",
+  "scan_budget_was_cooperative_and_did_not_cover_input_wait_or_all_native_calls": true,
+  "business_read_status": "未验证",
+  "old_private_config_or_keys_requested": false
+}

@@ -1,0 +1,21 @@
+{
+  "scope": "local_synthetic_and_process_supervision_tests_only",
+  "checks": [
+    {
+      "name": "r2-selected-tests",
+      "status": "通过",
+      "count": 57,
+      "seconds": 0.593
+    },
+    {
+      "name": "full-python-tests",
+      "status": "通过",
+      "count": 196,
+      "seconds": 15.594
+    }
+  ],
+  "tty_prompt_with_stderr_discarded": "通过",
+  "real_sleep_child_hard_timeout": "通过",
+  "windows_selected_live_status": "未验证",
+  "real_wechat_data_accessed": false
+}

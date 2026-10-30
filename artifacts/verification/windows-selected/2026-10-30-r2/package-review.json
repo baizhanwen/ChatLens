@@ -1,0 +1,32 @@
+{
+  "recorded_at_utc": "2026-10-30T04:02:02.676428+00:00",
+  "scope": "static_archive_local_pty_synthetic_process_and_mock_winapi_only",
+  "package": "artifacts/deliverables/windows-check/ChatLens-Windows-SelectedTest-20261030-r2.zip",
+  "sha256": "ff01179fb3e22b0c90b130b0ba1ad54d51bfe7e754cb200cf27cebb7fa800bbd",
+  "bytes": 15457641,
+  "files": 68,
+  "checks": {
+    "explicit_whitelist": "通过",
+    "zip_crc": "通过",
+    "manifest_sizes_sha256": "通过",
+    "sources_match": "通过",
+    "pinned_runtime_wheels": "通过",
+    "documented_pth": "通过",
+    "windows_bom_crlf": "通过",
+    "licenses": "通过",
+    "private_material_scan": "通过",
+    "original_package_unchanged": "通过"
+  },
+  "selected_tests": 57,
+  "full_python_tests": 196,
+  "initialization_hard_timeout_seconds": 120,
+  "post_input_hard_timeout_seconds": 120,
+  "collecting_hard_timeout_seconds": 330,
+  "finalization_hard_timeout_seconds": 30,
+  "input_wait_timeout": null,
+  "memory_scan_soft_limit_seconds": 90,
+  "windows_r2_runtime_status": "未验证",
+  "windows_four_message_status": "未验证",
+  "diagnosis": "Hidden input prompt defect confirmed in code; the user's actual stopped stage remains unknown without the old result JSON.",
+  "no_user_database_or_key_in_package": true
+}

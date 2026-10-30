@@ -1,0 +1,16 @@
+{
+  "dataset": "10000 synthetic events: 9000 originals,500 duplicate,300 revision,200 revoked; reversed sent_at order",
+  "started_cursor_before_kill": 527,
+  "committed_cursor_after_kill": 529,
+  "committed_messages_after_kill": 529,
+  "final_cursor": 10000,
+  "visible_messages": 8800,
+  "expected_visible_messages": 8800,
+  "updated_visible": 300,
+  "todo_count": 300,
+  "todo_ids_unique": true,
+  "elapsed_seconds": 4.841,
+  "python": "3.12.14 (main, Aug 14 2026, 15:24:41) [Clang 22.1.3 ]",
+  "system": "Darwin 27.0.0",
+  "capture_mode": "synthetic replay; NOT real client capture"
+}

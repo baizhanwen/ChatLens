@@ -26,6 +26,13 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def visible_input(prompt):
+    # CPython's console readline can send input(prompt) to C stderr.
+    # Keep the UI visible when the launcher suppresses private diagnostics.
+    print(prompt,flush=True)
+    return input()
+
+
 def bounded_regions(source, budget, image=False):
     rows = []
     for row in source.regions(include_image=image):
@@ -48,7 +55,7 @@ def fixed_shards(root):
         raise RunError('expected_two_message_shards_changed')
 
 
-def selected_keys(source, pages, cached, budget, stats):
+def selected_keys(source, pages, cached, budget, stats, progress=None):
     """Authenticate literals only against these three explicitly selected pages."""
     found = {}
     for relative, page in pages.items():
@@ -56,6 +63,8 @@ def selected_keys(source, pages, cached, budget, stats):
             found[relative] = cached
     if len(found) == len(pages):
         return found
+    if progress is not None:
+        progress('memory_markers')
     regions = bounded_regions(source, budget, True)
     stats['marker_search_region_count'] = len(regions)
     markers = set()
@@ -71,6 +80,8 @@ def selected_keys(source, pages, cached, budget, stats):
     if not markers:
         raise RunError('selected_database_keys_incomplete')
     patterns = [struct.pack('<QQ', address, len(proof.MARKER)) for address in sorted(markers)]
+    if progress is not None:
+        progress('memory_references')
     regions = bounded_regions(source, budget)
     stats['reference_search_region_count'] = len(regions)
     refs, configs, candidates = set(), set(), set()
@@ -185,6 +196,7 @@ def main():
     parser.add_argument('--pid',type=int,required=True)
     parser.add_argument('--creation-time',type=int,required=True)
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--progress-file',type=Path)
     args=parser.parse_args()
     report={'schema_version':1,'stage':'selected_live','recorded_at_utc':now(),
             'scope':'two_user_selected_conversations_four_controlled_new_texts_only',
@@ -198,17 +210,26 @@ def main():
             'restart_recovery_status':'未验证','strict_end_to_end_latency_measured':False,
             'source_database_records_modified':False,'source_process_modified':False,
             'source_shm_may_receive_normal_sqlite_lock_metadata':True}
-    owned=False; saved=False; budget=None; poller=None
+    owned=False; saved=False; budget=None; poller=None; progress=None
+    def phase(stage):
+        report['last_stage']=stage
+        if progress is not None:
+            progress.set(stage)
     try:
+        from windows_selected_progress import PhaseProgress
         from windows_selected_engine import resolve,Poller
         from windows_selected_native import NativeState,detect_shm_preconditions
+        progress=PhaseProgress(args.progress_file,output_dir=args.output)
+        phase('startup')
         if sys.platform != 'win32' or struct.calcsize('P') != 8:
             raise RunError('windows_x64_runtime_required')
         if args.output.exists() or not platform.path_is_local(args.output.parent,True):
             raise RunError('new_local_output_required')
+        phase('private_setup')
         args.output.mkdir();owned=True
         private=args.output/'private';platform.private_dir(private)
         report['private_acl_verified']=True
+        phase('config_validation')
         if not platform.path_is_local(args.key_file) or args.key_file.name!='validated-message0-key.json' or args.key_file.parent.name!='private' or args.key_file.stat().st_size>16384:
             raise RunError('selected_private_message0_key_required')
         document=json.loads(args.key_file.read_text(encoding='utf-8-sig'))
@@ -221,6 +242,7 @@ def main():
         exe=Path(document.get('exe_path') or '')
         if not platform.path_is_local(root,True) or root.name.lower()!='db_storage' or not platform.path_is_local(exe):
             raise RunError('selected_account_paths_invalid')
+        phase('driver_smoke')
         import sqlcipher3.dbapi2 as driver
         print('正在包内私有目录验证虚构加密数据库、WAL 和只读驱动...',flush=True)
         report['driver_smoke']=smoke(driver,private)
@@ -228,42 +250,55 @@ def main():
         relatives=('message/message_0.db','message/message_1.db','contact/contact.db')
         pages={}
         # Refuse unexpected extra shards rather than silently claiming complete coverage.
+        phase('file_preflight')
         fixed_shards(root)
-        for relative in relatives:
+        for relative,stage in zip(relatives,('read_message0','read_message1','read_contact')):
+            phase(stage)
             path=root/relative
             if not platform.path_is_local(path):
                 raise RunError('selected_database_path_unavailable')
             pages[relative]=platform.read_page(path)
+        phase('cached_key_check')
         if pages[relatives[0]][:16].hex()!=salt.lower() or not proof.page_authenticates(bytes.fromhex(value),pages[relatives[0]]):
             raise RunError('saved_message0_key_or_salt_changed')
+        phase('process_identity')
         with platform.WindowsProcess(args.pid,str(exe),args.creation_time) as source:
             budget=proof.Budget(source)
-            keys=selected_keys(source,pages,bytes.fromhex(value),budget,report['scan_stats'])
+            keys=selected_keys(source,pages,bytes.fromhex(value),budget,report['scan_stats'],phase)
         for relative in relatives:
             report['key_authentication'][relative]=proof.page_authenticates(keys[relative],pages[relative])
+        phase('saving_keys')
         platform.private_json(private/'selected-keys.json',{'schema_version':1,'db_root':str(root),'exe_path':str(exe),
                              'keys':{relative:{'enc_key':key.hex()} for relative,key in keys.items()}})
         report['selected_keys_saved']=True
         # The contact connection also participates in normal WAL reads.
+        phase('checking_wal')
         report['wal_preconditions']=detect_shm_preconditions(root,list(relatives))
-        private_name=input('输入本轮私聊的准确名称（仅留本机）：').strip()
-        group_name=input('输入本轮群聊的准确名称（仅留本机）：').strip()
+        phase('waiting_private_name')
+        private_name=visible_input('输入本轮私聊的准确名称（仅留本机），然后按回车：').strip()
+        phase('waiting_group_name')
+        group_name=visible_input('输入本轮群聊的准确名称（仅留本机），然后按回车：').strip()
         for name in (private_name,group_name):
             if not name or len(name.encode('utf-8'))>2048 or '\0' in name:
                 raise RunError('selected_contact_name_invalid')
         key_hex={relative:key.hex() for relative,key in keys.items()}
+        phase('contact_lookup')
         config=resolve(driver,root,key_hex,private_name,group_name)
         report['contact_resolution']={'status':'通过','private_test_matches':1,'group_test_matches':1}
         nonce=secrets.token_hex(4).upper()
         tokens={alias:['%s-%s-%d-%s'%(prefix,nonce,i,secrets.token_hex(3).upper()) for i in (1,2)]
                 for alias,prefix in [('private_test','CLWP'),('group_test','CLWG')]}
+        phase('saving_config')
         platform.private_json(private/'selected-config.json',{'db_root':str(root),'config':config,'tokens':tokens,'run_nonce':nonce})
+        phase('native_precheck')
         with NativeState(args.pid,str(exe),args.creation_time) as native:
             state=native.sample();report['native_state_before']=state
             if not (state.get('probe_succeeded') is True and state.get('running') is True and state.get('frontmost') is False and state.get('screen_locked') is False):
                 raise RunError('wechat_must_be_running_unlocked_and_in_background')
+            phase('message_baseline')
             poller=Poller(driver,root,key_hex,config,tokens)
             report['baseline_completed_at']=getattr(poller,'baseline_completed_at',now())
+            phase('waiting_start')
             print('\nREADY：已就绪，旧消息基线已建立；仅监听你选定的私聊和群。',flush=True)
             print('请让同一位受控发送人按顺序各发一次以下四条，每条单独发送：',flush=True)
             print('1. 私聊：'+tokens['private_test'][0],flush=True)
@@ -271,7 +306,8 @@ def main():
             print('3. 私聊：'+tokens['private_test'][1],flush=True)
             print('4. 群聊：'+tokens['group_test'][1],flush=True)
             print('请保持电脑微信在后台，不在电脑打开这两个会话；等待最多五分钟。',flush=True)
-            input('准备好后按回车开始计时，再让同一位测试朋友发送上述四条：')
+            visible_input('准备好后按回车开始计时，再让同一位测试朋友发送上述四条：')
+            phase('collecting')
             deadline=time.monotonic()+300
             retry_count=0
             while time.monotonic()<deadline:
@@ -313,6 +349,9 @@ def main():
         report['status']='待外部条件' if ('incomplete' in code or 'unavailable' in code or 'changed' in code or 'background' in code or 'scan_' in code) else '失败'
         report['reason']=code
     finally:
+        if progress is not None:
+            try:progress.set('finalizing')
+            except Exception:report['progress_finalization_failed']=True
         if poller is not None:
             try:poller.close()
             except Exception:pass

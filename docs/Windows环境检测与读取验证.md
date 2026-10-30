@@ -94,3 +94,17 @@ Windows 读取不能直接照搬本机 Mac 初始化或 POSIX 文件锁。当前
 本轮只持有 RAM 游标，不提供停止／崩溃恢复。每轮短事务和 ASC 分页，全部查询和状态采样完成后才推进 RAM 游标；忙锁重试不先提交部分进度。基线时不存在的所选表在另一固定分库新建后会从零处理，不查询其他会话正文。正文原值和身份只在内存，公开结果仅 alias、测试编号、匹配布尔、时间和不可逆事件摘要；密钥／配置使用当前用户受保护私有文件。本机 SQLCipher 正常 WAL 锁可能更新 SHM 元信息；非空 WAL 缺 SHM 时预检拒绝，不主动重建 SHM、checkpoint、改源库记录或复制活库当一致快照。
 
 新增 30 项合成测试覆盖实际 SQLCipher／WAL、范围隔离、605 条分页、忙锁回滚、压缩类型、群发送人前缀、新表出现、桌面锁／前台保守判断、固定三库预检、三库密钥筛选及最终背景门控。全套 169 项通过，记录为同目录 `synthetic-validation.json` 和测试日志。Windows 驱动加载、新增两库密钥、联系人解析、四条真实文字及 WAL 实机场景仍待回传；不存在“已全会话实时接入”的结论。
+
+## 第四包 r2：可见输入提示、阶段进度与硬超时
+
+用户报告原版在虚构驱动通过提示后约五分钟没有后续可见输出，手动 Ctrl+C 后得到 `selected_test_interrupted`。这只说明中断已被处理，尚不能确定当时是原生调用等待还是已进入看不见的联系人输入。原始失败描述为 `artifacts/verification/windows-selected/2026-10-30-r2/reported-silent-wait.json`，尚未以未知停点推断读取能力。
+
+确认存在的代码问题：[CPython 3.14.10 的终端输入分支](https://github.com/python/cpython/blob/v3.14.10/Python/bltinmodule.c) 调用 [readline 实现](https://github.com/python/cpython/blob/v3.14.10/Parser/myreadline.c#L279-L311) 时，可将 `input(prompt)` 提示写入 C stderr；原启动器 `2>$null` 会抑制该提示。非终端分支并非同一路径，故不能单凭描述断定本次已触发。r2 保留 stderr 隐私抑制，改为三处 stdout 明确提示并 flush 后调用无提示 input()。
+
+r2 每个阶段写固定白名单进度，包含阶段枚举、UTC 时间和三个 tty 布尔，不包含名称、路径、PID、原文、测试码或密钥。进度文件绑定本次输出名称和父进程创建的随机文件，原子替换；Windows 父读取使用共享 DELETE，避免妨碍替换。独立父进程只监督固定包内 Python 启动的本次 runner，stdin／stdout 继承以保留交互，stderr 丢弃；每十秒在非输入等待阶段显示状态。
+
+时限按组累计：初始配置至三库认证／保存／WAL 检查共 120 秒，输入后的联系人定位及基线共 120 秒，收取阶段 330 秒（内部正常收取仍 300 秒），最终保存 30 秒。不同初始化子步骤不重置总额，未知阶段不能转换成无限等待；三个人工输入阶段没有硬限时。原 90 秒扫描预算仅属协作式检查，不能中断单次阻塞原生调用，所以 r2 外加父进程监督；超时或 Ctrl+C 仅 terminate／必要时 kill 自己持有的 Popen 子进程，不按名字找进程、不动微信。
+
+父进程保存 `supervisor.json`。超时、异常或中断且没有子报告时生成 `result-to-send.json`，已有子报告则保留并另写 `supervisor-result-to-send.json`。未知消息读取数写 null，并标明尚未验证，不能据此断言零读取。保存失败不能作为成功退出。
+
+交付 `artifacts/deliverables/windows-check/ChatLens-Windows-SelectedTest-20261030-r2.zip`，15,457,641 字节、68 文件，SHA256 为 `ff01179fb3e22b0c90b130b0ba1ad54d51bfe7e754cb200cf27cebb7fa800bbd`。原版 ZIP 和原有结果保留。57 项相关合成／WinAPI mock／PTY／子进程测试及全套 196 项通过；包白名单、CRC、逐项摘要、依赖、许可、编码和脱敏核对通过，见同目录 `package-review.json` 与 `synthetic-validation.json`。Windows r2 交互、监督和四条真实新消息仍待实机，不以本机测试替代。

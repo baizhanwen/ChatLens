@@ -73,7 +73,7 @@ function Verify-Payload {
         if (-not [string]::Equals($digest, [string]$entry.sha256, [StringComparison]::OrdinalIgnoreCase)) { Stop-Check 'manifest_payload_hash_mismatch' }
         $names[$lower] = $true
     }
-    foreach ($required in @('runtime/python.exe', 'runtime/python314.dll', 'runtime/python314.zip', 'runtime/python314._pth', 'runtime/sqlcipher3/_sqlite3.cp314-win_amd64.pyd', 'runtime/zstandard/backend_c.cp314-win_amd64.pyd', 'windows_selected_engine.py', 'windows_selected_runner.py', 'windows_selected_native.py', 'windows_keyproof_core.py', 'windows_keyproof_platform.py', 'Verify-SelectedTest.ps1', 'Start-SelectedTest.cmd', 'README-SELECTED.txt', 'THIRD-PARTY-SELECTED-NOTICES.txt')) {
+    foreach ($required in @('runtime/python.exe', 'runtime/python314.dll', 'runtime/python314.zip', 'runtime/python314._pth', 'runtime/sqlcipher3/_sqlite3.cp314-win_amd64.pyd', 'runtime/zstandard/backend_c.cp314-win_amd64.pyd', 'windows_selected_engine.py', 'windows_selected_runner.py', 'windows_selected_supervisor.py', 'windows_selected_progress.py', 'windows_selected_native.py', 'windows_keyproof_core.py', 'windows_keyproof_platform.py', 'Verify-SelectedTest.ps1', 'Start-SelectedTest.cmd', 'README-SELECTED.txt', 'THIRD-PARTY-SELECTED-NOTICES.txt')) {
         if (-not $names.ContainsKey($required.ToLowerInvariant())) { Stop-Check 'manifest_required_payload_missing' }
     }
     # Enumerate this package only, never results/private or any account folder.
@@ -114,6 +114,7 @@ try {
     Write-Host '程序先在本机进行虚构加密库及 WAL 冒烟，再初始化所需 message_0/message_1/contact 密钥。'
     Write-Host '初始化会只读检查所选微信进程内存；内存块可能含聊天，仅解析密钥，不保存转储、不上传。'
     Write-Host '随后只用联系人元信息定位两个指定会话，建立新消息基线。不要提前发送测试码。'
+    Write-Host 'r2 会在输入前明确显示提示，并由独立父进程每十秒显示非等待阶段进度；初始化总计最多 120 秒。'
     Write-Host '等程序显示 READY 和四个随机测试码，再按程序提示回车计时，并让同一位测试朋友发送。'
     Write-Host '微信保持登录和联网，桌面微信放后台，不打开被测私聊或群。程序不会替你发送消息。'
     Add-Type -AssemblyName System.Windows.Forms
@@ -178,7 +179,7 @@ try {
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
     $outputDirectory = Join-Path $resultsRoot ($stamp + '-selected-live')
     $runtime = Join-Path $packageRoot 'runtime\python.exe'
-    $core = Join-Path $packageRoot 'windows_selected_runner.py'
+    $core = Join-Path $packageRoot 'windows_selected_supervisor.py'
     $creationText = $creationTime.ToString([Globalization.CultureInfo]::InvariantCulture)
     $processText = $processNumber.ToString([Globalization.CultureInfo]::InvariantCulture)
     $script:FailureReason = 'fixed_runtime_selected_test_failed'
@@ -192,6 +193,7 @@ try {
     if ($null -eq $nativeExit) { Stop-Check 'fixed_runtime_exit_code_unavailable' }
     Write-Host ('测试步骤已结束；退出码：' + $nativeExit)
     Write-Host ('如已生成，请只回传：results\' + $stamp + '-selected-live\result-to-send.json')
+    Write-Host '请同时回传本次目录下 supervisor.json；若有 supervisor-result-to-send.json，也一并回传。'
     Write-Host '不要发送 private 文件夹、validated-message0-key.json 或其他密钥文件。'
     Write-Host '四条受控消息是否读取成功，以本次脱敏报告为准。'
     exit $nativeExit

@@ -18,7 +18,8 @@ SOURCES = (
     'Verify-SelectedTest.ps1', 'Start-SelectedTest.cmd',
     'windows_selected_engine.py', 'windows_selected_runner.py',
     'windows_selected_native.py', 'windows_keyproof_core.py',
-    'windows_keyproof_platform.py', 'README-SELECTED.txt',
+    'windows_keyproof_platform.py', 'windows_selected_supervisor.py',
+    'windows_selected_progress.py', 'README-SELECTED.txt',
     'THIRD-PARTY-SELECTED-NOTICES.txt',
 )
 ARTIFACTS = (
@@ -146,7 +147,7 @@ def main():
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    output = args.output or root / 'artifacts/deliverables/windows-check/ChatLens-Windows-SelectedTest-20261030.zip'
+    output = args.output or root / 'artifacts/deliverables/windows-check/ChatLens-Windows-SelectedTest-20261030-r2.zip'
     print(json.dumps(build(root, output), ensure_ascii=False, indent=2))
 
 

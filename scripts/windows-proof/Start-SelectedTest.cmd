@@ -10,6 +10,6 @@ if not exist "%SELECTED_PS%" (
 "%SELECTED_PS%" -NoLogo -NoProfile -STA -ExecutionPolicy Bypass -File "%~dp0Verify-SelectedTest.ps1"
 set "SELECTED_EXIT=%ERRORLEVEL%"
 echo.
-echo Send only result-to-send.json. Keep all private files on this PC.
+echo Send this run's public JSON reports only. Keep all private files on this PC.
 pause
 exit /b %SELECTED_EXIT%
