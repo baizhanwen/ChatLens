@@ -63,3 +63,11 @@ Windows 读取不能直接照搬本机 Mac 初始化或 POSIX 文件锁。当前
 本机 23 项合成／WinAPI mock 测试通过，证据为 `artifacts/verification/windows-check/2026-10-29/synthetic-keyproof-tests.txt`；包含完整 HMAC、错误 key、分块／缺口、扫描限额、PID 复用、Win64 类型、路径身份、写前 ACL、既有文件保护，以及公开报告写失败不报成功。它们不代表 Windows API、便携运行时或真实密钥已在用户电脑执行。
 
 交付 ZIP 为 `artifacts/deliverables/windows-check/ChatLens-Windows-KeyProof-20261029.zip`（13,459,576 字节），SHA256 为 `01316297161c51517cdffbe7b777d7deee646b6131c75043ded99e8297b882a4`。仅包含 39 个官方运行时文件、6 个公开脚本／说明和 1 个清单；ZIP CRC、逐文件哈希、来源一致性、编码和私人材料扫描通过，证据为 `artifacts/verification/windows-check/2026-10-29/keyproof-package-review.json`。打包入口为 `python3 scripts/build_windows_keyproof_package.py`（新输出不覆盖旧文件）。Windows 便携启动、系统 API、真实 key 和聊天读取仍为未验证。
+
+## 2026-10-30：旧进程配置需要刷新
+
+用户在 Windows 使用前一天第二包生成的私有配置运行第三包。截图显示包完整性检查通过，但在进程重新核对阶段报 `selected_process_revalidation_failed`，异常类型为 `Microsoft.PowerShell.Commands.ProcessCommandException`。按源码控制流，失败位于 `Get-Process -Id`，尚未启动便携 Python 或内存扫描，消息读取仍为 0。最可能为旧配置记录的进程已退出或重启；没有远程检查当前 Windows 状态，不将推断作为直接实测。
+
+处理：保持当前微信登录，重新运行已有的 `Start-ReaderSetup.cmd`，按最新列表选择主窗口候选，选择同一授权账号目录，Python 可继续取消；随后运行第三包并选择本次新生成的 `private/config.json`。两个步骤之间保持微信运行。配置和密钥留在 Windows 本机，不回传。本次不重打历史包、不更改扫描范围、不自动切换账号或提权。
+
+脱敏记录为 `artifacts/verification/windows-check/2026-10-30/keyproof-process-refresh-required.json`，原始截图仅存私有目录。此失败不能作为密钥、解密或后台读取能力已通过／不支持的依据。

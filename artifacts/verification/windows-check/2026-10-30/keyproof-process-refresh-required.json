@@ -1,0 +1,22 @@
+{
+  "recorded_at_utc": "2026-10-30T02:29:51.166274+00:00",
+  "evidence_kind": "user_supplied_windows_launcher_screenshot_and_local_source_control_flow",
+  "stage": "keyproof_launcher_process_revalidation",
+  "status": "待外部条件",
+  "reason": "selected_process_revalidation_failed",
+  "exception_type": "Microsoft.PowerShell.Commands.ProcessCommandException",
+  "package_integrity_check_status": "通过",
+  "private_config_local_selection_reached": true,
+  "process_lookup_status": "失败",
+  "diagnosis": "Saved process ID from the previous setup could not be resolved; a restarted or exited process is the likely cause. Current Windows process state was not inspected remotely.",
+  "next_action": "Rerun existing Start-ReaderSetup.cmd, select the current main-window candidate and the same authorized account directory, then run KeyProof with the freshly generated local config.",
+  "portable_python_started": false,
+  "key_scanner_started": false,
+  "chat_messages_read": 0,
+  "business_read_status": "未验证",
+  "private_config_or_keys_uploaded": false,
+  "limitations": [
+    "Screenshot is a launcher failure, not key acquisition or database decryption evidence.",
+    "Do not infer Windows background reading support or failure from a stale process identifier."
+  ]
+}
