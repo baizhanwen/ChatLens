@@ -14,6 +14,7 @@
 
 - Python 源码测试：`python3 -B -m unittest discover -s tests -v`。
 - 本机隔离环境完整测试：`.build/wechat-read-venv/bin/python -B -m unittest discover -s tests -v`；包含 SQLCipher／zstandard 合成测试，不读取真实微信。
+- 自动测试报告默认写 `.build/test-evidence/`；可用 `CHATLENS_TEST_EVIDENCE_DIR` 为本轮指定独立目录。不得把回归结果写回 `docs/evidence/` 覆盖历史证据。
 - 前端构建：`npm --prefix apps/desktop run build`；迁移验证应指定新的输出目录，保留既有 dist 和交付包。
 - 旧开发版入口：`sh scripts/dev.sh`；构建与启动条件以 README 和锁定依赖为准，不因界面可打开就声明真实读取通过。
 - Windows 检测包独立验证；PowerShell 静态审查、合成 WinAPI mock 和 Mac 测试不能代替 Windows 实机。

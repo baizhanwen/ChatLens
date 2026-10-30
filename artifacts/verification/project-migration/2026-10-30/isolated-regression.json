@@ -1,0 +1,9 @@
+{
+  "status": "通过",
+  "test_count": 139,
+  "seconds": 14.828,
+  "historical_evidence_output_avoided": true,
+  "test_evidence_environment_variable": "CHATLENS_TEST_EVIDENCE_DIR",
+  "default_output": ".build/test-evidence",
+  "scope": "synthetic_tests_only_no_real_client_or_model"
+}

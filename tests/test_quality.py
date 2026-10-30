@@ -1,5 +1,6 @@
 """Report quality against fixed labels. Failing target metrics are reported honestly."""
 import json
+import os
 import platform
 import unittest
 from datetime import datetime, timezone
@@ -39,7 +40,7 @@ def evaluate():
             failures.append(dict(detail,text=sample['messages'][1]['content']))
     precision=tp/(tp+fp) if tp+fp else 0;recall=tp/(tp+fn) if tp+fn else 0
     report={'dataset':'fixtures/quality/annotated-60.json','dataset_version':fixture['dataset_version'],'generated_at':datetime.now(timezone.utc).isoformat(),'sample_count':len(fixture['samples']),'category_counts':category_counts,'model':'deterministic-rules-v1','real_model_verified':False,'annotation_origin':fixture['annotation_origin'],'evaluation_scope':'synthetic fixed-label development test; not real-model quality or human blind review','counts':{'true_positive':tp,'false_positive':fp,'false_negative':fn,'invalid_evidence':invalid},'precision':round(precision,6),'recall':round(recall,6),'targets':{'precision':.90,'recall':.80,'invalid_evidence':0},'targets_met':{'precision':precision>=.90,'recall':recall>=.80,'invalid_evidence':invalid==0},'field_accuracy_on_matched':{'sample_count':field_count,'owner':round(owner_correct/field_count,6) if field_count else None,'due_at':round(due_correct/field_count,6) if field_count else None},'failures':failures,'samples':details,'system':platform.platform(),'python':platform.python_version()}
-    output=ROOT/'docs/evidence';output.mkdir(parents=True,exist_ok=True);(output/'rule-quality.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
+    output=Path(os.environ.get('CHATLENS_TEST_EVIDENCE_DIR',str(ROOT/'.build/test-evidence')));output.mkdir(parents=True,exist_ok=True);(output/'rule-quality.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
     return report
 
 class QualityTests(unittest.TestCase):

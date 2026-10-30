@@ -100,6 +100,6 @@ class WorkerHTTP(unittest.TestCase):
             time.sleep(.1)
         todos=tasks['tasks'];self.assertGreater(len(todos),0);self.assertEqual(len(todos),len({t['id'] for t in todos}))
         evidence={'dataset':'10000 synthetic events: 9000 originals,500 duplicate,300 revision,200 revoked; reversed sent_at order','started_cursor_before_kill':cursor,'committed_cursor_after_kill':checkpoint,'committed_messages_after_kill':actual,'final_cursor':state['replay']['cursor'],'visible_messages':r['total'],'expected_visible_messages':8800,'updated_visible':300,'todo_count':len(todos),'todo_ids_unique':len(todos)==len({t['id'] for t in todos}),'elapsed_seconds':round(time.monotonic()-began,3),'python':sys.version,'system':os.uname().sysname+' '+os.uname().release,'capture_mode':'synthetic replay; NOT real client capture'}
-        output=ROOT/'docs'/'evidence';output.mkdir(parents=True,exist_ok=True);(output/'worker-10000-recovery.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2))
+        output=Path(os.environ.get('CHATLENS_TEST_EVIDENCE_DIR',str(ROOT/'.build/test-evidence')));output.mkdir(parents=True,exist_ok=True);(output/'worker-10000-recovery.json').write_text(json.dumps(evidence,ensure_ascii=False,indent=2))
 
 if __name__=='__main__':unittest.main()

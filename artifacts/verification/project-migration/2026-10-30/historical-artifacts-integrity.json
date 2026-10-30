@@ -1,0 +1,16 @@
+{
+  "status": "通过",
+  "original_historical_and_private_files_rechecked": 422,
+  "unchanged": true,
+  "scope": "original_delivery_documents_renders_builds_reports_packages_and_private_test_files",
+  "existing_archives_rebuilt": false,
+  "private_files_listed_in_public_report": false,
+  "legacy_test_report_overwrite_detected_and_corrected": true,
+  "reports_restored_to_exact_pre_migration_sha256": [
+    "docs/evidence/rule-quality.json",
+    "docs/evidence/worker-10000-recovery.json"
+  ],
+  "restoration_method": "exact_pre_migration_fingerprint_constrained_byte_recovery",
+  "new_test_reports_preserved_separately": true,
+  "future_regression_output_isolated": true
+}

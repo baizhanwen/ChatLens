@@ -107,6 +107,8 @@ Electron渲染进程禁用Node、启用上下文隔离与sandbox，仅白名单I
 
 ## 构建与验证
 
+自动测试新生成的合成报告默认写入 `.build/test-evidence/`，不会覆盖 `docs/evidence/` 中的历史报告；需要保留某一轮结果时，通过 `CHATLENS_TEST_EVIDENCE_DIR` 指定独立输出目录。
+
 ```bash
 python3 -m unittest discover -s tests -v
 sh scripts/build_native_macos.sh
@@ -115,6 +117,6 @@ sh scripts/build-macos.sh
 
 macOS脚本生成包含Python工作进程的arm64应用、DMG和ZIP。原生helper本机编译，应用为未公证开发版；签名、Gatekeeper首次运行、另一台Mac的安装和卸载仍需发布验收。Windows执行 `powershell -NoProfile -File scripts/build-windows.ps1`，须在Windows实机构建和验收，不能用macOS构建替代。
 
-可复现探针：`python3 scripts/probe_clients.py --output docs/evidence/m0-native-probe.json`，只读元信息；不会复制聊天库。原生合成窗口测试：`scripts/native/bin/macos-watch --self-test`、`--self-test --pause-test`。
+可复现探针：`python3 scripts/probe_clients.py --output .build/current-probe.json`，只读元信息；不会复制聊天库。原生合成窗口测试：`scripts/native/bin/macos-watch --self-test`、`--self-test --pause-test`。
 
-见 [施工状态](docs/施工状态.md)、[兼容性表](docs/compatibility.json)、[接入验证](docs/接入验证记录.md)、[视觉设计](docs/视觉读取设计.md)、[验收报告](docs/验收报告.md)、[已知限制](docs/已知限制.md)、[操作手册](docs/操作手册.md)。证据均在 `docs/evidence/`；个人原文和截图不得提交公开仓库。
+见 [施工状态](docs/施工状态.md)、[兼容性表](docs/compatibility.json)、[接入验证](docs/接入验证记录.md)、[视觉设计](docs/视觉读取设计.md)、[验收报告](docs/验收报告.md)、[已知限制](docs/已知限制.md)、[操作手册](docs/操作手册.md)。原开发版证据保留在 `docs/evidence/`，后续脱敏验证见 `artifacts/verification/`；新测试和探针使用独立输出，个人原文和截图不得提交公开仓库。
