@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "verified_at_utc": "2026-11-01T12:56:45.851335+00:00",
+  "repository": "https://github.com/baizhanwen/ChatLens",
+  "source_commit": "3cb14371767ae3a4e832638044dc0f266cc81fd5",
+  "tag": "windows-web-20261101-r5",
+  "tag_target_sha": "3cb14371767ae3a4e832638044dc0f266cc81fd5",
+  "remote_main_contains_source_commit": true,
+  "release_url": "https://github.com/baizhanwen/ChatLens/releases/tag/windows-web-20261101-r5",
+  "is_prerelease": true,
+  "is_draft": false,
+  "assets": [
+    {
+      "name": "ChatLens-Windows-Web-20261101-r5-SHA256SUMS.txt",
+      "bytes": 103,
+      "sha256": "3aceabc5c6b8899a0759f59570e3fd7990518ff85b3662579282a078ccdb848c",
+      "github_digest": "sha256:3aceabc5c6b8899a0759f59570e3fd7990518ff85b3662579282a078ccdb848c",
+      "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r5/ChatLens-Windows-Web-20261101-r5-SHA256SUMS.txt",
+      "download_verified": true
+    },
+    {
+      "name": "ChatLens-Windows-Web-20261101-r5-TEST-GUIDE.md",
+      "bytes": 11780,
+      "sha256": "176d3ddaa168bbef0a51d97e5b2d363195d0dffa7c06d79336f0cfd9cf925922",
+      "github_digest": "sha256:176d3ddaa168bbef0a51d97e5b2d363195d0dffa7c06d79336f0cfd9cf925922",
+      "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r5/ChatLens-Windows-Web-20261101-r5-TEST-GUIDE.md",
+      "download_verified": true
+    },
+    {
+      "name": "ChatLens-Windows-Web-20261101-r5.zip",
+      "bytes": 15639141,
+      "sha256": "53ef8517386e6837802524c0aa5dc0389fc3b203c89749a3b0866d318bbf51e8",
+      "github_digest": "sha256:53ef8517386e6837802524c0aa5dc0389fc3b203c89749a3b0866d318bbf51e8",
+      "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r5/ChatLens-Windows-Web-20261101-r5.zip",
+      "download_verified": true
+    }
+  ],
+  "old_release_assets_overwritten": false,
+  "r4_intermediate_candidate_published": false,
+  "private_chat_or_configs_published": false,
+  "existing_license_state_preserved": true,
+  "real_windows_r5_end_to_end_status": "未验证"
+}
