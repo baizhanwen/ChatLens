@@ -28,6 +28,7 @@ class FakeProcess:
 
     def __init__(self, *arguments):
         self.arguments, self.handle, self.closed = arguments, None, False
+        self.expected_exe = arguments[1]
         self.instances.append(self)
 
     def __enter__(self):
@@ -81,16 +82,42 @@ class FakeProbe:
         return self.close_ok
 
 
+class FakeForeground:
+    def __init__(self):
+        self.image = r'C:\synthetic\Other.exe'
+        self.open_ok, self.query_ok, self.close_ok = True, True, True
+        self.opened, self.queries, self.closed = [], [], []
+        self.after_query = lambda: None
+
+    def OpenProcess(self, access, inherit, pid):
+        self.opened.append((access, inherit, pid))
+        return 202 if self.open_ok else None
+
+    def QueryFullProcessImageNameW(self, handle, flags, image, length):
+        self.queries.append((handle, flags, C.cast(length, C.POINTER(C.c_uint32))[0]))
+        if self.query_ok:
+            image.value = self.image
+        self.after_query()
+        return self.query_ok
+
+    def CloseHandle(self, handle):
+        self.closed.append(handle)
+        return self.close_ok
+
+
 class NativeTests(unittest.TestCase):
     def setUp(self):
         self.api = FakeProbe()
+        self.foreground = FakeForeground()
         self.stack = contextlib.ExitStack()
         self.addCleanup(self.stack.close)
         self.stack.enter_context(patch.object(N, 'WindowsProcess', FakeProcess))
         self.stack.enter_context(patch.object(N, '_probe_api', return_value=self.api))
 
     def native(self):
-        return N.NativeState(42, r'C:\synthetic\Weixin.exe', 1234)
+        native = N.NativeState(42, r'C:\synthetic\Weixin.exe', 1234)
+        native.process.api = self.foreground
+        return native
 
     def test_bound_handle_background_fields_and_desktop_closed(self):
         with self.native() as native:
@@ -111,6 +138,51 @@ class NativeTests(unittest.TestCase):
                 state = native.sample()
                 self.assertTrue(state['frontmost'])
                 self.assertTrue(state['probe_succeeded'])
+        self.assertEqual(self.foreground.opened, [])
+
+    def test_same_executable_child_is_foreground_without_rebinding_main_pid(self):
+        self.foreground.image = r'c:\SYNTHETIC\weixin.EXE'
+        with self.native() as native:
+            state = native.sample()
+            self.assertTrue(state['frontmost'])
+            self.assertTrue(state['probe_succeeded'])
+            self.assertEqual(native.pid, 42)
+            self.assertEqual(native.process.arguments, (42, r'C:\synthetic\Weixin.exe', 1234))
+        self.assertEqual(self.foreground.opened, [(0x1000, False, 99)])
+        self.assertEqual(self.foreground.queries, [(202, 0, 32768)])
+        self.assertEqual(self.foreground.closed, [202])
+        self.assertEqual(set(state), {'probe_succeeded', 'running', 'frontmost', 'screen_locked'})
+        self.assertNotIn(self.foreground.image, str(state))
+
+    def test_different_foreground_executable_confirms_background_with_query_only_handle(self):
+        with self.native() as native:
+            state = native.sample()
+        self.assertTrue(state['probe_succeeded'])
+        self.assertFalse(state['frontmost'])
+        self.assertEqual(self.foreground.opened, [(0x1000, False, 99)])
+        self.assertEqual(self.foreground.closed, [202])
+
+    def test_foreground_metadata_or_close_failure_cannot_confirm_background(self):
+        for field in ('open_ok', 'query_ok', 'close_ok'):
+            with self.subTest(field=field):
+                self.foreground = FakeForeground()
+                setattr(self.foreground, field, False)
+                with self.native() as native:
+                    state = native.sample()
+                self.assertFalse(state['probe_succeeded'])
+                self.assertIsNone(state['frontmost'])
+                self.assertEqual(self.foreground.closed, [] if field == 'open_ok' else [202])
+
+    def test_foreground_window_or_pid_change_during_metadata_query_is_unknown(self):
+        for field in ('window', 'foreground_pid'):
+            with self.subTest(field=field):
+                self.api, self.foreground = FakeProbe(), FakeForeground()
+                self.foreground.after_query = lambda: setattr(self.api, field, 5678)
+                with patch.object(N, '_probe_api', return_value=self.api), self.native() as native:
+                    state = native.sample()
+                self.assertFalse(state['probe_succeeded'])
+                self.assertIsNone(state['frontmost'])
+                self.assertEqual(self.foreground.closed, [202])
 
     def test_missing_foreground_and_failed_pid_query_never_confirm(self):
         with self.native() as native:

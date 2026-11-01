@@ -81,6 +81,22 @@ class NativeState:
         self.api = None
         self.process.__exit__(*error)
 
+    def _same_foreground_executable(self, pid):
+        # A verified launcher may stay bound while a same-executable child
+        # owns the foreground window. Query metadata only, then discard it.
+        native = self.process.api
+        handle = native.OpenProcess(0x1000, False, pid)
+        if not handle:
+            raise PlatformError('native_foreground_process_unavailable')
+        try:
+            image, length = C.create_unicode_buffer(32768), C.c_uint32(32768)
+            if not native.QueryFullProcessImageNameW(handle, 0, image, C.byref(length)):
+                raise PlatformError('native_foreground_identity_unavailable')
+            return ntpath.normcase(_path(image.value)) == ntpath.normcase(self.process.expected_exe)
+        finally:
+            if not native.CloseHandle(handle):
+                raise PlatformError('native_foreground_close_failed')
+
     def sample(self):
         result = {'probe_succeeded': False, 'running': False,
                   'frontmost': None, 'screen_locked': None}
@@ -97,8 +113,16 @@ class NativeState:
             foreground_known = bool(window and self.api.GetWindowThreadProcessId(window, C.byref(foreground_pid))
                                     and foreground_pid.value)
             if foreground_known:
-                result['frontmost'] = foreground_pid.value == self.pid
+                result['frontmost'] = (foreground_pid.value == self.pid
+                                       or self._same_foreground_executable(foreground_pid.value))
             result['screen_locked'], desktop_ok = _desktop(self.api)
+            if foreground_known:
+                confirmed_window, confirmed_pid = self.api.GetForegroundWindow(), C.c_uint32()
+                foreground_known = bool(confirmed_window == window
+                    and self.api.GetWindowThreadProcessId(confirmed_window, C.byref(confirmed_pid))
+                    and confirmed_pid.value == foreground_pid.value)
+                if not foreground_known:
+                    result['frontmost'] = None
             result['probe_succeeded'] = foreground_known and desktop_ok
         except Exception:
             # Native error strings and desktop names must never escape.

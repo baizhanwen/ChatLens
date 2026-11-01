@@ -129,6 +129,7 @@ class WindowsWebManager:
         self.catalog_ready = self.catalog_loading = self.queued = self.switching = False
         self.closed, self.account_matched, self.account_blocked = False, bool(read_only), False
         self.account_probe_reason = 'windows_account_not_checked'
+        self.account_diagnostics = {}
         self.stage, self.reason = 'starting', None
         self.description = '正在恢复已有关注范围；原消息和采集位置保留。'
         self.account_identity = None
@@ -280,7 +281,7 @@ class WindowsWebManager:
             self._open_saved(self.active_scope_id)
 
     def _tick_connection(self, *, force=False):
-        """Process metadata is only a candidate; account handles establish login."""
+        """Process metadata is a candidate; handles establish the data binding."""
         if not self.wait_for_wechat or self.read_only:
             return self.account_matched
         if not force and self.clock() - self.last_process_at < 3:
@@ -316,6 +317,7 @@ class WindowsWebManager:
             self.pid = self.creation_time = None
             self.account_probe = self.provided_account_probe
             self.account_probe_reason = 'windows_account_not_checked'
+            self.account_diagnostics = {}
             if state == 'not_running':
                 self._disconnect_waiting('waiting_for_wechat', self.process_reason,
                     '尚未检测到原路径的微信。请打开微信并完成登录，再点击重新检测；也可以只浏览本机已保存消息。', allow_saved=True)
@@ -332,9 +334,10 @@ class WindowsWebManager:
                     messages.get(self.process_reason, '暂时不能唯一确认微信程序。请只保留原账号对应的微信，完成登录后重新检测。'))
             return False
         if (pid, birth) != (self.pid, self.creation_time):
-            self._disconnect_waiting('checking_account', None, '已找到微信程序，正在核对登录账号；程序运行并不代表已经登录。')
+            self._disconnect_waiting('checking_account', None, '已找到原路径的微信程序，正在核对当前打开的账号资料。')
             self.pid, self.creation_time = pid, birth
             self.account_probe = None
+            self.account_diagnostics = {}
         if self.account_probe is None:
             factory = self.account_probe_factory
             if factory is None and self.provided_account_probe is not None:
@@ -350,7 +353,7 @@ class WindowsWebManager:
             self.stage = 'needs_connection'
             self.description = ('当前活动微信资料与所选本机资料不一致，已隔离旧范围。请登录原账号，或关闭入口后选择另一账号自己的资料目录。'
                 if self.connection_state == 'wrong_account' else
-                '已找到微信程序，但尚未核验原账号登录。请在微信中完成登录后重新检测；若已登录，请保持微信运行并检查账号核验权限。')
+                '已找到微信程序，当前账号读取尚未核验。请保持原账号微信运行并点击重新检测；已登录时仍可能因程序绑定或句柄访问条件而暂未取得核验依据。原数据和配置保持不变。')
             return False
         if self.account_blocked:
             # Returning to this account creates a fresh domain as well. A page
@@ -445,6 +448,9 @@ class WindowsWebManager:
         except Exception:
             matched = False
             reason = None
+            result = None
+        from windows_account_probe import sanitize_diagnostics
+        self.account_diagnostics = sanitize_diagnostics(result.get('diagnostics') if isinstance(result, dict) else None)
         public_reasons = {'windows_account_root_invalid', 'windows_account_handle_invalid',
             'windows_account_device_unresolved', 'windows_account_open_database_unavailable',
             'windows_account_changed_or_ambiguous', 'windows_account_open_database_matched',
@@ -462,7 +468,9 @@ class WindowsWebManager:
             if self.wait_for_wechat:
                 self.connection_state = ('wrong_account' if self.account_probe_reason == 'windows_account_changed_or_ambiguous'
                                          else 'account_unverified')
-            self.description = '无法确认当前微信仍是此资料对应的账号，已停止采集并隔离旧页面。请登录原账号，或关闭后选择另一账号自己的资料目录。'
+            self.description = ('当前活动微信资料与所选资料不一致，已停止采集并隔离旧页面。请切回原账号，或关闭后选择另一账号自己的资料目录。'
+                if self.account_probe_reason == 'windows_account_changed_or_ambiguous' else
+                '当前账号读取尚未核验，已停止采集并保留原数据。请保持原账号微信运行后重新检测；已登录时也可能暂时无法取得可靠的账号打开状态。')
             return False
         return True
 
@@ -688,6 +696,30 @@ class WindowsWebManager:
                 'active_scope': next((row for row in profiles if row['active']), None),
                 'profiles': profiles, 'workspace_path': '/'}
 
+    def connection_diagnostics(self, expected_generation=None):
+        """Export cached fixed codes/counts only, never process or account identity."""
+        with self.lock:
+            self._check_generation(expected_generation)
+            from windows_account_probe import sanitize_diagnostics
+            connection = self.setup()['connection']
+            state = connection['state']
+            states = {'cleanup_required', 'explicit_read_only', 'waiting_for_wechat', 'checking_account',
+                      'wrong_account', 'account_unverified', 'stopped', 'connected'}
+            reasons = {'windows_account_not_checked', 'windows_account_root_invalid', 'windows_account_handle_invalid',
+                       'windows_account_device_unresolved', 'windows_account_open_database_unavailable',
+                       'windows_account_changed_or_ambiguous', 'windows_account_open_database_matched',
+                       'windows_account_probe_unavailable'}
+            stage = connection.get('collector_stage')
+            return {'schema_version': 1, 'kind': 'chatlens_windows_connection_diagnostics', 'platform': 'windows',
+                'connection_state': state if state in states else 'account_unverified',
+                'account_reason': self.account_probe_reason if self.account_probe_reason in reasons else 'windows_account_probe_unavailable',
+                'checks': {key: connection['checks'][key] for key in
+                           ('process_running', 'account_verified', 'reader_ready', 'scope_selected', 'collecting')},
+                'account_diagnostics': sanitize_diagnostics(self.account_diagnostics),
+                'selected_conversation_count': min(MAX_CONVERSATIONS, len(self.active_config.get('conversations', []))),
+                'collector_running': bool(connection.get('collector_running', self.child is not None and self.child.poll() is None)),
+                'collector_stage': stage if stage in {'starting', 'collecting', 'paused', 'stale', 'stopping', 'stopped', 'error'} else None}
+
     def request_recheck(self, expected_generation=None):
         with self.lock:
             self._check_generation(expected_generation)
@@ -696,7 +728,7 @@ class WindowsWebManager:
             if not self.queued:
                 self.queued = True
                 self.connection_state = 'checking_account'
-                self.description = '正在重新检测微信程序和原账号登录，检测完成后会显示下一步。'
+                self.description = '正在重新检测微信程序和原账号读取依据，检测完成后会显示下一步。'
                 self.commands.put(('recheck', None))
             return self.setup()
 

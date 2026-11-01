@@ -1,0 +1,48 @@
+{
+  "status": "passed",
+  "scope": "Windows waiting-login-to-collection production manager HTTP UI with explicit synthetic native/source adapters",
+  "passed_check_count": 16,
+  "checks": [
+    "normal_start_without_wechat_opens_five_step_guide_and_keeps_saved_data",
+    "offline_workspace_explicitly_explains_saved_messages_and_has_connection_entry",
+    "recheck_without_wechat_is_retryable_and_does_not_start_or_reset",
+    "missing_account_reading_evidence_is_neutral_and_keeps_verified_process_fact",
+    "unverified_account_can_download_only_safe_cached_diagnostic_counts",
+    "login_in_same_service_enables_scope_management_without_automatic_collection",
+    "explicit_start_restores_original_scope_without_changing_baseline_or_messages",
+    "starting_owned_heartbeat_does_not_claim_ready_or_allow_duplicate_start",
+    "paused_owned_heartbeat_is_distinct_from_stopped_and_stays_actionable",
+    "stopped_collector_has_actionable_banner_and_can_restart_in_same_web_service",
+    "wechat_exit_clears_old_page_nonce_and_returns_to_waiting_with_offline_browse",
+    "another_account_is_distinct_from_not_logged_in_and_never_reuses_old_domain",
+    "original_account_returns_with_new_pid_and_resumes_authorized_checkpoint",
+    "390px_waiting_ready_and_scope_steps_have_visible_actions_without_overflow",
+    "explicit_read_only_is_named_and_explains_why_scope_change_is_disabled",
+    "explicit_offline_workspace_preserves_management_link_and_next_step_description"
+  ],
+  "viewports": [
+    "1440x1000",
+    "390x844"
+  ],
+  "browser_runtime_errors": 0,
+  "browser_external_requests": 0,
+  "source_sha256": {
+    "apps/web/index.html": "28df561c50d5226b7f0c9d71d25a69f05ebca5492a7e4a049efe7d9097572b6e",
+    "apps/web/app.js": "b77539a47737cdac4f5e56c759f7d0614e8fda0a62254d4c8b0d11e037a94ece",
+    "apps/web/styles.css": "1a96f1b4d4e0430eb9fb7040039b72155be64099541d0eabe8c713ca1464c5a3",
+    "apps/web/connect.html": "73d30e74951eaff6c447391a855869616b1ba962d6e7d641c5416423a0407284",
+    "apps/web/connect.js": "efd6dfaf08d3e5ac45a22b3cb9ac118365fea1755c391d826c122872481e7e58",
+    "apps/web/connect.css": "39fdc8f36df3c2caf72f95c7edaaa616e6cdaabdb9ecfa472d199cbbafcef4fe",
+    "scripts/web-windows-connection-smoke.cjs": "1ff1077c8b1402fb523b17117a55713687b1356fe60781108abe02e192f8c76c",
+    "tests/web_windows_multi_fixture.py": "f42813d9e4e2abed1f1c6060eef08889243452d458f45a3f25bdca7567e426f1",
+    "tests/web_ai_fixture.py": "76683ab4a989fd3fbacae0c6351416d6979f3b9273e84e03ea9205200b59413d",
+    "scripts/windows-proof/windows_web_manager.py": "1e42b509a1089cc821c4a94ce719f4da0a246e179bee5f57cb66159cf21bcd36",
+    "scripts/windows-proof/windows_web_server.py": "89d81ebd7dbfe0dca3553c6694b286c5d5e2cafa14b136477e78a88ea98bb39d",
+    "scripts/windows-proof/web_runtime.py": "c18f32bc54fa8d2ecddce7e8998233f752593e8eaad1c23e65630e803811ea90",
+    "scripts/windows-proof/windows_account_probe.py": "dc0a1bf60c8ac0a8da6f0537801d8fe563a81706dccc4d0ac5d4fb69fd6391f4",
+    "scripts/windows-proof/windows_process_detection.py": "e6f6015b4a9c8f7916703c32fdf336140106f7afb340714bbe15ab0762a48523"
+  },
+  "real_windows_api_executed": false,
+  "real_chat_or_cloud_used": false,
+  "permanent_read_only_recovery_verified_synthetically": true
+}

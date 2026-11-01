@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "input": "explicit synthetic launcher -> main-window -> helper tree",
+  "published_r3_archive_sha256": "e8a75d9c91526fb639355da85213300472e90c826cde628d59e596c5f66dd63b",
+  "r3_module_sha256": "22eb98d76789f730546b2068b187d0f4feff334a9d89560ea7dc54c408c8c49b",
+  "r3_selected_role": "launcher",
+  "fixed_selected_role": "main_window",
+  "fixed_multiple_main_windows_state": "ambiguous",
+  "method": "Only two pure selector function AST nodes loaded from the hash-verified published archive; no Windows native APIs executed.",
+  "actual_user_process_layout_verified": false,
+  "real_chat_or_cloud_used": false
+}

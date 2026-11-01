@@ -665,6 +665,7 @@
   function windowsConnectionDetails() {
     const value = live.session?.platform === 'windows' ? live.setup?.connection : null;
     if (!value) return null;
+    if (value.state === 'account_unverified') return ['账号读取核验未完成', 'waiting', value.reason === 'windows_reader_configuration_unavailable' ? '原账号读取依据已确认，但读取配置未通过检查。请保持已登录状态，在连接引导中重新核验配置并查看固定诊断。' : value.checks?.process_running === true ? '微信程序已找到，但尚未定位账号读取依据，不代表未登录。请保持当前已登录状态，进入连接引导重新核验或反馈固定诊断。' : '微信程序的本机身份或访问条件尚未完成核验，无法据此判断是否登录。请进入连接引导查看固定诊断。'];
     const phase = typeof value.collector_stage === 'string' ? value.collector_stage : null;
     const running = typeof value.collector_running === 'boolean' ? value.collector_running : value.checks?.collecting === true;
     if (phase !== null && ['connected', 'stopped'].includes(value.state)) {
@@ -684,11 +685,9 @@
     }
     if (value.checks?.collecting === true) return null;
     if (value.reason === 'windows_reader_configuration_unavailable') return ['读取配置需要检查', 'waiting', '原账号读取已核验，但现有配置尚未通过检查。进入连接引导查看原因，原数据和检查点会保留。'];
-    if (value.state === 'account_unverified' && typeof value.reason === 'string' && value.reason.startsWith('windows_process_')) return ['微信程序尚未完成核验', 'waiting', '程序路径、版本或访问条件仍需检查。进入连接引导查看具体原因，不能据此判断账号是否登录。'];
     const details = {
       waiting_for_wechat: ['等待本机微信', 'waiting', '请打开微信并由你完成登录，再进入连接引导点击“重新检测微信”。查看已有消息不表示正在采集。'],
       checking_account: ['正在核验账号读取', 'waiting', '正在检测微信程序和原账号的本机读取范围，请等待连接引导中的实际状态更新。'],
-      account_unverified: ['账号读取尚未核验', 'waiting', '程序存在不代表已完成登录。请在连接引导查看具体原因，完成本人操作后重新检测。'],
       wrong_account: ['微信账号不匹配', 'failure', '当前微信与这份资料的账号不一致，已停止采集并隔离原数据。请切回原账号后重新检测。'],
       connected: ['尚未开始采集', 'waiting', '原账号的本机读取范围已核验。在连接引导点击“开始采集”，即可从保存位置继续。'],
       stopped: ['采集已停止', 'waiting', '已保存消息仍可查看。在连接引导重新检测或点击“开始采集”继续，不必退出本工具。'],

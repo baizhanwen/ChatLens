@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "kind": "chatlens_windows_connection_diagnostics",
+  "platform": "windows",
+  "connection_state": "account_unverified",
+  "account_reason": "windows_account_open_database_unavailable",
+  "checks": {
+    "process_running": true,
+    "account_verified": false,
+    "reader_ready": false,
+    "scope_selected": true,
+    "collecting": false
+  },
+  "account_diagnostics": {
+    "schema_version": 1,
+    "handles_seen": 80,
+    "handles_with_name": 20,
+    "file_type_handles": 0,
+    "family_process_count": 5,
+    "family_processes_completed": 5,
+    "main_database_names_seen": 0,
+    "helper_database_names_seen": 0,
+    "query_completed": true
+  },
+  "selected_conversation_count": 2,
+  "collector_running": false,
+  "collector_stage": "stopped"
+}

@@ -176,6 +176,10 @@ class SyntheticWindowsRuntime:
             start_collector=self.start_child, stop_collector=self.stop_child,
             catalog_loader=lambda _: self.choices,
             account_probe=lambda: {'state': self.account_state, 'matched': self.account_state == 'matched',
+                'diagnostics': {'schema_version': 1, 'handles_seen': 80, 'handles_with_name': 20,
+                    'file_type_handles': 0 if self.account_state == 'unknown' else 6, 'query_completed': True,
+                    'family_process_count': 5, 'family_processes_completed': 5,
+                    'main_database_names_seen': 0, 'helper_database_names_seen': 0 if self.account_state == 'unknown' else 2},
                 'reason': self.account_reason if self.account_state=='matched' else
                           'windows_account_changed_or_ambiguous' if self.account_state=='mismatch' else
                           'windows_account_open_database_unavailable'})

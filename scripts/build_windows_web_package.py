@@ -12,7 +12,7 @@ from build_windows_selected_package import ARTIFACTS, CACHE_DIRECTORY, cached_ar
 
 PREFIX = 'ChatLens-Windows-Web'
 MANIFEST = 'WEB-MANIFEST.json'
-PACKAGE_REVISION = '20261101-r3'
+PACKAGE_REVISION = '20261101-r5'
 SOURCES = (
     'Start-Web.ps1', 'Start-ChatLens.cmd', 'README-WEB.txt',
     'web_runtime.py', 'web_server.py', 'windows_web_manager.py', 'windows_web_server.py',
@@ -74,6 +74,16 @@ def build(root, output):
         'scope': 'explicit_1_to_50_conversation_profiles_with_received_sent_unknown_statistics',
         'conversation_limits': {'minimum': 1, 'maximum': 50},
         'startup': 'Interactive readiness guide with retryable Windows process and current-account verification; explicit collection start; no automatic read-only fallback.',
+        'process_selection': 'After exact executable, supported version, x64 architecture and creation-time checks, prefer exactly one visible, unowned main-window candidate (IsWindowVisible and GW_OWNER == NULL), matching .NET MainWindowHandle filtering without reading titles. Multiple valid main-window candidates remain ambiguous. Only when no valid main-window candidates exist may a unique process-tree root be selected as a hidden/tray candidate; account-reading verification is still required.',
+        'account_process_family': {
+            'windows_execution_status': '未验证',
+            'maximum_members': 16, 'shared_enumeration_budget_seconds': 3, 'child_timeout_seconds': 6,
+            'scope': 'One connected family of the original executable only; every member must retain exact executable, x64 architecture, supported version, creation time and parent/child identity before and after capture.',
+            'evidence': 'Complete PSS handle/name enumeration across every validated member; combine fixed database-path evidence. Another account root yields mismatch; incomplete or unstable evidence yields unknown.',
+            'main_pid_usage': 'The selected main PID remains the collector foreground/background identity; a helper PID never replaces it.',
+            'native_route': 'Existing Toolhelp/process metadata and PSS handle/name capture only; no DuplicateHandle, process-memory or database-content read, key reinitialization or new runtime dependency for account verification.',
+        },
+        'connection_diagnostics': 'User-requested export of cached fixed states, bounded counters and readiness booleans only. Export does not initiate another process/account scan or cloud request and contains no PID, private paths, account/contact identifiers, names, messages, keys, configuration or session credentials.',
         'account_readiness': 'Pending until the original local account and reader configuration are verified; process/window presence is not login or network-online proof.',
         'collector_readiness': 'Only a fresh heartbeat from the currently owned collector establishes actual initialization, collecting, paused or stale state; saved data and a launched process do not establish collection readiness.',
         'native_windows_sdk_execution_status': '未验证',

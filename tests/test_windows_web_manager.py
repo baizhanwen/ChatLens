@@ -383,6 +383,8 @@ class WindowsManagerTests(unittest.TestCase):
         self.assertTrue(unverified['checks']['process_running'])
         self.assertFalse(unverified['checks']['account_verified'])
         self.assertEqual(unverified['state'],'account_unverified')
+        self.assertIn('已登录',unverified['description'])
+        self.assertNotIn('请在微信中完成登录',unverified['description'])
         self.assertEqual(manager.children_started,0)
         self.assertEqual(manager.list_conversations()['conversations'],[])
         with self.assertRaises(ValueError):manager.request_catalog(expected_generation=manager.scope_generation)
@@ -402,6 +404,37 @@ class WindowsManagerTests(unittest.TestCase):
         self.assertEqual(manager.children_started,1)
         self.assertEqual(len(manager.messages('private_test')['messages']),1)
         self.assertEqual(original,{path:path.read_bytes() for path in paths})
+
+    def test_connection_diagnostics_exports_only_cached_codes_and_counts(self):
+        manager=self.waiting_manager();self.detect_process(manager,logged_in=False)
+        counts={'schema_version':1,'handles_seen':80,'handles_with_name':20,
+                'file_type_handles':0,'query_completed':True,'family_process_count':5,
+                'family_processes_completed':5,'main_database_names_seen':0,'helper_database_names_seen':0}
+        self.probe_result['diagnostics']=counts
+        self.clock_value+=4;manager.tick()
+        document=manager.connection_diagnostics(expected_generation=manager.scope_generation)
+        self.assertEqual(set(document),{'schema_version','kind','platform','connection_state','account_reason',
+            'checks','account_diagnostics','selected_conversation_count','collector_running','collector_stage'})
+        self.assertEqual(document['account_diagnostics'],counts)
+        self.assertEqual(document['account_reason'],'windows_account_open_database_unavailable')
+        self.assertEqual(document['connection_state'],'account_unverified')
+        self.assertTrue(document['checks']['process_running'])
+        self.assertFalse(document['checks']['account_verified'])
+        self.assertEqual(document['selected_conversation_count'],2)
+        text=json.dumps(document)
+        for private in (str(self.root),'synthetic-peer','synthetic-group','scope_generation','creation_time','pid'):
+            self.assertNotIn(private,text)
+        # Export is read-only even if the probe would now return a new account.
+        self.probe_result['state']='matched';self.probe_result['matched']=True
+        self.assertEqual(manager.connection_diagnostics()['connection_state'],'account_unverified')
+        self.assertEqual(manager.children_started,0)
+        with self.assertRaisesRegex(WebDataError,'scope_changed'):
+            manager.connection_diagnostics(expected_generation='stale')
+        # Free-form nested data cannot reach the downloadable file.
+        manager.account_diagnostics={**counts,'path':str(self.root)}
+        self.assertEqual(manager.connection_diagnostics()['account_diagnostics'],{})
+        self.process_result['state']='not_running';self.clock_value+=4;manager.tick()
+        self.assertEqual(manager.connection_diagnostics()['account_diagnostics'],{})
 
     def test_running_disconnect_and_new_process_restore_original_account_and_nonce(self):
         manager=self.waiting_manager();self.detect_process(manager,logged_in=True)
@@ -467,6 +500,16 @@ class WindowsManagerTests(unittest.TestCase):
                 response=connection.getresponse();result=json.loads(response.read());status=response.status;connection.close()
                 return status,result
             self.assertIn('/connect.html#token=',server.launch_url)
+            endpoint='/api/setup/diagnostics'
+            self.assertEqual(request('GET',endpoint,Cookie='')[0],401)
+            self.assertEqual(request('GET',endpoint,Origin='https://invalid.example')[0],403)
+            self.assertEqual(request('GET',endpoint,**{'X-ChatLens-Scope':'stale'})[0],409)
+            self.assertEqual(request('GET',endpoint+'?q=unexpected')[0],400)
+            status,document=request('GET',endpoint)
+            self.assertEqual(status,200)
+            self.assertEqual(document['kind'],'chatlens_windows_connection_diagnostics')
+            self.assertNotIn(str(self.root),json.dumps(document))
+            self.assertEqual(manager.children_started,0)
             self.assertEqual(request('POST','/api/setup/recheck',{},Origin='https://invalid.example')[0],403)
             self.assertEqual(request('POST','/api/setup/recheck',{},**{'X-ChatLens-Scope':'stale'})[0],409)
             self.assertEqual(request('POST','/api/setup/recheck',{'unexpected':True})[0],400)
@@ -510,11 +553,15 @@ class WindowsManagerTests(unittest.TestCase):
             elif len(steps)==2:
                 self.assertEqual(steps[-1],'account_unverified')
                 self.assertEqual(commands,[])
-                self.probe_result={'state':'matched','matched':True,'reason':'windows_account_open_database_matched'}
+                self.probe_result={'state':'matched','matched':True,'reason':'windows_account_open_database_matched',
+                    'diagnostics':{'schema_version':1,'family_process_count':5,'family_processes_completed':5,
+                                   'main_database_names_seen':0,'helper_database_names_seen':2,'query_completed':True}}
                 manager.request_recheck(expected_generation=manager.scope_generation)
             elif len(steps)==3:
                 self.assertEqual(steps[-1],'connected')
                 self.assertEqual(commands,[])
+                self.assertEqual(manager.pid,777)
+                self.assertEqual(manager.connection_diagnostics()['account_diagnostics']['helper_database_names_seen'],2)
                 manager.request_start(expected_generation=manager.scope_generation)
             else:
                 self.assertTrue(manager.setup()['connection']['checks']['collecting'])
@@ -568,6 +615,32 @@ class WindowsManagerTests(unittest.TestCase):
                 self.assertEqual(result['reader_readiness_verified'],expected)
                 self.assertEqual(result['collector_stage_before_close'],'starting' if phase=='absent' else phase)
                 self.assertEqual(result['collection_setup_status'],'通过' if expected else '未验证')
+
+    def test_same_executable_launcher_parent_does_not_steal_account_probe_binding(self):
+        from windows_process_detection import select_candidate
+        selected=select_candidate([
+            {'pid':111,'parent_pid':8,'creation_time':1111},
+            {'pid':222,'parent_pid':111,'creation_time':1222},
+            {'pid':333,'parent_pid':222,'creation_time':1333}],{222})
+        probes=[]
+        def probe_factory(pid,birth,executable,db_root):
+            self.assertEqual(executable,self.scope['exe_path'])
+            self.assertEqual(db_root,self.scope['db_root'])
+            def probe():
+                probes.append((pid,birth))
+                return ({'state':'matched','matched':True,'reason':'windows_account_open_database_matched'}
+                        if (pid,birth)==(222,1222) else
+                        {'state':'unknown','matched':False,'reason':'windows_account_open_database_unavailable'})
+            return probe
+        manager=self.manager(wait_for_wechat=True,pid=None,creation_time=None,account_probe=None,
+            process_detector=lambda:dict(selected),account_probe_factory=probe_factory)
+        self.assertEqual((manager.pid,manager.creation_time),(222,1222))
+        self.assertTrue(manager.setup()['connection']['checks']['account_verified'])
+        manager.request_start(expected_generation=manager.scope_generation);manager.tick()
+        self.assertTrue(manager.setup()['connection']['checks']['collecting'])
+        self.assertTrue(probes)
+        self.assertEqual(set(probes),{(222,1222)})
+        self.assertEqual(manager.children_started,1)
 
     def start_waiting_collection(self):
         manager=self.waiting_manager();self.detect_process(manager,logged_in=True)

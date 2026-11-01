@@ -85,7 +85,13 @@ class WindowsWebPackageTests(unittest.TestCase):
             prefix = package.PREFIX + '/'
             entries = {name[len(prefix):]: archive.read(name) for name in archive.namelist()}
         manifest = json.loads(entries.pop(package.MANIFEST))
-        self.assertEqual(manifest['package_revision'], '20261101-r3')
+        self.assertEqual(manifest['package_revision'], '20261101-r5')
+        self.assertIn('prefer exactly one visible, unowned main-window candidate', manifest['process_selection'])
+        self.assertIn('cached fixed states', manifest['connection_diagnostics'])
+        self.assertEqual(manifest['account_process_family']['maximum_members'], 16)
+        self.assertEqual(manifest['account_process_family']['windows_execution_status'], '未验证')
+        self.assertEqual(manifest['account_process_family']['shared_enumeration_budget_seconds'], 3)
+        self.assertEqual(manifest['account_process_family']['child_timeout_seconds'], 6)
         self.assertEqual(manifest['conversation_limits'], {'minimum': 1, 'maximum': 50})
         self.assertEqual(set(entries), {entry['name'] for entry in manifest['files']})
         for entry in manifest['files']:
@@ -179,6 +185,7 @@ class WindowsWebPackageTests(unittest.TestCase):
     def test_collector_builder_includes_account_probe_and_all_local_imports(self):
         shipped = {Path(name).stem for name in collector_package.SOURCES if name.endswith('.py')}
         self.assertIn('windows_account_probe', shipped)
+        self.assertIn('windows_process_detection', shipped)
         directory = ROOT / 'scripts/windows-proof'
         local_modules = {file.stem for file in directory.glob('*.py')}
         for name in collector_package.SOURCES:
@@ -192,6 +199,12 @@ class WindowsWebPackageTests(unittest.TestCase):
                     imports.add(item.module.split('.')[0])
             self.assertFalse((imports & local_modules) - shipped,
                              (name, (imports & local_modules) - shipped))
+        launcher = (directory / 'Verify-Collector.ps1').read_bytes()
+        self.assertTrue(launcher.startswith(b'\xef\xbb\xbf'))
+        self.assertNotIn(b'\n', launcher.replace(b'\r\n', b''))
+        text = launcher.decode('utf-8-sig')
+        self.assertIn("'windows_account_probe.py'", text)
+        self.assertIn("'windows_process_detection.py'", text)
 
 
 if __name__ == '__main__':

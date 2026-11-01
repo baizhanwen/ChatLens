@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "command": ".build/wechat-read-venv/bin/python -B -m unittest discover -s tests -q",
+  "tests": 697,
+  "elapsed_seconds": 27.975,
+  "log_sha256": "80d2b298b8692b550751d0719ea40ad345342e5c27f363ef79a931f176a57ea9",
+  "browser_checks": 77,
+  "components": {
+    "account_probe": 24,
+    "process_detection": 20,
+    "native_state": 16,
+    "windows_web_manager": 31
+  },
+  "host_platform": "macOS",
+  "windows_native_calls": "explicit synthetic adapters only",
+  "real_windows_execution_status": "未验证",
+  "real_r5_account_reading_status": "未验证",
+  "real_chat_sources_or_cloud_used": false,
+  "data_configuration_and_checkpoint_preservation": "covered by synthetic store tests, not a new real-client acceptance claim",
+  "private_data_in_public_evidence": false
+}

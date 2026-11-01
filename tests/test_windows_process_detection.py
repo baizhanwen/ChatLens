@@ -19,9 +19,10 @@ def put(pointer, kind, value):
 
 
 class SyntheticAPI:
-    def __init__(self, entries=(), windows=(), version=(4,1,15,56)):
+    def __init__(self, entries=(), windows=(), version=(4,1,15,56), hidden=(), owned=()):
         self.entries, self.windows, self.version = list(entries), windows, version
         self.index, self.closed, self.accesses = 0, [], []
+        self.hidden, self.owned = set(hidden), set(owned)
 
     def GetFileVersionInfoSizeW(self, *arguments):
         return 64
@@ -82,7 +83,8 @@ class SyntheticAPI:
         return 1
 
     def GetProcessTimes(self, pid, birth, *unused):
-        C.cast(birth, C.POINTER(detection.FILETIME)).contents.low = pid + 1000
+        row=next(row for row in self.entries if row['pid']==pid)
+        C.cast(birth, C.POINTER(detection.FILETIME)).contents.low = row.get('creation_time',pid + 1000)
         return 1
 
     def EnumWindows(self, callback, data):
@@ -94,12 +96,24 @@ class SyntheticAPI:
         put(pid, C.c_uint32, window)
         return 1
 
+    def IsWindowVisible(self, window):
+        return int(window not in self.hidden)
+
+    def GetWindow(self, window, relation):
+        assert relation==4
+        return 99 if window in self.owned else 0
+
 
 class WindowsProcessDetectionTests(unittest.TestCase):
     def detect(self, api):
         with patch.object(detection,'path_is_local',return_value=True), \
              patch.object(detection.C,'get_last_error',create=True,return_value=18):
             return detection.detect_wechat_process(EXE,api=api,native=api)
+
+    def family(self, api, pid=12, birth=1012, **options):
+        with patch.object(detection,'path_is_local',return_value=True), \
+             patch.object(detection.C,'get_last_error',create=True,return_value=18):
+            return detection.verified_process_family(EXE,pid,birth,api=api,native=api,**options)
 
     def test_hidden_main_process_is_detected_without_window_or_login_claim(self):
         api = SyntheticAPI([{'pid':12,'parent_pid':8},{'pid':13,'parent_pid':12},{'pid':14,'parent_pid':12}])
@@ -114,6 +128,56 @@ class WindowsProcessDetectionTests(unittest.TestCase):
         self.assertEqual(self.detect(api)['pid'],21)
         api.windows=[12,21]
         self.assertEqual(self.detect(api)['state'],'ambiguous')
+
+    def test_launcher_parent_does_not_override_its_main_window_child(self):
+        api=SyntheticAPI([{'pid':12,'parent_pid':8},{'pid':21,'parent_pid':12},
+                          {'pid':22,'parent_pid':21}],windows=[21])
+        result=self.detect(api)
+        self.assertEqual((result['pid'],result['creation_time']),(21,1021))
+        self.assertEqual(result['state'],'ready')
+        self.assertTrue(all(row[0:2]==(0x1000,False) for row in api.accesses))
+
+    def test_hidden_launcher_window_does_not_compete_with_visible_main_child(self):
+        api=SyntheticAPI([{'pid':12,'parent_pid':8},{'pid':21,'parent_pid':12}],
+                         windows=[12,21],hidden=[12])
+        result=self.detect(api)
+        self.assertEqual((result['pid'],result['creation_time']),(21,1021))
+
+    def test_owned_popup_does_not_compete_with_unowned_main_window(self):
+        api=SyntheticAPI([{'pid':12,'parent_pid':8},{'pid':21,'parent_pid':12}],
+                         windows=[12,21],owned=[12])
+        self.assertEqual(self.detect(api)['pid'],21)
+
+    def test_no_eligible_window_preserves_unique_hidden_root_fallback(self):
+        api=SyntheticAPI([{'pid':12,'parent_pid':8},{'pid':21,'parent_pid':12}],
+                         windows=[12,21],hidden=[12],owned=[21])
+        self.assertEqual(self.detect(api)['pid'],12)
+
+    def test_multiple_window_children_do_not_fall_back_to_launcher_parent(self):
+        api=SyntheticAPI([{'pid':12,'parent_pid':8},{'pid':21,'parent_pid':12},
+                          {'pid':22,'parent_pid':12}],windows=[21,22])
+        result=self.detect(api)
+        self.assertEqual(result['state'],'ambiguous')
+        self.assertIsNone(result['pid'])
+
+    def test_failed_window_enumeration_cannot_establish_a_hidden_root(self):
+        api=SyntheticAPI([{'pid':12,'parent_pid':8}])
+        api.EnumWindows=lambda *_:0
+        self.assertEqual(self.detect(api)['state'],'unavailable')
+
+    def test_window_metadata_error_cannot_be_reinterpreted_as_no_window(self):
+        api=SyntheticAPI([{'pid':12,'parent_pid':8}],windows=[12])
+        api.GetWindow=lambda *_:(_ for _ in ()).throw(OSError('SYNTHETIC_PRIVATE_DETAIL'))
+        result=self.detect(api)
+        self.assertEqual(result['state'],'unavailable')
+        self.assertNotIn('SYNTHETIC_PRIVATE_DETAIL',str(result))
+
+    def test_invalid_or_reused_process_metadata_is_rejected(self):
+        for rows in ([{'pid':True,'parent_pid':1,'creation_time':123}],
+                     [{'pid':12,'parent_pid':1,'creation_time':0}],
+                     [{'pid':12,'parent_pid':1,'creation_time':123}]*2):
+            with self.subTest(rows=rows):
+                self.assertEqual(detection.select_candidate(rows,[12])['state'],'unavailable')
 
     def test_not_running_is_distinct_from_unsupported_version(self):
         self.assertEqual(self.detect(SyntheticAPI())['state'],'not_running')
@@ -157,6 +221,43 @@ class WindowsProcessDetectionTests(unittest.TestCase):
         self.assertEqual(result['state'],'unavailable')
         self.assertNotIn('SYNTHETIC_PRIVATE',str(result))
         self.assertNotIn('synthetic\\',str(result))
+
+    def test_verified_family_reuses_exact_path_version_architecture_and_birth_queries(self):
+        api=SyntheticAPI([{'pid':12,'parent_pid':8},{'pid':21,'parent_pid':12},{'pid':22,'parent_pid':21}])
+        family=self.family(api,pid=21,birth=1021)
+        self.assertEqual([row['pid'] for row in family],[12,21,22])
+        self.assertEqual(family[1]['creation_time'],1021)
+        self.assertTrue(all(access==0x1000 and not inherit for access,inherit,_ in api.accesses))
+        self.assertEqual(sorted(api.closed),[12,21,22,99])
+        self.assertTrue(all(set(row)=={'pid','parent_pid','creation_time'} for row in family))
+
+    def test_family_rejects_missing_main_wrong_birth_independent_roots_cycles_and_parent_reuse(self):
+        cases=[([{'pid':21,'parent_pid':8}],12,1012),
+               ([{'pid':12,'parent_pid':8}],12,9999),
+               ([{'pid':12,'parent_pid':8},{'pid':21,'parent_pid':9}],12,1012),
+               ([{'pid':12,'parent_pid':21},{'pid':21,'parent_pid':12}],12,1012),
+               ([{'pid':12,'parent_pid':8},{'pid':21,'parent_pid':22},{'pid':22,'parent_pid':21}],12,1012),
+               ([{'pid':12,'parent_pid':8,'creation_time':2000},{'pid':21,'parent_pid':12,'creation_time':1000}],12,2000)]
+        for rows,pid,birth in cases:
+            with self.subTest(rows=rows):
+                with self.assertRaises(detection.PlatformError):self.family(SyntheticAPI(rows),pid,birth)
+
+    def test_family_member_cap_and_any_inaccessible_process_fail_closed(self):
+        rows=[{'pid':12,'parent_pid':8}]+[{'pid':n,'parent_pid':12} for n in range(20,36)]
+        with self.assertRaises(detection.PlatformError):self.family(SyntheticAPI(rows))
+        api=SyntheticAPI([{'pid':12,'parent_pid':8},{'pid':21,'parent_pid':12}])
+        original=api.OpenProcess
+        api.OpenProcess=lambda access,inherit,pid:None if pid==21 else original(access,inherit,pid)
+        with self.assertRaises(detection.PlatformError):self.family(api)
+        self.assertIn(12,api.closed)
+        self.assertIn(99,api.closed)
+
+    def test_family_rejects_wrong_version_architecture_and_shared_deadline(self):
+        with self.assertRaises(detection.PlatformError):self.family(SyntheticAPI([{'pid':12,'parent_pid':8}],version=(4,2,0,1)))
+        api=SyntheticAPI([{'pid':12,'parent_pid':8}])
+        api.IsWow64Process2=lambda *args:0
+        with self.assertRaises(detection.PlatformError):self.family(api)
+        with self.assertRaises(detection.PlatformError):self.family(SyntheticAPI([{'pid':12,'parent_pid':8}]),clock=lambda:4,deadline=3)
 
 
 if __name__=='__main__':

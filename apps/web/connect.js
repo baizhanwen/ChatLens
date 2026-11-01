@@ -8,8 +8,10 @@
   const renderedLists = new Map();
   let profilesSignature = '';
   let searchTimer;
+  let toastTimer;
 
   function node(tag, className, text) { const result = document.createElement(tag); if (className) result.className = className; if (text !== undefined) result.textContent = text; return result; }
+  function feedback(text) { clearTimeout(toastTimer); $('setup-toast').textContent = text; $('setup-toast').hidden = false; toastTimer = setTimeout(() => { $('setup-toast').hidden = true; }, 4200); }
   function error(code, status = 0) { return Object.assign(new Error(), { code, status }); }
   function ignored(problem) { return ['stale_response', 'scope_changed'].includes(problem?.code); }
   function allowedOrigin() { return location.protocol === 'http:' && location.hostname === '127.0.0.1'; }
@@ -134,6 +136,7 @@
   }
 
   function windowsCopy(value = {}) {
+    if (value.state === 'account_unverified') return ['账号读取核验未完成', 'waiting', '读取待核验', value.reason === 'windows_reader_configuration_unavailable' ? '请保持当前已登录状态，并确认选择的是此前测试成功的完整资料目录，再重新核验读取配置。原数据和检查点保留。' : '如果微信已登录，请保持当前状态，点击“重新检测微信”重新核验读取依据。仍未完成时，点击“导出连接诊断”提供定位信息，不需要反复退出或重新登录。'];
     const phase = collectorStage(value);
     if (collectorRunning(value) && ['connected', 'stopped'].includes(value.state) && phase !== null) {
       const phases = {
@@ -150,12 +153,9 @@
     if (phase === 'error' && value.state === 'stopped') return ['上一轮采集异常结束', 'failure', '需要检查', '原消息和检查点仍在。请查看本轮实际原因，重新检测原账号和读取条件后，再开始采集。'];
     if (value.checks?.collecting === true) return ['采集已启动', 'running', '采集进程运行中', '可以进入工作台查看实际采集阶段和新文字，或修改关注范围。微信在前台等情况会暂停读取，请以工作台状态为准。'];
     if (value.reason === 'windows_reader_configuration_unavailable') return ['读取配置需要检查', 'waiting', '配置未就绪', '原账号的读取范围已核验，但已有配置未通过检查。请保留原资料，确认选择的是此前测试成功的完整 collector-data，再重新检测。'];
-    if (value.state === 'account_unverified' && typeof value.reason === 'string' && value.reason.startsWith('windows_process_')) return [value.reason === 'windows_process_version_unsupported' ? '当前微信版本尚未支持' : '微信程序暂未完成核验', 'waiting', '程序检查未完成', '请按上方的实际检测说明处理，再点击“重新检测微信”。程序核验未完成时不会把状态判断为已经登录。'];
-    const unverified = value.reason === 'windows_account_open_database_unavailable';
     const copies = {
       waiting_for_wechat: ['等待本机微信', 'waiting', '未找到微信进程', '请打开这台电脑上的微信，并由你完成扫码或手机登录确认，再点击“重新检测微信”。本工具不会替你登录。'],
       checking_account: ['正在检查微信与账号', 'running', '正在核验', '正在检查微信程序和原账号的本机读取范围。请等待实际状态返回，不需要退出或重启本工具。'],
-      account_unverified: [unverified ? '尚未确认微信登录' : '账号读取核验未完成', 'waiting', '尚未核验', unverified ? '请在微信窗口完成“进入微信”或手机登录确认，再点击“重新检测微信”。仅检测到程序还不能开始采集。' : '目前无法核验原账号的本机读取范围。请确认微信窗口已完成登录，再重新检测；若仍未完成，可查看下方状态原因。不会据此认定你尚未登录。'],
       wrong_account: ['当前微信与原资料账号不匹配', 'failure', '账号不匹配', '请在微信中切回这份资料对应的原账号，再点击“重新检测微信”。已停止原采集，不会把两个账号的消息或配置混在一起。'],
       connected: ['原账号读取已核验', 'success', '可以开始采集', '可以继续使用原关注范围，也可以先修改关注范围。点击“开始采集”后才接收新的文字，原消息和采集位置会保留。'],
       stopped: ['采集已停止，可以继续', 'waiting', '等待开始', '原消息和采集位置仍在。确认原账号的读取范围已核验后，点击“开始采集”继续；需要重新核验时可点击“重新检测微信”。'],
@@ -178,13 +178,14 @@
     $('windows-connection-title').textContent = value.state === 'connected' && phase === null && (state.busy === 'start' || setup?.stage === 'starting' && setup?.scope_switching !== true) ? '正在准备所选范围的采集' : copy[0];
     $('windows-connection-state').textContent = copy[2];
     $('windows-connection-state').className = 'tag tag-' + copy[1];
-    $('windows-connection-description').textContent = typeof value.description === 'string' && value.description.trim() ? value.description.slice(0, 1500) : '先检测微信程序，再核验原账号的本机读取范围；程序存在不代表已完成登录或网络在线。';
+    const unverifiedDescription = value.reason === 'windows_reader_configuration_unavailable' ? '原账号的读取依据已确认，但读取配置尚未通过检查。当前需要处理的是读取配置，不是微信登录状态。' : facts.process_running === true ? '微信程序已找到，但尚未定位到这份资料对应的账号读取依据。这属于读取定位或核验未完成，不代表微信未登录。' : '微信程序的身份或访问条件尚未完成核验，暂不能定位账号读取依据。这里不会据此判断账号是否登录。';
+    $('windows-connection-description').textContent = value.state === 'account_unverified' ? unverifiedDescription : typeof value.description === 'string' && value.description.trim() ? value.description.slice(0, 1500) : '先检测微信程序，再核验原账号的本机读取范围；程序存在不代表已完成登录或网络在线。';
     $('windows-next-step').textContent = copy[3];
     const keys = ['process_running', 'account_verified', 'reader_ready', 'scope_selected', 'collecting'];
     const selectedCount = count(setup?.active_scope?.count);
     const details = {
       process_running: facts.process_running === true ? ['进程已找到', '已找到这台电脑上的微信程序'] : facts.process_running === false ? ['未找到', '请打开本机微信后重新检测'] : ['尚未检查', '等待本机进程检查结果'],
-      account_verified: facts.account_verified === true ? ['读取已核验', '与这份资料对应的原账号一致'] : value.state === 'wrong_account' ? ['账号不匹配', '请切回原账号再重新检测'] : ['尚未核验', '由你完成登录后，再核验读取范围'],
+      account_verified: facts.account_verified === true ? ['读取已核验', '与这份资料对应的原账号一致'] : value.state === 'wrong_account' ? ['账号不匹配', '请切回原账号再重新检测'] : ['尚未核验', '等待本机账号读取依据核验'],
       reader_ready: facts.reader_ready === true ? ['配置可用', '复用原有读取配置和检查点'] : value.reason === 'windows_reader_configuration_unavailable' ? ['检查未通过', '请确认所选完整资料目录'] : ['待核验', '保留原资料目录，等待配置核验'],
       scope_selected: facts.scope_selected === true ? ['已有范围', selectedCount === null ? '已保存你选择的关注范围' : '已保存 ' + selectedCount + ' 个关注会话'] : ['待选择', '读取就绪后选择私聊和群聊'],
       collecting: collectorAlive && phase === 'starting' ? ['准备中', '等待本轮采集状态确认'] : collectorAlive && phase === 'paused' ? ['已暂停', '等待后台、解锁等读取条件'] : collectorAlive && phase === 'stale' ? ['等待心跳', '不将状态未知当作已经停止'] : collectorAlive && phase === 'error' ? ['需要处理', '保留进度，查看实际状态原因'] : collectorAlive && ['stopping', 'stopped'].includes(phase) ? ['正在结束', '等待本轮进程正常退出'] : facts.collecting === true ? [phase === null ? '进程运行中' : '正在采集', '查看工作台中的实际采集阶段'] : value.state === 'checking_account' ? ['尚未开始', '账号和配置核验通过后再开始'] : ['未在采集', value.state === 'explicit_read_only' ? '离线只读，不接收新的消息' : '点击“开始采集”后才继续接收']
@@ -212,6 +213,11 @@
     start.textContent = state.busy === 'start' ? '正在开始采集' : '开始采集';
     start.classList.toggle('is-loading', state.busy === 'start');
     start.setAttribute('aria-busy', String(state.busy === 'start'));
+    const diagnostics = $('download-connection-diagnostics');
+    diagnostics.disabled = !active || !state.generation || Boolean(state.busy);
+    diagnostics.textContent = state.busy === 'diagnostics' ? '正在导出诊断' : '导出连接诊断';
+    diagnostics.classList.toggle('is-loading', state.busy === 'diagnostics');
+    diagnostics.setAttribute('aria-busy', String(state.busy === 'diagnostics'));
     $('windows-offline').hidden = value.can_read_saved !== true || collectorAlive;
     $('windows-open-workspace').hidden = !ready;
     $('windows-open-workspace').textContent = phase === 'paused' ? '查看工作台（采集暂停）' : '进入工作台';
@@ -361,6 +367,41 @@
     } catch (problem) { if (request === state.listRequest && !ignored(problem)) { state.listError = true; if (problem.status === 401) setError(problem); } }
     finally { if (request === state.listRequest) { state.listLoading = false; renderSelection(); } }
   }
+
+  function connectionDiagnostics(value) {
+    const top = ['schema_version', 'kind', 'platform', 'connection_state', 'account_reason', 'checks', 'account_diagnostics', 'selected_conversation_count', 'collector_running', 'collector_stage'];
+    const object = item => item !== null && typeof item === 'object' && !Array.isArray(item);
+    const keys = (item, allowed) => object(item) && Object.keys(item).length === allowed.length && allowed.every(key => Object.hasOwn(item, key));
+    const code = item => item === null || typeof item === 'string' && /^[a-z0-9_]{1,100}$/.test(item);
+    const checks = ['process_running', 'account_verified', 'reader_ready', 'scope_selected', 'collecting'];
+    const counters = ['handles_seen', 'handles_with_name', 'type_names_present', 'file_type_handles', 'file_names_retained', 'all_named_db_candidates', 'database_names_seen', 'matching_root_paths', 'other_root_paths', 'unresolved_database_paths', 'family_process_count', 'family_processes_completed', 'main_database_names_seen', 'helper_database_names_seen'];
+    if (!keys(value, top) || value.schema_version !== 1 || value.kind !== 'chatlens_windows_connection_diagnostics' || value.platform !== 'windows' || !code(value.connection_state) || !code(value.account_reason) || !code(value.collector_stage) || typeof value.collector_running !== 'boolean' || !Number.isSafeInteger(value.selected_conversation_count) || value.selected_conversation_count < 0 || value.selected_conversation_count > 50 || !keys(value.checks, checks) || checks.some(key => value.checks[key] !== null && typeof value.checks[key] !== 'boolean')) throw error('invalid_diagnostics');
+    const detail = value.account_diagnostics;
+    if (!object(detail) || Object.keys(detail).some(key => !['schema_version', ...counters, 'query_completed'].includes(key)) || Object.keys(detail).length > 0 && detail.schema_version !== 1 || Object.hasOwn(detail, 'query_completed') && typeof detail.query_completed !== 'boolean' || counters.some(key => Object.hasOwn(detail, key) && (!Number.isSafeInteger(detail[key]) || detail[key] < 0 || detail[key] > 32768))) throw error('invalid_diagnostics');
+    return Object.fromEntries(top.map(key => [key, value[key]]));
+  }
+
+  async function downloadDiagnostics() {
+    if (!windows() || !state.connected || !state.generation || state.busy) return;
+    const epoch = state.epoch, generation = state.generation;
+    state.busy = 'diagnostics'; render();
+    try {
+      const result = connectionDiagnostics(await api('/api/setup/diagnostics'));
+      if (epoch !== state.epoch || generation !== state.generation) return;
+      const text = JSON.stringify(result, null, 2) + '\n';
+      if (new TextEncoder().encode(text).length > 65536) throw error('invalid_diagnostics');
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json;charset=utf-8' }));
+      const link = node('a'); link.href = url; link.download = 'ChatLens-Windows-Connection-Diagnostics.json'; link.hidden = true;
+      document.body.append(link);
+      try { link.click(); } finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+      feedback('连接诊断已导出到本机。');
+    } catch (problem) {
+      if (epoch === state.epoch && !ignored(problem)) {
+        if (problem.status === 401) setError(problem);
+        feedback(problem.code === 'invalid_diagnostics' ? '诊断格式暂不可用，请重新尝试。' : '诊断未能导出，请重新尝试。');
+      }
+    } finally { if (epoch === state.epoch) { state.busy = null; render(); schedule(state.epoch); } }
+  }
   async function mutate(kind, profileId) {
     if (!state.connected || !state.generation || working()) return;
     if (['recheck', 'start'].includes(kind) && (!windows() || !connectionAction(kind))) return;
@@ -392,6 +433,7 @@
   $('initialize-button').addEventListener('click', () => mutate('initialize')); $('retry-initialization').addEventListener('click', () => mutate('initialize'));
   $('start-selected').addEventListener('click', () => mutate('select')); $('manage-conversations').addEventListener('click', beginSelection); $('open-workspace').addEventListener('click', openWorkspace);
   $('windows-recheck').addEventListener('click', () => mutate('recheck')); $('windows-start').addEventListener('click', () => mutate('start'));
+  $('download-connection-diagnostics').addEventListener('click', downloadDiagnostics);
   $('windows-offline').addEventListener('click', openWorkspace); $('windows-open-workspace').addEventListener('click', openWorkspace);
   $('retry-connection').addEventListener('click', connect); $('check-status').addEventListener('click', () => poll()); $('retry-conversations').addEventListener('click', loadConversations);
   for (const type of ['private', 'group']) $(type + '-list').addEventListener('keydown', event => { if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return; const rows = [...$(type + '-list').querySelectorAll('.picker-checkbox:not(:disabled)')]; if (!rows.length) return; const current = rows.indexOf(document.activeElement), next = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : (current + (['ArrowUp', 'ArrowLeft'].includes(event.key) ? -1 : 1) + rows.length) % rows.length; event.preventDefault(); rows[next].focus(); });

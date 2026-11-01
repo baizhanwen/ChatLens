@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "source_scan": {
+    "history_commits": 21,
+    "history_blobs": 773,
+    "working_files": 646,
+    "sensitive_findings": 0
+  },
+  "synthetic_screenshot_ocr": {
+    "files": 44,
+    "sensitive_findings": 0
+  },
+  "browser_checks": 77,
+  "all_browser_source_hashes_match_final_sources": true,
+  "desktop_and_390px_screenshots_visually_reviewed": true,
+  "package_sha256": "53ef8517386e6837802524c0aa5dc0389fc3b203c89749a3b0866d318bbf51e8",
+  "package_public_sources_match_final_sources": true,
+  "private_report_or_screenshot_published": false,
+  "real_windows_api_executed": false,
+  "real_r5_wechat_end_to_end_status": "未验证",
+  "license_state_preserved": true
+}

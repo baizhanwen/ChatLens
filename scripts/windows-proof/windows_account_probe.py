@@ -1,8 +1,9 @@
 """Bounded, metadata-only check of the selected Windows process's DB account.
 
 Uses documented Process Snapshotting handle-name capture (flags 0x0c), never
-VA cloning, process-memory reads, database reads, process writes or discovery
-of another process. Run in an owned short-lived child so a native API stall
+VA cloning, process-memory reads, database reads or process writes. A strictly
+verified same-executable process family stays inside the owned short-lived child,
+so a native API stall
 cannot hold the Web manager indefinitely. No paths leave the child.
 
 SDK references: Microsoft Learn processsnapshot PssCaptureSnapshot,
@@ -22,10 +23,51 @@ import sys
 import time
 
 from windows_keyproof_platform import FILETIME, PlatformError, _api, _path, path_is_local
+from windows_process_detection import verified_process_family
 
 HANDLE_NAME_FLAGS = 0x04 | 0x08
 PROCESS_METADATA_ACCESS = 0x400 | 0x40 | 0x10
 MAX_HANDLES = 32768
+SNAPSHOT_COUNTS = (
+    'handles_seen', 'handles_with_name', 'type_names_present', 'file_type_handles',
+    'file_names_retained', 'all_named_db_candidates', 'database_names_seen',
+    'matching_root_paths', 'other_root_paths', 'unresolved_database_paths')
+DIAGNOSTIC_COUNTS = SNAPSHOT_COUNTS + ('family_process_count', 'family_processes_completed',
+                                      'main_database_names_seen', 'helper_database_names_seen')
+DIAGNOSTIC_KEYS = {'schema_version', 'query_completed', *DIAGNOSTIC_COUNTS}
+
+
+def sanitize_diagnostics(value):
+    """Public counts only: permit subsets, never names, IDs or native details."""
+    if (not isinstance(value, dict) or not set(value).issubset(DIAGNOSTIC_KEYS)
+            or type(value.get('schema_version')) is not int or value['schema_version'] != 1
+            or 'query_completed' in value and type(value['query_completed']) is not bool
+            or any(type(value[key]) is not int or not 0 <= value[key] <= 32768
+                   for key in DIAGNOSTIC_COUNTS if key in value)):
+        return {}
+    return {key: value[key] for key in ('schema_version', *DIAGNOSTIC_COUNTS, 'query_completed') if key in value}
+
+
+def _prepare_diagnostics(value, *, reset=False):
+    if not isinstance(value, dict):
+        return None
+    clean = sanitize_diagnostics(value)
+    if reset:
+        clean = {}
+    value.clear()
+    value.update({'schema_version': 1, **{key: 0 for key in DIAGNOSTIC_COUNTS}, 'query_completed': False})
+    value.update(clean)
+    return value
+
+
+def _count(diagnostics, key):
+    if diagnostics is not None:
+        diagnostics[key] = min(32768, diagnostics[key] + 1)
+
+
+def _database_path_shape(value):
+    return re.fullmatch(r'(.+\\db_storage)\\(?:message\\message_[0-9]+\.db|contact\\contact\.db)(?:-wal|-shm)?',
+                        ntpath.normcase(value.replace('/', '\\')))
 
 
 class HandleEntry(C.Structure):
@@ -60,19 +102,24 @@ class _SnapshotAPI:
             setattr(self, name, method)
 
 
-def _result(state, reason):
-    return {'state': state, 'matched': state == 'matched', 'reason': reason}
+def _result(state, reason, diagnostics=None):
+    value = {'state': state, 'matched': state == 'matched', 'reason': reason}
+    clean = sanitize_diagnostics(diagnostics)
+    if clean:
+        value['diagnostics'] = clean
+    return value
 
 
-def classify_paths(paths, expected_root, device_map=None):
+def classify_paths(paths, expected_root, device_map=None, *, diagnostics=None):
     """Pure classifier; ambiguous/unrecognized evidence never means matched."""
+    diagnostics = _prepare_diagnostics(diagnostics)
     expected = ntpath.normcase(ntpath.normpath(expected_root))
     if not re.fullmatch(r'[a-z]:\\[^\x00:]*\\db_storage', expected):
-        return _result('unknown', 'windows_account_root_invalid')
+        return _result('unknown', 'windows_account_root_invalid', diagnostics)
     roots = set()
     for item in paths:
         if not isinstance(item, str) or '\0' in item or len(item) > 32768:
-            return _result('unknown', 'windows_account_handle_invalid')
+            return _result('unknown', 'windows_account_handle_invalid', diagnostics)
         value = ntpath.normcase(item.replace('/', '\\'))
         if value.startswith('\\\\?\\'):
             value = value[4:]
@@ -83,18 +130,21 @@ def classify_paths(paths, expected_root, device_map=None):
                     mapped = drive + value[len(device):]
                     break
             value = mapped or value
-        match = re.fullmatch(r'(.+\\db_storage)\\(?:message\\message_[0-9]+\.db|contact\\contact\.db)(?:-wal|-shm)?', value)
+        match = _database_path_shape(value)
         if match:
+            _count(diagnostics, 'database_names_seen')
             # An unmatched device path is relevant evidence we cannot resolve.
             root = ntpath.normcase(ntpath.normpath(match[1]))
             if not re.fullmatch(r'[a-z]:\\[^\x00:]*', root):
-                return _result('unknown', 'windows_account_device_unresolved')
+                _count(diagnostics, 'unresolved_database_paths')
+                return _result('unknown', 'windows_account_device_unresolved', diagnostics)
+            _count(diagnostics, 'matching_root_paths' if root == expected else 'other_root_paths')
             roots.add(root)
     if not roots:
-        return _result('unknown', 'windows_account_open_database_unavailable')
+        return _result('unknown', 'windows_account_open_database_unavailable', diagnostics)
     if roots != {expected}:
-        return _result('mismatch', 'windows_account_changed_or_ambiguous')
-    return _result('matched', 'windows_account_open_database_matched')
+        return _result('mismatch', 'windows_account_changed_or_ambiguous', diagnostics)
+    return _result('matched', 'windows_account_open_database_matched', diagnostics)
 
 
 def _wide(pointer, length):
@@ -103,33 +153,66 @@ def _wide(pointer, length):
     return C.wstring_at(pointer, length // 2)
 
 
-def snapshot_paths(api, process_handle, *, clock=time.monotonic):
+def snapshot_paths(api, process_handle, *, clock=time.monotonic, diagnostics=None, deadline=None, max_handles=None):
     """Read SDK handle names only; always free this process's snapshot/marker."""
     snapshot, marker = C.c_void_p(), C.c_void_p()
+    diagnostics = _prepare_diagnostics(diagnostics, reset=True)
+    handle_limit = MAX_HANDLES if max_handles is None else max_handles
+    if type(handle_limit) is not int or not 0 <= handle_limit <= MAX_HANDLES:
+        raise PlatformError('windows_account_snapshot_handle_limit')
+    end = min(clock() + 3, deadline) if deadline is not None else clock() + 3
     if C.sizeof(HandleEntry) != 136 or HandleEntry.ObjectName.offset != 80:
         raise PlatformError('windows_account_sdk_layout_invalid')
     try:
+        if clock() > end:
+            raise PlatformError('windows_account_snapshot_deadline')
         if api.PssCaptureSnapshot(process_handle, HANDLE_NAME_FLAGS, 0, C.byref(snapshot)) or not snapshot:
             raise PlatformError('windows_account_snapshot_unavailable')
         if api.PssWalkMarkerCreate(None, C.byref(marker)) or not marker:
             raise PlatformError('windows_account_marker_unavailable')
-        paths, deadline = [], clock() + 3
-        for _ in range(MAX_HANDLES):
-            if clock() > deadline:
+        paths = []
+        for _ in range(handle_limit):
+            if clock() > end:
                 raise PlatformError('windows_account_snapshot_deadline')
             entry = HandleEntry()
             status = api.PssWalkSnapshot(snapshot, 2, marker, C.byref(entry), C.sizeof(entry))
             if status == 259:  # ERROR_NO_MORE_ITEMS: a complete snapshot only.
+                if diagnostics is not None:
+                    diagnostics['query_completed'] = True
                 return paths
             if status:
                 raise PlatformError('windows_account_snapshot_walk_failed')
+            _count(diagnostics, 'handles_seen')
+            if entry.TypeNameLength and entry.TypeName:
+                _count(diagnostics, 'type_names_present')
+            type_name = None
+            if diagnostics is not None and entry.TypeNameLength and entry.TypeName:
+                try:
+                    type_name = _wide(entry.TypeName, entry.TypeNameLength).casefold()
+                except PlatformError:
+                    pass
+                if type_name == 'file':
+                    _count(diagnostics, 'file_type_handles')
+            if entry.Flags & 2:
+                _count(diagnostics, 'handles_with_name')
+            object_name = None
+            if diagnostics is not None and entry.Flags & 2 and entry.ObjectNameLength and entry.ObjectName:
+                try:
+                    object_name = _wide(entry.ObjectName, entry.ObjectNameLength)
+                except PlatformError:
+                    # A diagnostic for a non-File object must not alter the
+                    # original File-only proof. File parsing below stays strict.
+                    object_name = None
+                if object_name is not None and _database_path_shape(object_name):
+                    _count(diagnostics, 'all_named_db_candidates')
             # Some named non-file objects also contain paths. Require the SDK
             # type name and the name-present flag, then classify fixed DB paths.
             if not entry.Flags & 2 or not entry.TypeNameLength or not entry.TypeName:
                 continue
-            if _wide(entry.TypeName, entry.TypeNameLength).casefold() != 'file':
+            if (type_name if type_name is not None else _wide(entry.TypeName, entry.TypeNameLength).casefold()) != 'file':
                 continue
-            paths.append(_wide(entry.ObjectName, entry.ObjectNameLength))
+            paths.append(object_name if object_name is not None else _wide(entry.ObjectName, entry.ObjectNameLength))
+            _count(diagnostics, 'file_names_retained')
         raise PlatformError('windows_account_snapshot_handle_limit')
     finally:
         if marker:
@@ -139,47 +222,89 @@ def snapshot_paths(api, process_handle, *, clock=time.monotonic):
             api.PssFreeSnapshot(_api().GetCurrentProcess(), snapshot)
 
 
-def probe_direct(pid, creation_time, executable, db_root):
-    """Child-only native operation. Returns no path, username or file bytes."""
-    handle = None
+def probe_direct(pid, creation_time, executable, db_root, *, diagnostics=None, clock=time.monotonic):
+    """A complete stable family is proved in the child; only counts leave it."""
+    public_diagnostics = diagnostics
+    totals = _prepare_diagnostics({}, reset=True)
+    deadline = clock() + 3
+    def budget():
+        if clock() > deadline:
+            raise PlatformError('windows_account_snapshot_deadline')
+    def finish(state, reason):
+        if isinstance(public_diagnostics, dict):
+            public_diagnostics.clear()
+            public_diagnostics.update(totals)
+        return _result(state, reason, totals if public_diagnostics is not None else None)
     try:
         if type(pid) is not int or not 0 < pid <= 0xffffffff or type(creation_time) is not int or not 0 < creation_time < 2**64:
             raise PlatformError('windows_account_process_identity_invalid')
         executable, db_root = _path(executable), _path(db_root)
         if not path_is_local(executable) or not path_is_local(db_root, require_dir=True):
             raise PlatformError('windows_account_path_unsafe')
+        family = verified_process_family(executable, pid, creation_time, clock=clock, deadline=deadline)
+        totals['family_process_count'] = len(family)
+        budget()
         native, api = _api(), _SnapshotAPI()
-        handle = native.OpenProcess(PROCESS_METADATA_ACCESS, False, pid)
-        if not handle:
-            raise PlatformError('windows_account_process_unavailable')
-        image, size = C.create_unicode_buffer(32768), C.c_uint32(32768)
-        timestamps = [FILETIME() for _ in range(4)]
-        def verify():
-            size.value = len(image)  # QueryFullProcessImageNameW writes length back.
-            if not native.QueryFullProcessImageNameW(handle, 0, image, C.byref(size)):
-                raise PlatformError('windows_account_process_query_failed')
-            if ntpath.normcase(image.value) != ntpath.normcase(executable):
-                raise PlatformError('windows_account_executable_mismatch')
-            if not native.GetProcessTimes(handle, *(C.byref(x) for x in timestamps)):
-                raise PlatformError('windows_account_process_time_unavailable')
-            if timestamps[0].low | timestamps[0].high << 32 != creation_time:
-                raise PlatformError('windows_account_process_reused')
-        verify()
         device_map = {}
         drives = api.GetLogicalDrives()
         for index in range(26):
+            budget()
             if drives & (1 << index):
                 drive, target = chr(65 + index) + ':', C.create_unicode_buffer(32768)
                 if api.QueryDosDeviceW(drive, target, len(target)):
                     device_map[target.value.casefold()] = drive.casefold()
-        paths = snapshot_paths(api, handle)
-        verify()
-        return classify_paths(paths, db_root, device_map)
+        paths = []
+        for member in sorted(family, key=lambda row: (row['pid'] != pid, row['pid'])):
+            budget()
+            handle = native.OpenProcess(PROCESS_METADATA_ACCESS, False, member['pid'])
+            if not handle:
+                raise PlatformError('windows_account_process_unavailable')
+            try:
+                image, size = C.create_unicode_buffer(32768), C.c_uint32(32768)
+                timestamps = [FILETIME() for _ in range(4)]
+                def verify():
+                    budget()
+                    size.value = len(image)
+                    if not native.QueryFullProcessImageNameW(handle, 0, image, C.byref(size)):
+                        raise PlatformError('windows_account_process_query_failed')
+                    if ntpath.normcase(image.value) != ntpath.normcase(executable):
+                        raise PlatformError('windows_account_executable_mismatch')
+                    if not native.GetProcessTimes(handle, *(C.byref(x) for x in timestamps)):
+                        raise PlatformError('windows_account_process_time_unavailable')
+                    if timestamps[0].low | timestamps[0].high << 32 != member['creation_time']:
+                        raise PlatformError('windows_account_process_reused')
+                    budget()
+                verify()
+                member_diagnostics = {}
+                try:
+                    member_paths = snapshot_paths(api, handle, diagnostics=member_diagnostics, clock=clock,
+                                                  deadline=deadline, max_handles=MAX_HANDLES - totals['handles_seen'])
+                finally:
+                    for key in SNAPSHOT_COUNTS:
+                        totals[key] = min(32768, totals[key] + member_diagnostics.get(key, 0))
+                verify()
+                if member_diagnostics.get('query_completed') is not True:
+                    raise PlatformError('windows_account_snapshot_incomplete')
+                totals['family_processes_completed'] += 1
+                key = 'main_database_names_seen' if member['pid'] == pid else 'helper_database_names_seen'
+                for path in member_paths:
+                    if _database_path_shape(path):
+                        _count(totals, key)
+                paths.extend(member_paths)
+            finally:
+                native.CloseHandle(handle)
+        budget()
+        after = verified_process_family(executable, pid, creation_time, clock=clock, deadline=deadline)
+        if after != family:
+            raise PlatformError('windows_account_process_family_changed')
+        budget()
+        classified = classify_paths(paths, db_root, device_map, diagnostics=totals)
+        budget()
+        totals['query_completed'] = True
+        return finish(classified['state'], classified['reason'])
     except Exception:
-        return _result('unknown', 'windows_account_probe_unavailable')
-    finally:
-        if handle:
-            _api().CloseHandle(handle)
+        totals['query_completed'] = False
+        return finish('unknown', 'windows_account_probe_unavailable')
 
 
 class WindowsAccountProbe:
@@ -198,14 +323,29 @@ class WindowsAccountProbe:
             if os.name == 'nt':
                 options['creationflags'] = subprocess.CREATE_NO_WINDOW
             completed = self.runner(arguments, **options)
-            if completed.returncode != 0 or len(completed.stdout) > 1024:
+            if completed.returncode != 0 or len(completed.stdout) > 4096:
                 raise ValueError
-            result = json.loads(completed.stdout)
-            if (not isinstance(result, dict) or set(result) != {'state', 'matched', 'reason'}
+            def pairs(items):
+                parsed = {}
+                for key, value in items:
+                    if key in parsed:
+                        raise ValueError
+                    parsed[key] = value
+                return parsed
+            result = json.loads(completed.stdout, object_pairs_hook=pairs)
+            if (not isinstance(result, dict) or set(result) not in (
+                    {'state', 'matched', 'reason'}, {'state', 'matched', 'reason', 'diagnostics'})
                     or result['state'] not in ('matched', 'mismatch', 'unknown')
                     or type(result['matched']) is not bool or result['matched'] != (result['state'] == 'matched')
                     or not isinstance(result['reason'], str) or not re.fullmatch(r'windows_account_[a-z_]{1,80}', result['reason'])):
                 raise ValueError
+            if 'diagnostics' in result:
+                clean = sanitize_diagnostics(result['diagnostics'])
+                if not clean:
+                    raise ValueError
+                if result['matched'] and clean.get('query_completed') is not True:
+                    raise ValueError
+                result['diagnostics'] = clean
             return result
         except Exception:
             return _result('unknown', 'windows_account_probe_unavailable')
@@ -218,7 +358,7 @@ def main():
     parser.add_argument('--exe', required=True)
     parser.add_argument('--root', required=True)
     args = parser.parse_args()
-    print(json.dumps(probe_direct(args.pid, args.creation_time, args.exe, args.root)))
+    print(json.dumps(probe_direct(args.pid, args.creation_time, args.exe, args.root, diagnostics={})))
 
 
 if __name__ == '__main__':

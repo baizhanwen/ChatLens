@@ -58,8 +58,23 @@ async function main(){
   await check('recheck_without_wechat_is_retryable_and_does_not_start_or_reset',async()=>{
    await id('windows-recheck').click();await waitTitle('等待本机微信');await page.waitForFunction(()=>!document.querySelector('#windows-recheck').disabled);assert.equal((await command({command:'state'})).children_started,0);assert.equal((await command({command:'state'})).legacy_unchanged,true);assert.equal((await setup()).connection.can_modify_scope,false);
   });
-  await check('process_running_is_not_login_and_unverified_account_cannot_manage_or_collect',async()=>{
-   await command({command:'account_mode',state:'unknown'});await command({command:'process',state:'ready'});await waitTitle('尚未确认微信登录');assert((await page.locator('[data-windows-check="process_running"] .windows-check-state').innerText()).includes('已找到'));assert((await page.locator('[data-windows-check="account_verified"] .windows-check-state').innerText()).includes('尚未'));assert(await id('manage-conversations').isDisabled());assert(await id('windows-recheck').isEnabled());assert.equal((await command({command:'state'})).children_started,0);await shot('desktop-process-without-login');
+  await check('missing_account_reading_evidence_is_neutral_and_keeps_verified_process_fact',async()=>{
+   await command({command:'account_mode',state:'unknown'});await command({command:'process',state:'ready'});await waitTitle('账号读取核验未完成');assert((await page.locator('[data-windows-check="process_running"] .windows-check-state').innerText()).includes('已找到'));assert((await page.locator('[data-windows-check="account_verified"] .windows-check-state').innerText()).includes('尚未'));assert((await id('windows-connection-description').innerText()).includes('读取定位'));assert((await id('windows-next-step').innerText()).includes('保持当前状态'));assert(!/进入微信|扫码|完成登录后|放开.*权限/.test(await id('windows-next-step').innerText()));assert(await id('manage-conversations').isDisabled());assert(await id('windows-recheck').isEnabled());assert.equal((await command({command:'state'})).children_started,0);await shot('desktop-account-reading-unverified');await page.setViewportSize({width:390,height:844});await noOverflow();assert.equal(await id('windows-connection-title').innerText(),'账号读取核验未完成');await shot('mobile-account-reading-unverified');await page.setViewportSize({width:1440,height:1000});
+  });
+  await check('unverified_account_can_download_only_safe_cached_diagnostic_counts',async()=>{
+   const button=id('download-connection-diagnostics');await button.waitFor();assert(await button.isEnabled());
+   const [download]=await Promise.all([page.waitForEvent('download'),button.click()]);
+   assert.equal(download.suggestedFilename(),'ChatLens-Windows-Connection-Diagnostics.json');
+   const target=path.join(output,download.suggestedFilename());await download.saveAs(target);
+   const raw=fs.readFileSync(target,'utf8'),value=JSON.parse(raw);
+   assert.deepEqual(Object.keys(value).sort(),['schema_version','kind','platform','connection_state','account_reason','checks','account_diagnostics','selected_conversation_count','collector_running','collector_stage'].sort());
+   assert.equal(value.kind,'chatlens_windows_connection_diagnostics');assert.equal(value.schema_version,1);
+   assert.equal(value.connection_state,'account_unverified');assert.equal(value.account_reason,'windows_account_open_database_unavailable');
+   assert.equal(value.account_diagnostics.handles_seen,80);assert.equal(value.account_diagnostics.file_type_handles,0);assert.equal(value.account_diagnostics.query_completed,true);
+   assert.equal(value.account_diagnostics.family_process_count,5);assert.equal(value.account_diagnostics.family_processes_completed,5);assert.equal(value.account_diagnostics.main_database_names_seen,0);assert.equal(value.account_diagnostics.helper_database_names_seen,0);
+   assert(value.checks.process_running);assert(!value.checks.account_verified);assert.equal(value.selected_conversation_count,2);
+   assert(!/synthetic-peer|synthetic-group|scope_generation|creation_time|\\\\|\/Users\/|wxid_|enc_key|api_key|"pid"|"path"/.test(raw));
+   assert.equal((await command({command:'state'})).children_started,0);assert.equal((await command({command:'state'})).legacy_unchanged,true);
   });
   await check('login_in_same_service_enables_scope_management_without_automatic_collection',async()=>{
    await command({command:'account_mode',state:'matched'});await readyState();assert(await id('manage-conversations').isEnabled());assert.equal((await command({command:'state'})).children_started,0);assert.equal((await setup()).connection.can_start,true);await id('manage-conversations').click();await page.locator('input.picker-checkbox').first().waitFor();assert.equal(await page.locator('input.picker-checkbox').count(),60);assert.equal(await page.locator('input.picker-checkbox:checked').count(),2);assert.equal((await command({command:'state'})).children_started,0);await shot('desktop-ready-and-can-manage');

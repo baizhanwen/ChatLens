@@ -117,7 +117,7 @@ def make_windows_server(manager, static_dir, *, port=0, token=None):
                     return
                 self._response(200, raw, content_type)
                 return
-            if parsed.path not in ('/api/setup', '/api/setup/conversations'):
+            if parsed.path not in ('/api/setup', '/api/setup/conversations', '/api/setup/diagnostics'):
                 return super().do_GET()
             if not self._session():
                 return
@@ -125,9 +125,11 @@ def make_windows_server(manager, static_dir, *, port=0, token=None):
                 query = parse_qs(parsed.query, keep_blank_values=True, max_num_fields=2)
                 if any(len(values) != 1 for values in query.values()):
                     raise ValueError
-                if parsed.path == '/api/setup':
+                if parsed.path in ('/api/setup', '/api/setup/diagnostics'):
                     if query:
                         raise ValueError
+                    if parsed.path == '/api/setup/diagnostics':
+                        return self._operation(lambda: self.server.data.connection_diagnostics(expected_generation=self._generation()))
                     return self._operation(self.server.data.setup)
                 if set(query) - {'q'}:
                     raise ValueError
