@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "verified_at_utc": "2026-11-01T14:30:12.250487+00:00",
+  "repository": "https://github.com/baizhanwen/ChatLens",
+  "source_commit": "a3fed6574ede461f27783edbe3f98248338c5d4b",
+  "tag": "windows-web-20261101-r6",
+  "tag_target_sha": "a3fed6574ede461f27783edbe3f98248338c5d4b",
+  "remote_main_contains_source_commit": true,
+  "release_url": "https://github.com/baizhanwen/ChatLens/releases/tag/windows-web-20261101-r6",
+  "is_prerelease": true,
+  "is_draft": false,
+  "assets": [
+    {
+      "name": "ChatLens-Windows-Web-20261101-r6-SHA256SUMS.txt",
+      "bytes": 103,
+      "sha256": "b59eff5ebedf4129c3db4c415530d1c2190ca3e1a47568b5379a0192fe07e838",
+      "github_digest": "sha256:b59eff5ebedf4129c3db4c415530d1c2190ca3e1a47568b5379a0192fe07e838",
+      "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r6/ChatLens-Windows-Web-20261101-r6-SHA256SUMS.txt",
+      "download_verified": true
+    },
+    {
+      "name": "ChatLens-Windows-Web-20261101-r6-TEST-GUIDE.md",
+      "bytes": 13129,
+      "sha256": "7c0c43fa8c665995ababf298fd8b8c2a75b3360fdded09efbaa550fda8e29fa8",
+      "github_digest": "sha256:7c0c43fa8c665995ababf298fd8b8c2a75b3360fdded09efbaa550fda8e29fa8",
+      "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r6/ChatLens-Windows-Web-20261101-r6-TEST-GUIDE.md",
+      "download_verified": true
+    },
+    {
+      "name": "ChatLens-Windows-Web-20261101-r6.zip",
+      "bytes": 15644559,
+      "sha256": "b1c61e551e16000b317baa458d0a06a23dcc0f7901633c8d1bcda936943d25dd",
+      "github_digest": "sha256:b1c61e551e16000b317baa458d0a06a23dcc0f7901633c8d1bcda936943d25dd",
+      "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r6/ChatLens-Windows-Web-20261101-r6.zip",
+      "download_verified": true
+    }
+  ],
+  "old_release_assets_overwritten": false,
+  "private_chat_or_configs_published": false,
+  "existing_license_state_preserved": true,
+  "real_windows_self_canary_user_reported_status": "通过",
+  "real_windows_wechat_mapped_account_and_new_messages_status": "未验证",
+  "second_windows_machine_status": "待外部条件"
+}
