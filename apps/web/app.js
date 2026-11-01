@@ -1,11 +1,15 @@
-/* ChatLens frontend preview: fictional data in page memory, no network or storage. */
+/* ChatLens: file:// is fictional preview; loopback HTTP reads the authenticated local service. */
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
   const svgNS = 'http://www.w3.org/2000/svg';
   const initialDate = new Date();
+  const LIVE = location.protocol !== 'file:';
+  const live = { connected: false, ready: false, error: null, status: null, session: null, timer: null, failures: 0, cycle: 0, selection: 0, overview: 0, search: null, searchRequest: 0, searching: false };
+  const liveCache = new Map();
+  const CACHE_LIMIT = 1000;
   let sequence = 100;
-  let conversations;
+  let conversations = [];
   let activeId = 'lin';
   let typeFilter = 'all';
   let collectionState = 'running';
@@ -85,8 +89,8 @@
     return rows.map((chat) => ({ ...chat, messages: chat.messages.map((row, index) => seedMessage(chat.id, index, ...row)) }));
   }
 
-  function activeChat() { return conversations.find((row) => row.id === activeId); }
-  function timeText(date) { return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }); }
+  function activeChat() { return conversations.find((row) => row.id === activeId) || { id: null, name: '请选择会话', short: '聊', type: 'private', color: 'sage', subtitle: '仅显示所选会话', messages: [], unread: 0, count: 0 }; }
+  function timeText(date) { return date instanceof Date && !Number.isNaN(date.getTime()) ? date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '—'; }
   function atBottom() { const scroll = $('message-scroll'); return scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 75; }
   function announce(text) { $('announcer').textContent = text; }
 
@@ -110,11 +114,11 @@
     const list = $('conversation-list');
     list.replaceChildren();
     for (const chat of filtered) {
-      const last = chat.messages[chat.messages.length - 1];
+      const last = LIVE ? { date: chat.latestDate, body: chat.latestPreview || '尚未采集到新文字', sender: '' } : chat.messages[chat.messages.length - 1];
       const button = element('button', 'conversation-item' + (chat.id === activeId ? ' selected' : ''));
       button.type = 'button';
       button.setAttribute('data-testid', 'conversation-item-' + chat.id);
-      button.setAttribute('aria-label', chat.name + (chat.unread ? '，' + chat.unread + ' 条演示未读消息' : ''));
+      button.setAttribute('aria-label', chat.name + (chat.unread ? '，' + chat.unread + (LIVE ? ' 条本页未读消息' : ' 条演示未读消息') : ''));
       button.setAttribute('aria-pressed', String(chat.id === activeId));
       const avatar = element('span', 'avatar ' + chat.color, chat.short);
       avatar.setAttribute('aria-hidden', 'true');
@@ -122,7 +126,7 @@
       const title = element('span', 'conversation-title-row');
       title.append(element('span', 'conversation-name', chat.name), element('time', 'conversation-time', timeText(last.date)));
       const preview = element('span', 'conversation-preview-row');
-      const snippet = (chat.type === 'group' ? last.sender + '：' : '') + last.body.replace(/\n/g, ' ');
+      const snippet = (chat.type === 'group' && last.sender ? last.sender + '：' : '') + last.body.replace(/\n/g, ' ');
       preview.append(element('span', 'conversation-preview', snippet));
       if (chat.unread) preview.append(element('span', 'unread-count', chat.unread > 99 ? '99+' : String(chat.unread)));
       copy.append(title, preview);
@@ -130,7 +134,7 @@
       button.addEventListener('click', () => selectConversation(chat.id));
       list.append(button);
     }
-    if (!filtered.length) list.append(emptyState('没有找到会话', '试试其他名称，或切换会话类型。'));
+    if (!filtered.length) list.append(emptyState(conversations.length ? '没有找到会话' : (LIVE ? '尚无可展示的会话' : '没有找到会话'), conversations.length ? '试试其他名称，或切换会话类型。' : '请确认本机采集服务已选择会话并完成初始化。'));
   }
 
   function appendHighlighted(node, text, query) {
@@ -149,6 +153,7 @@
   }
 
   function dayLabel(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return '来源时间未提供';
     const today = new Date();
     const sameDay = date.toDateString() === today.toDateString();
     return (sameDay ? '今天' : date.getFullYear() + '年') + ' · ' + (date.getMonth() + 1) + '月' + String(date.getDate()).padStart(2, '0') + '日';
@@ -160,12 +165,13 @@
     const chat = activeChat();
     const query = $('message-search').value.trim();
     const lowered = query.toLocaleLowerCase();
-    const messages = chat.messages.filter((message) => !query || (message.body + ' ' + message.sender).toLocaleLowerCase().includes(lowered));
+    const searched = LIVE && query ? (live.search?.chatId === chat.id && live.search?.query === query ? live.search.messages : []) : null;
+    const messages = searched || chat.messages.filter((message) => !query || (message.body + ' ' + message.sender).toLocaleLowerCase().includes(lowered));
     const list = $('message-list');
     list.replaceChildren();
     let previousDay = '';
     for (const message of messages) {
-      const key = message.date.toDateString();
+      const key = message.date ? message.date.toDateString() : 'unknown';
       if (key !== previousDay) {
         list.append(element('div', 'day-divider', dayLabel(message.date)));
         previousDay = key;
@@ -177,7 +183,7 @@
       const content = element('div', 'message-content');
       const meta = element('div', 'message-meta');
       const timestamp = element('time', '', timeText(message.date));
-      timestamp.dateTime = message.date.toISOString();
+      if (message.date) timestamp.dateTime = message.date.toISOString();
       meta.append(element('span', 'message-sender', message.sender), timestamp);
       const body = element('p', 'message-body');
       appendHighlighted(body, message.body, query);
@@ -185,8 +191,12 @@
       row.append(avatar, content);
       list.append(row);
     }
-    $('message-count').textContent = query ? messages.length + ' 条结果' : chat.messages.length + ' 条';
-    if (!messages.length) list.append(emptyState('没有找到相关消息', '换个关键词试试。搜索仅限当前虚构会话。'));
+    $('message-count').textContent = query ? (live.searching && LIVE ? '查找中…' : messages.length + ' 条结果') : (LIVE ? (chat.count || 0) : chat.messages.length) + ' 条';
+    if (!messages.length) {
+      if (LIVE && (live.searching || liveCache.get(chat.id)?.loading)) list.append(emptyState('正在读取消息', '正在从本机采集库读取已保存的文字。', 'refresh'));
+      else list.append(emptyState(query ? '没有找到相关消息' : '等待新的文字消息', query ? (LIVE ? '换个关键词试试。搜索仅限当前所选会话。' : '换个关键词试试。搜索仅限当前虚构会话。') : '启用采集后收到的新文字会显示在这里。', query ? 'search' : 'messages'));
+    }
+    if (LIVE) updateOlderButton();
     if (options.bottom) {
       scrollToBottom(false);
     } else if (options.restore !== undefined) {
@@ -202,10 +212,11 @@
     $('thread-avatar').textContent = chat.short;
     $('thread-title').textContent = chat.name;
     $('thread-type').textContent = chat.type === 'group' ? '群聊' : '私聊';
-    $('thread-subtitle').textContent = chat.subtitle + ' · 仅演示所选新文字';
+    $('thread-subtitle').textContent = chat.subtitle + (LIVE ? ' · 本机已保存文字' : ' · 仅演示所选新文字');
   }
 
   function selectConversation(id) {
+    if (LIVE) { selectLiveConversation(id); return; }
     if ($('message-scroll').clientHeight > 0) scrollPositions.set(activeId, $('message-scroll').scrollTop);
     navigate('messages');
     const changed = activeId !== id;
@@ -246,6 +257,7 @@
   };
 
   function simulateMessage() {
+    if (LIVE) return;
     if (collectionState !== 'running') {
       toast(collectionState === 'paused' ? '演示接收已暂停，恢复后再模拟新消息。' : '当前演示连接中断，请先演示重新连接。');
       return;
@@ -272,6 +284,7 @@
   }
 
   function reset() {
+    if (LIVE) return;
     conversations = makeData();
     activeId = 'lin';
     collectionState = 'running';
@@ -297,6 +310,10 @@
   }
 
   function renderStatus() {
+    if (LIVE) { renderLiveStatus(); return; }
+    if ($('overview-scope-count')) $('overview-scope-count').replaceChildren(document.createTextNode(String(conversations.length)), element('small', '', ' 个'));
+    if ($('collection-scope-count')) $('collection-scope-count').replaceChildren(document.createTextNode(String(conversations.length)), element('small', '', ' 个会话'));
+    $('conversation-total').textContent = conversations.length;
     const states = {
       running: { title: '演示运行中', short: '运行中', stage: '演示接收中', color: 'running', description: '正在展示虚构消息的接收流程，没有连接真实采集服务。' },
       paused: { title: '演示已暂停', short: '已暂停', stage: '等待恢复演示', color: 'waiting', description: '虚构消息保留在本页，点击恢复后可以继续模拟来信。' },
@@ -337,9 +354,9 @@
   function renderRecent() {
     const list = $('recent-conversations');
     list.replaceChildren();
-    const sorted = [...conversations].sort((a, b) => b.messages.at(-1).date - a.messages.at(-1).date);
+    const sorted = [...conversations].sort((a, b) => (LIVE ? b.latestDate || 0 : b.messages.at(-1)?.date || 0) - (LIVE ? a.latestDate || 0 : a.messages.at(-1)?.date || 0));
     for (const chat of sorted) {
-      const last = chat.messages.at(-1);
+      const last = LIVE ? { date: chat.latestDate, body: chat.latestPreview || '尚未采集到新文字' } : chat.messages.at(-1);
       const row = element('button', 'recent-row');
       row.type = 'button';
       row.setAttribute('aria-label', '打开' + chat.name);
@@ -349,9 +366,11 @@
       row.addEventListener('click', () => selectConversation(chat.id));
       list.append(row);
     }
+    if (!sorted.length) list.append(emptyState(LIVE ? '等待采集会话' : '暂无会话', LIVE ? '只会展示本机已授权的会话，连接中不会填入虚构数据。' : '请查看关注的会话。', 'messages'));
   }
 
   function addLog(kind) {
+    if (LIVE) return;
     const entries = {
       started: ['前端预览已就绪', '已载入 3 个虚构会话。真实采集服务尚未接入。'],
       received: ['新增一条虚构消息', '消息已添加至当前页面，未读取或保存真实聊天。'],
@@ -391,6 +410,7 @@
     $('breadcrumb-current').textContent = { overview: '沟通总览', messages: '会话消息', collection: '采集状态' }[view];
     setDrawer(false, false);
     if (view === 'messages' && changed) {
+      if (LIVE && activeChat().id && !liveCache.get(activeId)?.loaded) ensureLiveMessages(activeId);
       renderMessages({ bottom: !scrollPositions.has(activeId), restore: scrollPositions.get(activeId) });
       renderNewMessageButton();
     }
@@ -418,6 +438,7 @@
   }
 
   function previewState(mode) {
+    if (LIVE) return;
     clearTimeout(previewTimer);
     previewMode = mode;
     $('preview-state').value = mode;
@@ -449,6 +470,7 @@
   }
 
   function toggleCollection() {
+    if (LIVE) return;
     if (collectionState === 'disconnected') return;
     collectionState = collectionState === 'running' ? 'paused' : 'running';
     addLog(collectionState === 'paused' ? 'paused' : 'resumed');
@@ -457,14 +479,514 @@
   }
 
   function toggleConnection() {
+    if (LIVE) return;
     collectionState = collectionState === 'disconnected' ? 'running' : 'disconnected';
     addLog(collectionState === 'disconnected' ? 'disconnected' : 'reconnected');
     renderStatus();
     toast(collectionState === 'disconnected' ? '正在演示连接中断，真实服务尚未接入。' : '演示连接已恢复。');
   }
 
+  // The HTTP workspace reads committed local collection data. Its caches and
+  // search cursors deliberately never share the fictional preview state.
+  function liveDate(value) {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function cacheFor(id) {
+    if (!liveCache.has(id)) liveCache.set(id, { messages: [], loaded: false, loading: false, cursor: null, oldest: null, hasMore: false, request: 0, deferred: false });
+    return liveCache.get(id);
+  }
+
+  function apiError(code, status = 0) {
+    const error = new Error(code);
+    error.code = code;
+    error.status = status;
+    return error;
+  }
+
+  async function api(route, token) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch(new URL(route, location.origin), {
+        credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
+        headers: token ? { Authorization: 'Bearer ' + token } : {}
+      });
+      if (!response.ok) throw apiError('http_' + response.status, response.status);
+      try { return await response.json(); }
+      catch { throw apiError('invalid_response'); }
+    } finally { clearTimeout(timeout); }
+  }
+
+  function messageRoute(id, params = {}) {
+    const query = new URLSearchParams({ conversation: id, limit: '100' });
+    for (const [name, value] of Object.entries(params)) if (value !== null && value !== undefined && value !== '') query.set(name, String(value));
+    return '/api/messages?' + query;
+  }
+
+  function decodePage(payload, id) {
+    if (!payload || !Array.isArray(payload.messages) || typeof payload.has_more !== 'boolean') throw apiError('invalid_response');
+    const messages = payload.messages.map(row => {
+      if (!row || !Number.isSafeInteger(row.id) || row.id < 1 || typeof row.body !== 'string' || typeof row.sender !== 'string' || (row.conversation_id || row.conversation) !== id) throw apiError('invalid_response');
+      const date = typeof row.sent_at === 'number' ? liveDate(row.sent_at * 1000) : null;
+      return { id: row.id, sender: row.sender, body: row.body, date, observed: liveDate(row.observed_at), own: row.own === true };
+    });
+    const ids = messages.map(row => row.id);
+    if (ids.some((value, index) => index && value <= ids[index - 1])) throw apiError('invalid_response');
+    return { messages, hasMore: payload.has_more, before: ids[0] || null, after: ids.at(-1) || null };
+  }
+
+  function bindCache(id) {
+    const chat = conversations.find(row => row.id === id);
+    if (chat) chat.messages = cacheFor(id).messages;
+  }
+
+  function mergeMessages(cache, incoming) {
+    const rows = new Map(cache.messages.map(row => [row.id, row]));
+    for (const row of incoming) rows.set(row.id, row);
+    cache.messages = [...rows.values()].sort((a, b) => a.id - b.id);
+    cache.oldest = cache.messages[0]?.id || null;
+  }
+
+  function reconcileConversations(payload) {
+    if (!payload || !Array.isArray(payload.conversations)) throw apiError('invalid_response');
+    const previous = new Map(conversations.map(chat => [chat.id, chat]));
+    const seen = new Set();
+    const rows = payload.conversations.map(row => {
+      if (!row || typeof row.id !== 'string' || !row.id || seen.has(row.id) || typeof row.name !== 'string' || !['private', 'group'].includes(row.type) || !Number.isSafeInteger(row.count) || row.count < 0) throw apiError('invalid_response');
+      seen.add(row.id);
+      const old = previous.get(row.id);
+      const delta = old ? Math.max(0, row.count - old.count) : 0;
+      const reading = row.id === activeId && currentView === 'messages' && !$('message-search').value.trim() && atBottom() && preferences.autoScroll;
+      if (delta && row.id === activeId && !reading) pending.set(row.id, (pending.get(row.id) || 0) + delta);
+      return { id: row.id, name: row.name, type: row.type, short: row.name.slice(0, row.type === 'group' ? 2 : 1) || '聊', color: row.type === 'group' ? 'sand' : 'sage', subtitle: (row.type === 'group' ? '群聊' : '私聊') + ' · 仅所选会话', count: row.count, latestDate: liveDate(row.latest_at), latestPreview: typeof row.latest_preview === 'string' ? row.latest_preview : '', latestId: row.latest_id, messages: cacheFor(row.id).messages, unread: reading ? 0 : (old?.unread || 0) + delta };
+    });
+    conversations = rows;
+    for (const id of liveCache.keys()) if (!seen.has(id)) { liveCache.delete(id); pending.delete(id); scrollPositions.delete(id); }
+    if (!seen.has(activeId)) {
+      activeId = rows[0]?.id || null;
+      live.searchRequest++;
+      live.search = null;
+      live.searching = false;
+      $('message-search').value = '';
+      renderHeader();
+      renderMessages();
+    }
+    renderConversations();
+    renderRecent();
+    renderNewMessageButton();
+    document.querySelector('.entry-footer > span').textContent = '在已选的 ' + rows.length + ' 个会话内查找';
+    const scope = document.querySelector('.sidebar-scope > span:nth-child(2)');
+    scope.replaceChildren(icon('messages'), document.createTextNode(rows.filter(row => row.type === 'private').length + ' 个私聊 · ' + rows.filter(row => row.type === 'group').length + ' 个群聊'));
+  }
+
+  const liveStates = {
+    starting: ['正在初始化', 'waiting', '采集程序正在初始化所选会话，请等待状态更新。'],
+    collecting: ['正在采集', 'running', '本机采集程序在线。新文字保存后会自动出现在页面。'],
+    stopping: ['正在停止采集', 'waiting', '采集程序正在保存进度并关闭。已保存的消息仍可查看。'],
+    paused: ['采集已暂停', 'waiting', '采集程序报告已暂停。已保存的消息仍可查看。'],
+    stopped: ['采集已停止', 'waiting', '采集程序已停止。重新启动本机采集程序后，页面会继续更新。'],
+    error: ['采集异常', 'failure', '采集程序报告异常。请查看本机启动器的处理说明。'],
+    stale: ['采集心跳已过期', 'waiting', '暂未收到新的采集心跳，页面保留已保存消息。请检查采集程序。'],
+    unavailable: ['采集状态不可用', 'waiting', '尚未收到采集程序状态。已保存消息可查看，不能据此确认正在采集。']
+  };
+
+  function stateDetails() {
+    if (live.error) return [live.error.status === 401 ? '本机会话已失效' : '页面连接中断', 'failure', live.error.status === 401 ? '请从本机启动器重新打开工作台。已显示内容保留，暂不更新。' : '暂时无法连接本机服务。已显示内容可能已过期，恢复连接后会继续读取。'];
+    if (!live.connected) return ['正在连接本机服务', 'waiting', '正在读取真实采集状态和已保存消息。'];
+    return liveStates[live.status?.state] || liveStates.unavailable;
+  }
+
+  function updateLiveElapsed() {
+    const started = liveDate(live.status?.started_at);
+    const end = ['stopped', 'error', 'paused', 'stale', 'unavailable'].includes(live.status?.state) ? liveDate(live.status?.heartbeat_at) : new Date();
+    if (!started || !end) { $('demo-elapsed').textContent = '—'; return; }
+    const seconds = Math.max(0, Math.floor((end - started) / 1000));
+    $('demo-elapsed').textContent = (seconds >= 3600 ? String(Math.floor(seconds / 3600)) + ':' : '') + String(Math.floor(seconds / 60) % (seconds >= 3600 ? 60 : 100000)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
+  }
+
+  function renderLiveStatus() {
+    const [title, color, description] = stateDetails();
+    const total = live.status?.total_messages ?? conversations.reduce((sum, chat) => sum + chat.count, 0);
+    const saved = liveDate(live.status?.last_update);
+    $('ribbon-state').textContent = title;
+    $('ribbon-description').textContent = live.connected ? '本机采集 · 仅所选会话' : '已显示内容暂不更新';
+    $('ribbon-tag').className = 'tag tag-' + color;
+    for (const id of ['status-title', 'collection-stage-tag']) { $(id).textContent = title; $(id).className = 'tag tag-' + color; }
+    for (const id of ['status-description', 'collection-stage-description']) $(id).textContent = description;
+    $('collection-stage-title').textContent = title;
+    $('fact-state').textContent = title;
+    $('last-update').textContent = saved ? saved.toLocaleString('zh-CN', { hour12: false }) : '尚无保存记录';
+    $('total-messages').textContent = total + ' 条';
+    $('overview-count').replaceChildren(document.createTextNode(String(total)), element('small', '', ' 条'));
+    $('collection-total').replaceChildren(document.createTextNode(String(total)), element('small', '', ' 条'));
+    $('overview-scope-count').replaceChildren(document.createTextNode(String(conversations.length)), element('small', '', ' 个'));
+    $('collection-scope-count').replaceChildren(document.createTextNode(String(conversations.length)), element('small', '', ' 个会话'));
+    $('conversation-total').textContent = conversations.length;
+    $('overview-state').textContent = title;
+    $('overview-state').style.color = 'var(--' + color + '-text)';
+    $('nav-state-dot').style.background = 'var(--' + color + '-text)';
+    $('nav-unread').textContent = String(conversations.reduce((sum, chat) => sum + chat.unread, 0));
+    $('live-connection-notice').hidden = !live.error;
+    $('live-connection-description').textContent = description;
+    $('live-retry').disabled = live.error?.status === 401;
+    $('live-retry').textContent = live.error?.status === 401 ? '请从启动器重新打开' : '重新连接';
+    document.querySelector('.sidebar-local > div').replaceChildren(document.createTextNode('本机采集'), element('span', '', live.error ? '连接已中断 · 内容可能已过期' : live.connected ? title : '正在连接本机服务'));
+    $('live-page-state').textContent = live.connected ? '本机服务已连接' : '尚未连接';
+    $('live-resume-state').textContent = live.status?.resumed_from_checkpoint === true ? '已从保存位置继续' : live.status?.resumed_from_checkpoint === false ? '本次首次启用' : '暂无恢复记录';
+    const heartbeat = liveDate(live.status?.heartbeat_at);
+    $('live-heartbeat').textContent = heartbeat ? heartbeat.toLocaleTimeString('zh-CN', { hour12: false }) : '尚未收到';
+    document.querySelectorAll('.property-list dd')[2].textContent = title;
+    updateLiveElapsed();
+  }
+
+  function recordLiveStatus(status) {
+    const previous = live.status;
+    live.status = status;
+    if (previous?.state === status.state) return;
+    const [title, , description] = liveStates[status.state] || liveStates.unavailable;
+    logRows.unshift({ title, description, date: liveDate(status.updated_at) });
+    logRows = logRows.slice(0, 8);
+    const list = $('activity-log');
+    list.replaceChildren();
+    for (const row of logRows) {
+      const item = element('li');
+      const copy = element('div');
+      copy.append(element('strong', '', row.title), element('p', '', row.description));
+      item.append(element('span', 'status-dot'), copy, element('time', '', timeText(row.date)));
+      list.append(item);
+    }
+    $('log-count').textContent = logRows.length + ' 条';
+  }
+
+  function acceptStatus(status) {
+    if (!status || !Object.hasOwn(liveStates, status.state) || !Number.isSafeInteger(status.total_messages) || status.total_messages < 0) throw apiError('invalid_response');
+    recordLiveStatus(status);
+  }
+
+  function showLiveFailure(error) {
+    live.connected = false;
+    live.error = { status: error?.status || 0 };
+    live.failures++;
+    renderLiveStatus();
+  }
+
+  function scheduleLive(epoch) {
+    clearTimeout(live.timer);
+    if (live.error?.status === 401 || epoch !== live.cycle) return;
+    live.timer = setTimeout(() => live.ready ? pollLive(epoch) : connectLive(), live.failures ? Math.min(10000, 1000 * 2 ** Math.min(live.failures, 4)) : 1000);
+  }
+
+  async function connectLive() {
+    const epoch = ++live.cycle;
+    clearTimeout(live.timer);
+    live.error = null;
+    live.connected = false;
+    renderLiveStatus();
+    try {
+      if (location.protocol !== 'http:' || location.hostname !== '127.0.0.1') throw apiError('loopback_required', 403);
+      let token = new URLSearchParams(location.hash.slice(1)).get('token');
+      const session = await api('/api/session', token);
+      token = null;
+      if (epoch !== live.cycle) return;
+      if (session?.mode !== 'live' || session.capabilities?.read_messages !== true) throw apiError('invalid_response');
+      live.session = session;
+      if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+      const [metadata, status] = await Promise.all([api('/api/conversations'), api('/api/status')]);
+      if (epoch !== live.cycle) return;
+      acceptStatus(status);
+      reconcileConversations(metadata);
+      live.ready = true;
+      live.connected = true;
+      live.failures = 0;
+      renderLiveStatus();
+      if (activeId) await ensureLiveMessages(activeId);
+    } catch (error) { if (epoch === live.cycle) showLiveFailure(error); }
+    finally { scheduleLive(epoch); }
+  }
+
+  async function pollLive(epoch) {
+    try {
+      const [metadata, status] = await Promise.all([api('/api/conversations'), api('/api/status')]);
+      if (epoch !== live.cycle) return;
+      acceptStatus(status);
+      reconcileConversations(metadata);
+      live.connected = true;
+      live.error = null;
+      live.failures = 0;
+      renderLiveStatus();
+      if (activeId) await appendLiveMessages(activeId);
+    } catch (error) { if (epoch === live.cycle) showLiveFailure(error); }
+    finally { scheduleLive(epoch); }
+  }
+
+  async function ensureLiveMessages(id, latest = false) {
+    const cache = cacheFor(id);
+    const epoch = live.cycle;
+    if (cache.loaded && !latest) return;
+    if (cache.loading && !latest) return;
+    const request = ++cache.request;
+    cache.loading = true;
+    if (id === activeId) renderMessages();
+    try {
+      const page = decodePage(await api(messageRoute(id)), id);
+      if (request !== cache.request || !liveCache.has(id)) return;
+      cache.messages = page.messages;
+      cache.loaded = true;
+      cache.hasMore = page.hasMore;
+      cache.cursor = page.after;
+      cache.oldest = page.before;
+      cache.deferred = false;
+      bindCache(id);
+      if (id === activeId && !$('message-search').value.trim()) {
+        renderMessages({ bottom: latest || !scrollPositions.has(id), restore: latest ? undefined : scrollPositions.get(id) });
+        if (latest) { pending.set(id, 0); activeChat().unread = 0; }
+      }
+      renderConversations();
+      renderNewMessageButton();
+      if (latest) renderLiveStatus();
+    } catch (error) { if (request === cache.request && epoch === live.cycle) showLiveFailure(error); }
+    finally { if (request === cache.request) { cache.loading = false; if (id === activeId) { renderMessages(); updateOlderButton(); } } }
+  }
+
+  async function appendLiveMessages(id) {
+    const cache = cacheFor(id);
+    if (!cache.loaded) { await ensureLiveMessages(id); return; }
+    if (cache.loading || cache.deferred) return;
+    const request = ++cache.request;
+    const canFollow = () => id === activeId && currentView === 'messages' && atBottom() && preferences.autoScroll && !$('message-search').value.trim();
+    const wasFollowing = canFollow();
+    const previousCursor = cache.cursor || 0;
+    cache.loading = true;
+    try {
+      // Drain bounded pages; the next poll resumes from the committed rowid.
+      for (let index = 0; index < 5; index++) {
+        const page = decodePage(await api(messageRoute(id, { after: cache.cursor || 0 })), id);
+        if (request !== cache.request || !liveCache.has(id)) return;
+        if (page.messages.length) {
+          if (cache.cursor && page.after <= cache.cursor) throw apiError('invalid_response');
+          mergeMessages(cache, page.messages);
+          cache.cursor = page.after;
+          if (cache.messages.length > CACHE_LIMIT) {
+            if (canFollow() || id !== activeId) {
+              cache.messages = cache.messages.slice(-CACHE_LIMIT);
+              cache.oldest = cache.messages[0].id;
+              cache.hasMore = true;
+            } else cache.deferred = true;
+          }
+          bindCache(id);
+        }
+        if (!page.hasMore || cache.deferred) break;
+      }
+      if (id === activeId) {
+        const follow = canFollow();
+        if (wasFollowing && !follow) pending.set(id, Math.max(pending.get(id) || 0, cache.messages.filter(row => row.id > previousCursor).length));
+        if (!$('message-search').value.trim()) renderMessages({ bottom: follow });
+        renderNewMessageButton();
+      }
+      renderConversations();
+    } catch (error) { if (request === cache.request) throw error; }
+    finally { if (request === cache.request) cache.loading = false; }
+  }
+
+  async function selectLiveConversation(id) {
+    if (!conversations.some(row => row.id === id)) return;
+    if ($('message-scroll').clientHeight > 0) scrollPositions.set(activeId, $('message-scroll').scrollTop);
+    const changed = id !== activeId;
+    activeId = id;
+    activeChat().unread = 0;
+    if (changed) {
+      $('message-search').value = '';
+      live.searchRequest++;
+      live.search = null;
+      live.searching = false;
+    }
+    pending.set(id, 0);
+    navigate('messages');
+    $('workbench').classList.add('mobile-thread-open');
+    renderConversations();
+    renderHeader();
+    renderMessages({ bottom: !scrollPositions.has(id), restore: scrollPositions.get(id) });
+    renderNewMessageButton();
+    renderLiveStatus();
+    await ensureLiveMessages(id);
+    announce('已切换至' + (conversations.find(row => row.id === id)?.name || '所选会话') + '。');
+  }
+
+  let searchDelay;
+  function requestLiveSearch() {
+    clearTimeout(searchDelay);
+    const query = $('message-search').value.trim();
+    const id = activeId;
+    const request = ++live.searchRequest;
+    live.search = null;
+    live.searching = Boolean(query && id);
+    renderMessages({ restore: 0 });
+    if (!query || !id) return;
+    searchDelay = setTimeout(async () => {
+      try {
+        const page = decodePage(await api(messageRoute(id, { q: query })), id);
+        if (request !== live.searchRequest || id !== activeId || query !== $('message-search').value.trim()) return;
+        live.search = { chatId: id, query, messages: page.messages, hasMore: page.hasMore, before: page.before };
+      } catch (error) { if (request === live.searchRequest) showLiveFailure(error); }
+      finally { if (request === live.searchRequest && id === activeId) { live.searching = false; renderMessages({ restore: 0 }); } }
+    }, 200);
+  }
+
+  function updateOlderButton() {
+    const query = $('message-search').value.trim();
+    const cache = cacheFor(activeId);
+    $('load-older').hidden = query ? !live.search?.hasMore : !cache.hasMore;
+    $('load-older').disabled = cache.loading || live.searching;
+    $('load-older').textContent = cache.loading || live.searching ? '正在读取…' : query ? '加载更早的匹配消息' : '加载更早消息';
+  }
+
+  async function loadOlder() {
+    if (!LIVE || !activeId) return;
+    const id = activeId;
+    const query = $('message-search').value.trim();
+    const cache = cacheFor(id);
+    const search = live.search;
+    if (cache.loading || live.searching || (query ? !search?.hasMore : !cache.hasMore)) return;
+    const request = query ? live.searchRequest : ++cache.request;
+    const scroll = $('message-scroll');
+    const previousHeight = scroll.scrollHeight;
+    const previousTop = scroll.scrollTop;
+    if (query) live.searching = true;
+    else cache.loading = true;
+    updateOlderButton();
+    try {
+      const page = decodePage(await api(messageRoute(id, { before: query ? search.before : cache.oldest, q: query })), id);
+      if (query) {
+        if (request !== live.searchRequest || live.search !== search) return;
+        const byId = new Map([...page.messages, ...search.messages].map(row => [row.id, row]));
+        search.messages = [...byId.values()].sort((a, b) => a.id - b.id);
+        search.before = search.messages[0]?.id || search.before;
+        search.hasMore = page.hasMore;
+      } else {
+        if (request !== cache.request) return;
+        mergeMessages(cache, page.messages);
+        cache.hasMore = page.hasMore;
+        bindCache(id);
+      }
+      if (id === activeId && query === $('message-search').value.trim()) {
+        renderMessages();
+        scroll.scrollTop = previousTop + scroll.scrollHeight - previousHeight;
+      }
+    } catch (error) { showLiveFailure(error); }
+    finally {
+      if (query && request === live.searchRequest) live.searching = false;
+      else if (!query && request === cache.request) cache.loading = false;
+      if (id === activeId) { renderMessages(); updateOlderButton(); }
+    }
+  }
+
+  async function openLiveOverviewQuery() {
+    const query = $('overview-search').value.trim();
+    setFilter('all');
+    $('conversation-search').value = '';
+    const match = query && conversations.find(row => row.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+    if (match) { await selectLiveConversation(match.id); return; }
+    await selectLiveConversation(activeId || conversations[0]?.id);
+    navigate('messages');
+    $('message-search').value = query;
+    if (query) requestLiveSearch();
+  }
+
+  async function jumpLiveLatest() {
+    const id = activeId;
+    $('message-search').value = '';
+    live.searchRequest++;
+    live.search = null;
+    live.searching = false;
+    const button = $('live-refresh');
+    if (button?.disabled) return;
+    if (button) { button.disabled = true; button.classList.add('is-loading'); button.setAttribute('aria-busy', 'true'); }
+    try {
+      if (id) await ensureLiveMessages(id, true);
+      if (id === activeId && !$('message-search').value.trim()) scrollToBottom();
+    }
+    finally { if (button) { button.disabled = false; button.classList.remove('is-loading'); button.setAttribute('aria-busy', 'false'); } }
+  }
+
+  function configureLiveUI() {
+    document.body.classList.add('live-mode');
+    document.querySelectorAll('[data-preview-only]').forEach(node => { node.hidden = true; });
+    ['simulate-message', 'toggle-collection', 'connection-demo', 'collection-toggle', 'collection-connection'].forEach(id => { $(id).hidden = true; });
+    document.querySelector('.preview-label').replaceChildren(element('span', 'status-dot'), document.createTextNode('本机采集 · 所选会话'));
+    document.querySelector('.user-avatar').title = '本机工作台';
+    document.querySelector('.user-avatar').setAttribute('aria-label', '本机工作台');
+    document.querySelector('.sidebar-scope > p').replaceChildren(document.createTextNode('只关注你选择的沟通。'), element('br'), document.createTextNode('采集的文字仅保存在本机。'));
+    document.querySelector('.sidebar-scope > span:nth-child(2)').replaceChildren(icon('messages'), document.createTextNode('正在读取所选会话'));
+    document.querySelector('.sidebar-version > span:last-child').textContent = 'v0.3 · LOCAL WORKSPACE';
+    $('preview-help').querySelector('span').textContent = '使用说明';
+    document.querySelector('.entry-label > .tag').textContent = '仅所选会话';
+    document.querySelector('.entry-footer > span').textContent = '正在读取所选会话';
+    document.querySelectorAll('.overview-stats > div > span')[1].textContent = '已保存文字';
+    document.querySelectorAll('.overview-stats > div > span')[2].textContent = '采集状态';
+    document.querySelector('.overview-note > p').replaceChildren(document.createTextNode('只阅读你选择的内容。'), element('span', '', '真实文字来自本机采集库。当前没有启用云端模型。'));
+    document.querySelector('#view-messages .page-heading > .tag').textContent = '本机真实数据';
+    document.querySelector('.conversation-note').replaceChildren(icon('shield'), document.createTextNode('仅所选会话 · 启用后的新文字'));
+    document.querySelector('.ribbon-preview').textContent = '真实采集状态';
+    document.querySelector('.message-footer > span').textContent = '只读查看 · 不会代发消息';
+    const refresh = element('button', 'button', '刷新消息');
+    refresh.id = 'live-refresh';
+    refresh.addEventListener('click', jumpLiveLatest);
+    document.querySelector('.message-footer').append(refresh);
+    $('status-panel').setAttribute('aria-label', '真实采集状态');
+    const labels = document.querySelectorAll('.status-facts dt');
+    ['已保存消息', '最近保存', '采集状态', '页面连接'].forEach((text, index) => { labels[index].textContent = text; });
+    document.querySelector('.status-facts > div:last-child dd').id = 'live-page-state';
+    for (const [label, id] of [['恢复方式', 'live-resume-state'], ['最近心跳', 'live-heartbeat']]) {
+      const row = element('div');
+      const value = element('dd', '', '正在读取');
+      value.id = id;
+      row.append(element('dt', '', label), value);
+      document.querySelector('.status-facts').append(row);
+    }
+    document.querySelector('.panel-note > p').textContent = '采集由本机启动器管理。页面只读取已保存消息，不控制微信。';
+    document.querySelector('#view-collection .page-heading p').textContent = '查看真实采集阶段、已保存消息和状态变化。';
+    document.querySelector('#view-collection .page-heading > .tag').textContent = '本机采集服务';
+    document.querySelectorAll('.stage-metrics > div > span')[0].textContent = '本次运行时间';
+    document.querySelectorAll('.stage-metrics > div > span')[1].textContent = '已保存消息';
+    const statusRefresh = element('button', 'button button-primary', '重新检查状态');
+    statusRefresh.id = 'live-status-refresh';
+    statusRefresh.addEventListener('click', connectLive);
+    document.querySelector('.stage-actions').append(statusRefresh);
+    document.querySelector('.log-card h2').textContent = '页面观察到的状态变化';
+    $('log-count').textContent = '0 条';
+    $('activity-log').append(emptyState('正在读取状态', '状态变化会记录在本页，刷新后还原。', 'pulse'));
+    document.querySelectorAll('.property-list dd').forEach((node, index) => { node.textContent = ['本机采集库', '每秒检查已保存消息', '正在连接', '未启用'][index]; });
+    document.querySelector('.technical-details summary').textContent = '本机读取说明';
+    document.querySelector('.technical-details p').textContent = '页面通过本机接口读取已选会话的文字与采集心跳。停止采集后内容仍可查看；重新启动会从已保存位置继续。不会读取未选会话或向云端发送聊天。';
+    $('preview-dialog-title').textContent = '关注你选择的沟通。';
+    const help = document.querySelectorAll('#preview-dialog > p');
+    help[0].textContent = '这是本机采集工作台，只展示采集程序中已经选择的会话及启用后保存的文字消息。';
+    help[1].textContent = '请保持电脑、微信与采集程序运行。页面关闭不等于停止采集；采集异常、停止或心跳过期会明确显示。当前不调用模型，也不会代发消息。';
+    $('confirm-preview').textContent = '知道了';
+    $('overview-search').placeholder = '输入会话名称，或在当前会话内查找文字';
+    ['message-search', 'overview-search'].forEach(id => { $(id).maxLength = 256; });
+    $('live-retry').addEventListener('click', connectLive);
+    $('load-older').addEventListener('click', loadOlder);
+  }
+
+  function initializeLive() {
+    activeId = null;
+    configureLiveUI();
+    renderConversations();
+    renderHeader();
+    renderMessages();
+    renderRecent();
+    connectLive();
+  }
+
   $('conversation-search').addEventListener('input', renderConversations);
-  $('message-search').addEventListener('input', () => renderMessages({ restore: 0 }));
+  $('message-search').addEventListener('input', () => {
+    if (LIVE) requestLiveSearch();
+    else renderMessages({ restore: 0 });
+  });
   function setFilter(value) {
     typeFilter = value;
     document.querySelectorAll('.filter-button').forEach(item => {
@@ -479,6 +1001,7 @@
   $('brand-home').addEventListener('click', event => { event.preventDefault(); navigate('overview'); });
   $('overview-form').addEventListener('submit', event => {
     event.preventDefault();
+    if (LIVE) { openLiveOverviewQuery(); return; }
     const query = $('overview-search').value.trim();
     const chat = conversations.find(row => row.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
     setFilter('all');
@@ -504,6 +1027,7 @@
   ['toggle-collection', 'collection-toggle'].forEach(id => $(id).addEventListener('click', toggleCollection));
   ['connection-demo', 'collection-connection'].forEach(id => $(id).addEventListener('click', toggleConnection));
   $('new-messages').addEventListener('click', () => {
+    if (LIVE) { jumpLiveLatest(); return; }
     if ($('message-search').value) { $('message-search').value = ''; renderMessages({ bottom: true }); }
     scrollToBottom();
   });
@@ -568,11 +1092,13 @@
     $('toggle-details').setAttribute('aria-expanded', String(visible));
   });
   setInterval(() => {
+    if (LIVE) { updateLiveElapsed(); return; }
     const seconds = Math.floor((Date.now() - demoStartedAt) / 1000);
     $('demo-elapsed').textContent = String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
   }, 1000);
   $('search-shortcut').textContent = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K';
-  reset();
+  if (LIVE) initializeLive();
+  else reset();
   navigate('overview');
   setDrawer(false, false);
   if (window.innerWidth <= 1250) setDetails(false);

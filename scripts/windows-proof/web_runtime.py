@@ -1,0 +1,183 @@
+"""Own a loopback Web server and, optionally, one supervised selected collector."""
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+import signal
+import subprocess
+import sys
+import threading
+import time
+import webbrowser
+
+from collector_private import ensure_private_dir, validate_local_path
+from collector_service import now, safe_code, write_public
+from web_data import CollectorWebData
+from web_server import make_server
+
+
+def owned_command(package, data_dir, output, pid, creation_time):
+    return [str(package / 'runtime/python.exe'), '-I', '-S', '-B', '-X', 'utf8',
+            str(package / 'collector_supervisor.py'), '--data-dir', str(data_dir),
+            '--output', str(output), '--pid', str(pid), '--creation-time', str(creation_time),
+            '--web-metadata']
+
+
+def stop_collection(child, child_output, *, grace=20, clock=time.monotonic, sleep=time.sleep):
+    """Signal only this run's child through its exclusively new output directory."""
+    if child is None:
+        return None, True
+    if child.poll() is not None:
+        return child.returncode, True
+    previous = None
+    try:
+        previous = signal.signal(signal.SIGINT, signal.SIG_IGN)
+    except (ValueError, OSError):
+        pass
+    try:
+        deadline = clock() + grace
+        stop_written = False
+        while child.poll() is None and clock() < deadline:
+            if not stop_written and child_output.is_dir():
+                validate_local_path(child_output, require_dir=True)
+                try:
+                    with (child_output / 'supervisor-stop.request').open('xb') as target:
+                        target.write(b'normal stop requested by owning Web launcher\n')
+                        target.flush()
+                        os.fsync(target.fileno())
+                    stop_written = True
+                except FileExistsError:
+                    stop_written = True
+            sleep(.1)
+        # The supervisor has its own owned-child timeout/cleanup. Do not kill a
+        # live supervisor blindly and leave its collector running.
+        if child.poll() is None:
+            return None, False
+        return child.returncode, True
+    finally:
+        if previous is not None:
+            signal.signal(signal.SIGINT, previous)
+
+
+def run(data_dir, output, *, package, pid=None, creation_time=None, read_only=False,
+        no_open=False, popen_factory=subprocess.Popen, open_browser=webbrowser.open,
+        wait=None, server_factory=make_server):
+    """The CLI fixes package/runtime paths; test seams use synthetic data only."""
+    data_dir, output, package = Path(data_dir), Path(output), Path(package)
+    if output.exists() or output.is_symlink():
+        raise ValueError('web_output_already_exists')
+    validate_local_path(output.parent, require_dir=True)
+    ensure_private_dir(data_dir)
+    ensure_private_dir(data_dir / 'private')
+    ensure_private_dir(data_dir / 'private' / 'store')
+    if read_only and (pid is not None or creation_time is not None):
+        raise ValueError('web_read_only_process_conflict')
+    if not read_only and (type(pid) is not int or pid <= 0 or type(creation_time) is not int or creation_time <= 0):
+        raise ValueError('web_collector_identity_required')
+    data = CollectorWebData(data_dir)
+    data.status()  # Fail safely for invalid/missing state; never create a baseline.
+    output.mkdir()
+    report = {'schema_version': 1, 'stage': 'local_web_runtime', 'started_at_utc': now(),
+              'status': '未验证', 'reason': 'not_started', 'read_only': bool(read_only),
+              'server_started': False, 'browser_open_requested': False,
+              'collector_child_started': False, 'collector_child_exit_code': None,
+              'collector_cleanup_confirmed': True, 'server_closed': False,
+              'web_live_end_to_end_status': '未验证', 'messages_sent_by_tool': 0, 'cloud_calls': 0,
+              'source_database_records_modified': False, 'private_data_copied': False}
+    server = child = worker = None
+    child_output = output / 'collector-run'
+    shutdown = threading.Event()
+    try:
+        server = server_factory(data, package / 'web', port=0)
+        worker = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': .1}, daemon=True)
+        worker.start()
+        report['server_started'] = True
+        if not read_only:
+            options = {'shell': False, 'stdin': None, 'stdout': None, 'stderr': subprocess.DEVNULL,
+                       'cwd': str(package)}
+            if os.name == 'nt':
+                options['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP
+            else:
+                options['start_new_session'] = True
+            child = popen_factory(owned_command(package, data_dir, child_output, pid, creation_time), **options)
+            report['collector_child_started'] = True
+        print('ChatLens 本机页面：' + server.base_url, flush=True)
+        print('正在尝试打开已授权的本机页面。页面登录凭据只在浏览器和内存中，不写报告。', flush=True)
+        if not no_open:
+            report['browser_open_requested'] = True
+            opened = bool(open_browser(server.launch_url))
+            if not opened:
+                # The fragment is not sent to HTTP logs. Show only to the local
+                # owner if their default-browser launch failed; never in reports.
+                print('默认浏览器未打开，请在本机浏览器粘贴下行地址，不要转发：', flush=True)
+                print(server.launch_url, flush=True)
+        print('只读浏览已保存消息。' if read_only else '正在启动原范围采集；可在页面查看实际心跳状态。', flush=True)
+        print('按一次 Ctrl+C 关闭本机页面服务，并停止本轮启动的采集。', flush=True)
+        notified = False
+        while not shutdown.is_set():
+            if not worker.is_alive():
+                raise ValueError('web_server_unexpected_stop')
+            if child is not None and child.poll() is not None and not notified:
+                print('本轮采集进程已结束，页面仍可浏览已有消息；实际状态以页面为准。', flush=True)
+                notified = True
+            if wait is None:
+                shutdown.wait(.25)
+            else:
+                wait(shutdown)
+        report['status'], report['reason'] = '通过', 'local_web_stopped'
+    except KeyboardInterrupt:
+        report['status'], report['reason'] = '通过', 'local_web_normal_stop'
+    except Exception as error:
+        report['status'], report['reason'] = '失败', safe_code(error)
+    finally:
+        if child is not None:
+            try:
+                code, clean = stop_collection(child, child_output)
+                report['collector_child_exit_code'], report['collector_cleanup_confirmed'] = code, clean
+                if not clean:
+                    report['status'], report['reason'] = '失败', 'web_collector_stop_not_confirmed'
+                elif code != 0:
+                    report['status'], report['reason'] = '失败', 'web_collector_child_failed'
+            except Exception:
+                report['status'], report['reason'] = '失败', 'web_collector_stop_failed'
+                report['collector_cleanup_confirmed'] = False
+        if server is not None:
+            if worker is not None and worker.is_alive():
+                server.shutdown()
+            server.server_close()
+            if worker is not None and worker.ident is not None:
+                worker.join(timeout=2)
+            report['server_closed'] = worker is None or not worker.is_alive()
+            if not report['server_closed']:
+                report['status'], report['reason'] = '失败', 'web_server_stop_not_confirmed'
+        report['finished_at_utc'] = now()
+        write_public(output / 'result-to-send.json', report)
+    return report
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--data-dir', type=Path, required=True)
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--pid', type=int)
+    parser.add_argument('--creation-time', type=int)
+    parser.add_argument('--read-only', action='store_true')
+    parser.add_argument('--no-open', action='store_true')
+    args = parser.parse_args()
+    package = Path(__file__).resolve().parent
+    if sys.platform != 'win32' or Path(sys.executable).resolve() != (package / 'runtime/python.exe').resolve():
+        print('reason=fixed_windows_web_runtime_required', flush=True)
+        return 2
+    try:
+        result = run(args.data_dir, args.output, package=package, pid=args.pid, creation_time=args.creation_time,
+                     read_only=args.read_only, no_open=args.no_open)
+    except Exception:
+        print('reason=web_runtime_start_or_report_failed', flush=True)
+        return 2
+    print('本轮已结束；只回传本次 result-to-send.json，private 和登录地址留在本机。', flush=True)
+    return 0 if result['status'] == '通过' else 2
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

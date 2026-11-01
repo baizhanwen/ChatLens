@@ -75,6 +75,14 @@ def supervise(command, output, *, popen_factory=subprocess.Popen, clock=time.mon
             options['start_new_session'] = True
         child = popen_factory(list(command), **options)
         while True:
+            # An owning Web launcher has no shared Ctrl+C process group. Its
+            # exclusive output directory is the only control channel it owns.
+            owner_stop = output / 'supervisor-stop.request'
+            if owner_stop.exists() or owner_stop.is_symlink():
+                validate_local_path(owner_stop)
+                if not owner_stop.is_file() or owner_stop.stat().st_nlink != 1:
+                    raise ValueError('collector_owner_stop_invalid')
+                raise KeyboardInterrupt
             observed = heartbeat_reader(output / 'status.json')
             tick = clock()
             if observed is not None and observed['sequence'] > last_sequence:
@@ -138,6 +146,7 @@ def main():
     parser.add_argument('--pid', type=int, required=True)
     parser.add_argument('--creation-time', type=int, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--web-metadata', action='store_true')
     args = parser.parse_args()
     package = Path(__file__).resolve().parent
     expected = package / 'runtime' / 'python.exe'
@@ -149,6 +158,8 @@ def main():
                '--output', str(args.output)]
     if args.selected_config is not None:
         command += ['--selected-config', str(args.selected_config)]
+    if args.web_metadata:
+        command += ['--web-metadata']
     try:
         result = supervise(command, args.output)
     except Exception:

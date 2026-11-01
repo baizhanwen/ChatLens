@@ -2,7 +2,9 @@
 
 本项目已于 2026-10-30 迁移为独立目录和 Git 仓库，当前本机位置为 `~/Developer/ChatLens`。代码、测试、历史证据、交付包和本机私有资料均已保留。源码与已审查的脱敏验证记录纳入 Git；密钥、私有资料、虚拟环境、构建产物、旧截图日志及二进制交付文件留在本地并由 `.gitignore` 排除。迁移说明见 [独立项目迁移记录](docs/独立项目迁移记录.md)。
 
-新版 Web 前端预览入口为 [apps/web/index.html](apps/web/index.html)：直接用浏览器打开，无需安装或构建。暖白、鼠尾草绿与深森林绿工作台采用共享设计变量，包含利明智耀品牌、沟通总览、会话消息、采集状态和本地显示设置；所有内容均为页面内存中的虚构演示。统一规范版 24 项浏览器检查通过，覆盖桌面、中屏与 390px 窄屏。按用户要求，先确认前端再做后端，本页面尚未连接微信或采集服务。使用说明见 [前端 README](apps/web/README.md)，设计变量和框架见 [统一规范](docs/前端设计规范.md)，验收见 [Web 前端预览](docs/Web前端预览.md)。以下原 Electron 说明与已经实测的独立采集工具继续保留，分别验收。
+新版 Web 已实现本机数据接入，保留已确认的暖白、鼠尾草绿与深森林绿界面及利明智耀标识。Windows 用户解压 `ChatLens-Windows-Web-20261101.zip`，双击 **`Start-ChatLens.cmd`**，选择此前测试成功的整个 **`collector-data`** 文件夹；自动打开的本机 HTTP 页面展示原选定会话、已保存文字、采集心跳及后续新消息。复用原检查点，不重建基线；微信不在线时可以只读浏览已有内容。运行无需安装 Python、Node、Codex 或模型服务，依赖已在包内固定。操作与验收边界见 [本机 Web 工作台](docs/本机Web工作台.md)。
+
+直接打开 [apps/web/index.html](apps/web/index.html) 的 `file://` 模式仍是虚构前端预览；HTTP 模式连接失败不会回退为虚构数据。只读 API、停止清理、合成加密源与本机 HTTP 浏览器联调分别测试，新 Windows Web 包的真实消息展示仍需独立实机核对，不能由旧采集成功代替。Mac 新持续采集／Web 启动器尚未接入验收；后面的原 Electron 说明和既有客户端专项记录分别保留。界面说明见 [前端 README](apps/web/README.md)，设计变量见 [统一规范](docs/前端设计规范.md)。
 
 本地优先的微信／QQ视觉聊天工作台。提供按需视觉采集、显式关注模式、历史导入、演示回放、原文检索、摘要、待办、客户与沟通分析、检索问答和本地报告导出。
 
@@ -27,6 +29,7 @@
 | Windows 便携验证运行时 | 第三包捆绑 Python 官方 3.15.2 x64 embeddable，仅在包目录运行，原始 ZIP SHA256 与官方发布页一致；不安装到系统、不安装 pip。2026-10-30 实机完成 message_0 首页密钥校验，正文与 WAL 读取未验证 |
 | Windows 选定会话测试依赖 | 第四包自带 Python 3.14.10 官方 x64 embeddable、`sqlcipher3==0.6.4` 普通 cp314 Windows x64 wheel、`zstandard==0.25.0` cp314 wheel。与第三包分开，版本匹配；不安装全局环境。原始摘要固定在清单，Windows 实际加载先做私有虚构 DB／WAL 验证 |
 | Windows 持续采集依赖 | 新包复用上述固定 Python／SQLCipher／zstandard，目标私有消息库使用 Python 标准库 `sqlite3`，官方 `_sqlite3.pyd`、`sqlite3.dll` 与标准库包已核对入包。进程／私有 ACL 用 Windows 系统 API，单实例锁用 `msvcrt`；不安装其他 Python、Node、Codex、服务或开机自启 |
+| 本机 Web 服务 | 使用同一便携 Python 的标准库 `http.server`／`sqlite3`，只绑定 `127.0.0.1` 随机端口，通过当前运行的随机会话凭据和 HttpOnly Cookie 访问；界面为原生 HTML／CSS／JS，无 npm 或前端构建运行依赖。名称元信息只查询原会话和已采消息中的发送人，不读取其他会话正文 |
 | Apple 开发工具 | 当前 Mac 初始化使用 LLDB 及其 Python 绑定；复制和临时签名使用系统 `ditto`、`codesign`。原生状态探针由 Swift 编译。独立用户需检测相应工具并按官方方式准备，不能假定随 Python 自动提供 |
 | `sqlcipher3-wheels==0.5.7` | 在隔离环境中安装二进制 wheel，以 SQLCipher 只读打开加密消息库及 WAL |
 | `zstandard==0.25.0` | 在隔离环境中解码压缩的文字正文 |

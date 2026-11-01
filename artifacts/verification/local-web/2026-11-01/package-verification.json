@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "kind": "chatlens_windows_web_package_verification",
+  "verified_at_utc": "2026-11-01T04:28:31.444206+00:00",
+  "verification_scope": "offline_public_package_static_integrity_only",
+  "package_name": "ChatLens-Windows-Web-20261101.zip",
+  "package_bytes": 15514607,
+  "package_sha256": "b7d5f8899327a95a8bc7da192d82059e7aa68a0542041875b653dc3cc6fbb188",
+  "status": "通过",
+  "counts": {
+    "archive_files": 79,
+    "manifest_payload_files": 78,
+    "public_source_files": 18,
+    "frontend_files": 4,
+    "runtime_files": 56,
+    "python_source_files": 14,
+    "license_or_notice_files": 4,
+    "pinned_upstream_archives": 3
+  },
+  "checks": {
+    "archive_crc": "通过",
+    "exclusive_whitelist_and_no_private_payload": "通过",
+    "manifest_sha256_and_sizes": "通过",
+    "frozen_public_source_byte_match": "通过",
+    "pinned_runtime_archive_byte_match_with_documented_pth_change": "通过",
+    "stdlib_sqlite_and_cp314_x64_extensions": "通过",
+    "upstream_license_preservation": "通过",
+    "launcher_encodings_and_cli_contract": "通过",
+    "python_syntax_and_local_import_closure": "通过",
+    "public_text_pattern_scan": "通过"
+  },
+  "chat_messages_read_during_build": 0,
+  "cloud_calls_during_build": 0,
+  "global_runtime_installs": 0,
+  "windows_native_execution_status": "未验证",
+  "real_wechat_web_message_display_status": "未验证",
+  "long_running_stability_status": "未验证"
+}

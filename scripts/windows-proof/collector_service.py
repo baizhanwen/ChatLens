@@ -64,6 +64,7 @@ class Heartbeat:
     def __init__(self, output):
         self.path = Path(output) / 'status.json'
         self.sequence = 0
+        self.metadata = None
 
     def emit(self, stage, total=0, added=0, resumed=False):
         if stage not in STAGES or type(total) is not int or type(added) is not int:
@@ -73,6 +74,11 @@ class Heartbeat:
                                 'sequence': self.sequence, 'stage': stage, 'recorded_at_utc': now(),
                                 'total_messages': total, 'new_messages_this_run': added,
                                 'resumed_from_checkpoint': bool(resumed)})
+        if self.metadata is not None:
+            try:
+                self.metadata.status(stage, total, added, resumed)
+            except Exception:
+                self.metadata.failed = True  # Stale Web status must not stop durable capture.
 
 
 def _same_path(first, second):
@@ -171,7 +177,7 @@ def show_plan(scope, summary, resumed):
     print('测试码只显示在本机；private 与 collector-data 不要回传。', flush=True)
 
 
-def collect_loop(reader, store, native, stop_requested, heartbeat, report, *, sleep=time.sleep, clock=time.monotonic, preflight=None):
+def collect_loop(reader, store, native, stop_requested, heartbeat, report, *, sleep=time.sleep, clock=time.monotonic, preflight=None, on_commit=None):
     failures = 0
     last_notice, last_stage = clock() - 10, None
     while not stop_requested():
@@ -188,6 +194,8 @@ def collect_loop(reader, store, native, stop_requested, heartbeat, report, *, sl
             report['new_messages_this_run'] += result['new_messages']
             report['duplicate_events_skipped_this_run'] += result['duplicates']
             report['total_messages'] = result['total_messages']
+            if result['new_messages'] and on_commit is not None:
+                on_commit()
         except Exception as error:
             code = safe_code(error)
             if code in ('continuous_native_state_not_ready', 'continuous_native_state_unavailable'):
@@ -218,6 +226,7 @@ def main():
     parser.add_argument('--pid', type=int, required=True)
     parser.add_argument('--creation-time', type=int, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--web-metadata', action='store_true')
     args = parser.parse_args()
     report = {'schema_version': 1, 'stage': 'continuous_collection', 'started_at_utc': now(),
               'status': '未验证', 'reason': 'not_started', 'scope': 'two_previously_selected_conversations_new_text_only',
@@ -230,6 +239,7 @@ def main():
               'private_acl_verified': False, 'controlled_summary_before': None, 'controlled_summary_after': None}
     store = reader = None
     heartbeat = None
+    metadata = None
     try:
         if sys.platform != 'win32':
             raise CollectorError('windows_collector_launcher_required')
@@ -249,6 +259,15 @@ def main():
         store = CollectorStore(args.data_dir / 'private' / 'store', binding)
         report['restored_messages'] = report['total_messages'] = store.stats()['total_messages']
         report['controlled_summary_before'] = store.controlled_summary(scope['test_tokens'], expected)
+        if args.web_metadata:
+            from collector_web_meta import WebMetadata
+            metadata = WebMetadata(args.data_dir / 'private', store.binding_digest, report['started_at_utc'])
+            heartbeat.metadata = metadata
+            heartbeat.emit('starting', report['total_messages'])
+            try:
+                metadata.refresh_catalog(driver, root, keys, scope['config'], store.sender_ids_by_alias())
+            except Exception:
+                metadata.failed = True
         signal.signal(signal.SIGINT, signal.SIG_IGN)  # Parent sends our local stop request.
         with NativeState(args.pid, str(exe), args.creation_time) as native:
             reader = ContinuousReader(driver, root, keys, scope['config'], store, native.sample)
@@ -260,8 +279,14 @@ def main():
                 ensure_private_dir(args.data_dir)
                 ensure_private_dir(args.data_dir / 'private')
                 ensure_private_dir(args.data_dir / 'private' / 'store')
+            def on_commit():
+                if metadata is not None:
+                    try:
+                        metadata.refresh_catalog(driver, root, keys, scope['config'], store.sender_ids_by_alias())
+                    except Exception:
+                        metadata.failed = True
             collect_loop(reader, store, native, lambda: (args.output / 'stop.request').exists(), heartbeat, report,
-                         preflight=preflight)
+                         preflight=preflight, on_commit=on_commit)
             report['normal_stop_requested'] = True
             report['status'], report['reason'] = '通过', 'collector_stopped_with_committed_checkpoint'
     except BaseException as error:
@@ -278,8 +303,17 @@ def main():
                 report['controlled_summary_after'] = store.controlled_summary(scope['test_tokens'], expected)
             except Exception:
                 report['status'], report['reason'] = '失败', 'collector_final_checkpoint_query_failed'
+            if metadata is not None:
+                try:
+                    metadata.status('stopped' if report['status'] == '通过' else 'error', report['total_messages'],
+                                    report['new_messages_this_run'], report['resumed_from_checkpoint'], report['reason'])
+                except Exception:
+                    metadata.failed = True
+                heartbeat.metadata = None  # Publish final state before releasing the writer lock.
             store.close()
         report['finished_at_utc'] = now()
+        if metadata is not None:
+            report['web_metadata_status'] = '未验证' if metadata.failed else '通过'
         try:
             write_public(args.output / 'result-to-send.json', report)
             if heartbeat is not None:

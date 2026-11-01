@@ -1,0 +1,32 @@
+{
+  "result": "passed",
+  "source": "synthetic_commits_into_actual_collector_store",
+  "transport": "actual_authenticated_loopback_http",
+  "race_check": "actual_db_search_response_delayed_800ms",
+  "real_wechat_validation": "not_performed",
+  "source_sha256": {
+    "apps/web/app.js": "eceb127ff0b9c1591a53a2cce010bb763fda1955c36adbae2b988e6910a90c6c",
+    "apps/web/index.html": "7117cb30a102eb63a71b8eb4f7b78da070810aff5a848a8c5aac6f3139d1a6a1",
+    "apps/web/styles.css": "06a3dc8d24e5fe1efbe5cf09404aa7b5849ae973b5da4f89a48589c2aa52a23f",
+    "scripts/windows-proof/web_data.py": "ab933ddfdd9cbec1d3dcb4e70b97a8254b67e6c7dc0291330e3fdee7881b482b",
+    "scripts/windows-proof/web_server.py": "4534ae068eb9ad8bc8178b8ef48331563d6bdb4680802e865bf1a14f252a23ce",
+    "tests/web_live_fixture.py": "ef13e72f2214b0861701c9cd0d6796dbf81347f49c045c14ff2c01219091c00f",
+    "scripts/web-live-smoke.cjs": "a01fc8fa81c8c44a51aecb3538c959716901b447ac00a86f28b7c9fc926a9b76"
+  },
+  "checks": [
+    "authenticated_real_http_bootstrap_and_fragment_removed",
+    "selected_conversations_real_latest100_and_older_pagination",
+    "server_search_pagination_separate_from_incremental_cursor",
+    "source_commit_polling_xss_literal_unknown_sender_and_no_duplicate",
+    "reading_position_preserved_and_new_message_button",
+    "conversation_switch_search_responses_cannot_replace_other_thread",
+    "actual_service_stop_keeps_rows_then_reconnect_catches_up",
+    "actual_collector_status_does_not_claim_collecting_when_stopped",
+    "390px_drawer_list_thread_detail_and_status_no_overflow",
+    "real_http_without_authorization_shows_error_and_never_fiction"
+  ],
+  "api_request_count": 36,
+  "external_requests": 0,
+  "browser_runtime_errors": 0,
+  "fixture_stderr_bytes": 0
+}

@@ -1,0 +1,3 @@
+All synthetic/contract regression: 336 passed, 0 skipped.
+Elapsed: 18.460 seconds.
+No real WeChat client or user private keys used in this run.

@@ -209,7 +209,8 @@ class CollectorStore:
             self._connection = connection
             connection.execute('PRAGMA trusted_schema=OFF')
             connection.execute('PRAGMA foreign_keys=ON')
-            connection.execute('PRAGMA busy_timeout=0')
+            # A short Web read may overlap our commit; keep message/cursor atomic.
+            connection.execute('PRAGMA busy_timeout=3000')
             connection.execute('PRAGMA temp_store=MEMORY')
             connection.execute('PRAGMA journal_mode=DELETE')
             connection.execute('PRAGMA synchronous=FULL')
@@ -371,6 +372,24 @@ class CollectorStore:
                     'commits': self._connection.execute('SELECT commits FROM checkpoint WHERE id=1').fetchone()[0]}
         except (sqlite3.Error, TypeError, IndexError):
             raise StoreError('collector_stats_unavailable') from None
+
+    @property
+    def binding_digest(self):
+        return self._binding
+
+    def sender_ids_by_alias(self):
+        """Bounded metadata for senders already observed inside the selected scope."""
+        self._check_files()
+        result = {'private_test': [], 'group_test': []}
+        try:
+            for alias in result:
+                rows = self._connection.execute(
+                    'SELECT DISTINCT sender_id FROM messages WHERE alias=? AND sender_id IS NOT NULL LIMIT 256',
+                    (alias,)).fetchall()
+                result[alias] = [row[0] for row in rows if isinstance(row[0], str)]
+            return result
+        except sqlite3.Error:
+            raise StoreError('collector_sender_metadata_unavailable') from None
 
     def controlled_summary(self, tokens, expected_senders):
         """Return counts/match flags for local controlled tests, never texts/IDs.

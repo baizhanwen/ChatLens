@@ -180,6 +180,27 @@ class CollectorSupervisorTests(unittest.TestCase):
         unrelated.terminate.assert_not_called()
         unrelated.kill.assert_not_called()
 
+    def test_owning_web_stop_file_uses_same_finite_graceful_path(self):
+        def sleep(seconds):
+            self.clock.sleep(seconds)
+            if self.clock.now() >= .4:
+                (self.output / 'supervisor-stop.request').touch(exist_ok=True)
+        result = self.run_fake(sleep=sleep)
+        self.assertEqual(result['reason'], 'collector_normal_stop')
+        self.assertTrue(result['normal_stop_requested'])
+        self.assertFalse(self.children[0].terminated)
+
+    def test_owning_web_stop_has_bounded_cleanup_for_unresponsive_child(self):
+        def sleep(seconds):
+            self.clock.sleep(seconds)
+            if self.clock.now() >= .4:
+                (self.output / 'supervisor-stop.request').touch(exist_ok=True)
+        result = self.run_fake(sleep=sleep, grace_exit=False, ignore_terminate=True)
+        self.assertEqual(result['reason'], 'collector_stop_deadline')
+        self.assertTrue(result['child_cleanup_confirmed'])
+        self.assertTrue(self.children[0].killed)
+        self.assertLess(result['elapsed_seconds'], 2)
+
     def test_timeout_then_zero_exit_is_still_failure(self):
         result = self.run_fake(reader=lambda _: heartbeat(1), live=0.4, terminate_code=0)
         self.assertTrue(result['timed_out'])

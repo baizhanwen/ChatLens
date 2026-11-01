@@ -271,6 +271,12 @@ class CollectorServiceSessionTests(unittest.TestCase):
         self.assertEqual(reader.calls, 0)
 
     def test_main_shows_ready_only_after_reader_has_established_baseline_and_stops_cleanly(self):
+        self.main_ready_case()
+
+    def test_main_web_status_is_finalized_before_store_lock_release(self):
+        self.main_ready_case(web_metadata=True)
+
+    def main_ready_case(self, web_metadata=False):
         import windows_keyproof_core as proof
         import windows_keyproof_platform as platform
         import windows_selected_native as native_module
@@ -281,6 +287,7 @@ class CollectorServiceSessionTests(unittest.TestCase):
         fake_package.dbapi2 = types.ModuleType('sqlcipher3.dbapi2')
 
         class DummyStore:
+            binding_digest = 'f' * 64
             def __init__(self, *args):
                 events.append('store')
             def stats(self):
@@ -291,6 +298,17 @@ class CollectorServiceSessionTests(unittest.TestCase):
                 return {'initialized': True, 'last_commit_at': '2026-01-01T00:00:00+00:00'}
             def close(self):
                 events.append('store_closed')
+            def sender_ids_by_alias(self):
+                return {'private_test': [PEER], 'group_test': [PEER]}
+
+        class DummyMetadata:
+            failed = False
+            def __init__(self, *args):
+                events.append('metadata_created')
+            def refresh_catalog(self, *args):
+                events.append('catalog')
+            def status(self, stage, *args):
+                events.append('metadata_' + stage)
 
         class DummyReader:
             resumed = False
@@ -315,6 +333,8 @@ class CollectorServiceSessionTests(unittest.TestCase):
 
         argv = ['collector_service.py', '--data-dir', str(self.destination), '--selected-config', str(self.selected),
                 '--pid', '123', '--creation-time', '456', '--output', str(output)]
+        if web_metadata:
+            argv.append('--web-metadata')
         with contextlib.ExitStack() as stack:
             stack.enter_context(patch.object(service.sys, 'argv', argv))
             stack.enter_context(patch.object(service.sys, 'platform', 'win32'))
@@ -327,9 +347,15 @@ class CollectorServiceSessionTests(unittest.TestCase):
             stack.enter_context(patch.object(service, 'CollectorStore', DummyStore))
             stack.enter_context(patch.object(service, 'ContinuousReader', DummyReader))
             stack.enter_context(patch.object(service, 'show_plan', side_effect=show))
+            if web_metadata:
+                stack.enter_context(patch('collector_web_meta.WebMetadata', DummyMetadata))
             stdout = stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
             self.assertEqual(service.main(), 0)
         self.assertLess(events.index('baseline_committed'), events.index('ready'))
+        if web_metadata:
+            self.assertLess(events.index('store'), events.index('metadata_created'))
+            self.assertLess(events.index('metadata_stopped'), events.index('store_closed'))
+            self.assertEqual(events.count('metadata_stopped'), 1)
         saved = json.loads((output / 'result-to-send.json').read_text())
         self.assertTrue(saved['normal_stop_requested'])
         self.assertTrue(saved['checkpoint_saved'])
