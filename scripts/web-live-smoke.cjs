@@ -66,7 +66,7 @@ async function main() {
     const bodyContains = text => page.waitForFunction(value => [...document.querySelectorAll('.message-body')].some(node => node.textContent === value), text);
     const navigate = async name => {
       if (page.viewportSize().width <= 640 && await byId('nav-toggle').getAttribute('aria-expanded') !== 'true') await byId('nav-toggle').click();
-      await byId('nav-' + name).click();
+      await byId(name === 'settings' ? 'settings-button' : 'nav-' + name).click();
       await byId('view-' + name).waitFor({ state: 'visible' });
     };
     const noOverflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
@@ -87,6 +87,17 @@ async function main() {
       assert.equal(await byId('reset-preview').isVisible(), false);
     });
     await screenshot('desktop-overview');
+    await check('dedicated_settings_navigation_and_display_preferences_keep_live_data', async () => {
+      await navigate('settings'); assert(await byId('model-form').isVisible()); assert(await byId('settings-form').isVisible());
+      assert.equal(await page.locator('#model-dialog,#settings-dialog').count(), 0); assert.equal(await byId('model-api-key').inputValue(), '');
+      await byId('pref-density').selectOption('compact'); await byId('save-settings').click(); assert(await byId('view-settings').isVisible());
+      assert(await page.locator('body').evaluate(node => node.classList.contains('compact'))); await noOverflow(); await screenshot('desktop-settings-1440');
+      await navigate('overview'); assert.equal(await byId('ai-model-target').evaluate(node => node.tagName), 'SPAN'); assert.equal(await byId('total-messages').textContent(), '126 条');
+    });
+    await check('988px_ai_and_settings_fit_without_horizontal_overflow', async () => {
+      await page.setViewportSize({ width: 988, height: 776 }); await noOverflow(); await screenshot('desktop-ai-988');
+      await navigate('settings'); await noOverflow(); await screenshot('desktop-settings-988'); await page.setViewportSize({ width: 1440, height: 1000 });
+    });
     await navigate('messages');
     await check('selected_conversations_real_latest100_and_older_pagination', async () => {
       assert.equal(await page.locator('.conversation-item').count(), 2);
@@ -169,6 +180,8 @@ async function main() {
     await screenshot('desktop-collection');
     await check('390px_drawer_list_thread_detail_and_status_no_overflow', async () => {
       await page.setViewportSize({ width: 390, height: 844 });
+      await navigate('settings'); assert(await byId('model-form').isVisible()); assert(await byId('settings-form').isVisible());
+      await noOverflow(); await screenshot('mobile-settings'); await navigate('collection');
       await noOverflow();
       await screenshot('mobile-collection');
       await navigate('messages');
@@ -197,7 +210,7 @@ async function main() {
     assert.equal(issues.page.length, 0);
     assert.equal(issues.external, 0);
     assert.deepEqual(hashes(), before, 'Source files changed during browser verification.');
-    const evidence = { result: 'passed', source: 'synthetic_commits_into_actual_collector_store', transport: 'actual_authenticated_loopback_http', race_check: 'actual_db_search_response_delayed_800ms', real_wechat_validation: 'not_performed', source_sha256: before, checks, api_request_count: apiRequests, external_requests: issues.external, browser_runtime_errors: issues.page.length, fixture_stderr_bytes: stderrBytes };
+    const evidence = { result: 'passed', source: 'synthetic_commits_into_actual_collector_store', transport: 'actual_authenticated_loopback_http', race_check: 'actual_db_search_response_delayed_800ms', viewports: ['1440x1000','988x776','390x844'], settings_surface: 'dedicated_page', real_wechat_validation: 'not_performed', source_sha256: before, checks, api_request_count: apiRequests, external_requests: issues.external, browser_runtime_errors: issues.page.length, fixture_stderr_bytes: stderrBytes };
     fs.writeFileSync(path.join(output, 'browser-qa.json'), JSON.stringify(evidence, null, 2) + '\n');
     process.stdout.write(JSON.stringify({ result: 'passed', checks: checks.length, evidence: path.relative(root, output) }) + '\n');
   } catch (error) {

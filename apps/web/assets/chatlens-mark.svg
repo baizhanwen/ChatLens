@@ -1,7 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="利明智耀 ChatLens 简约绿色标识">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="利明智耀 ChatLens L 标识">
   <rect width="64" height="64" rx="16" fill="#29322A"/>
-  <g fill="none" stroke="#FAFBF6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M21 20h22a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H29l-10 7v-9a6 6 0 0 1-4-6V26a6 6 0 0 1 6-6Z"/>
-    <path d="M24 32a8 8 0 0 1 16 0M24 37h16"/>
-  </g>
+  <path fill="#FAFBF6" d="M17 17h18v2h-3c-1.9 0-2.5.6-2.5 2.8v20.6c0 2.2.7 3.1 3.1 3.1h2.2c3.4 0 4.6-2.4 6-6.6h1.7L41.2 48H17v-2h3.1c1.9 0 2.5-.6 2.5-2.8V21.8c0-2.2-.6-2.8-2.5-2.8H17Z"/>
+  <circle cx="48" cy="44" r="4" fill="#B9D58A"/>
 </svg>

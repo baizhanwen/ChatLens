@@ -1,0 +1,14 @@
+{
+  "status": "passed",
+  "scope": "read_only_existing_local_workbench",
+  "existing_model_configured": true,
+  "saved_key_not_echoed": true,
+  "settings_navigation": true,
+  "current_model_retained": true,
+  "collector_state": "collecting",
+  "no_write_requests": true,
+  "no_external_browser_requests": true,
+  "browser_runtime_errors": 0,
+  "real_model_call": false,
+  "real_chat_screenshot_saved": false
+}

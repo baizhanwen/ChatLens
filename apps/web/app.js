@@ -379,8 +379,9 @@
   }
 
   function navigate(view) {
-    if (!['overview', 'messages', 'collection'].includes(view)) return;
+    if (!['overview', 'messages', 'collection', 'settings'].includes(view)) return;
     const changed = currentView !== view;
+    if (changed && currentView === 'settings') leaveSettings();
     if (changed && currentView === 'messages' && $('message-scroll').clientHeight > 0) {
       scrollPositions.set(activeId, $('message-scroll').scrollTop);
     }
@@ -392,7 +393,7 @@
       if (active) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     });
-    $('breadcrumb-current').textContent = { overview: 'AI 助手', messages: '会话消息', collection: '采集状态' }[view];
+    $('breadcrumb-current').textContent = { overview: 'AI 助手', messages: '会话消息', collection: '采集状态', settings: '设置' }[view];
     if (changed) ai.evidenceRequest++;
     if (view === 'overview' && ai.initialized) refreshAiStatus();
     setDrawer(false, false);
@@ -400,6 +401,11 @@
       if (LIVE && activeChat().id && !live.evidence && !liveCache.get(activeId)?.loaded) ensureLiveMessages(activeId);
       renderMessages({ bottom: !scrollPositions.has(activeId), restore: scrollPositions.get(activeId) });
       renderNewMessageButton();
+    }
+    if (view === 'settings' && changed) {
+      $('pref-density').value = preferences.density;
+      $('pref-autoscroll').checked = preferences.autoScroll;
+      loadModelSettings();
     }
     if (changed) window.scrollTo({ top: 0, behavior: 'instant' });
   }
@@ -989,9 +995,10 @@
 
   function setAiProvider(provider) {
     if (!provider || typeof provider.configured !== 'boolean') throw apiError('invalid_response');
-    if (ai.provider?.target_fingerprint !== provider.target_fingerprint) { ai.consentKey = null; $('ai-cloud-confirm').checked = false; }
+    if (ai.provider?.target_fingerprint !== provider.target_fingerprint) { ai.consentKey = null; ai.lastTestResult = null; $('ai-cloud-confirm').checked = false; aiNotice(); }
     ai.provider = { base_url: typeof provider.base_url === 'string' ? provider.base_url : '', model: typeof provider.model === 'string' ? provider.model : '', has_key: provider.has_key === true, configured: provider.configured, target_fingerprint: typeof provider.target_fingerprint === 'string' ? provider.target_fingerprint : '', is_local: provider.is_local === true };
     renderAiControls();
+    renderModelConnectionStatus();
   }
 
   function renderAiScopes() {
@@ -1034,8 +1041,7 @@
     $('ai-time-range').disabled = busy;
     $('ai-scope').disabled = busy;
     $('ai-new-thread').disabled = busy;
-    $('ai-model-target').disabled = Boolean(ai.job);
-    $('ai-model-target').querySelector('span').textContent = LIVE ? aiTarget() : '虚构预览 · 不连接模型';
+    $('ai-model-target').querySelector('span').textContent = LIVE ? configured ? provider.model : '未配置模型' : '虚构预览';
     const cloud = LIVE && configured && !provider.is_local;
     $('ai-cloud-consent').hidden = !cloud;
     $('ai-cloud-confirm').disabled = busy;
@@ -1249,7 +1255,7 @@
     if (!question || aiBusy()) return;
     if (LIVE && !live.connected) { aiNotice('请先恢复与本机服务的连接。'); return; }
     if (LIVE && ai.status?.busy) { aiNotice('上一项请求仍在结束，请稍后再提问。'); return; }
-    if (LIVE && !ai.provider?.configured) { aiNotice('请先配置模型，再发送这个问题。'); openModelDialog(); return; }
+    if (LIVE && !ai.provider?.configured) { aiNotice('请先在设置中配置模型，再发送这个问题。'); navigate('settings'); return; }
     if (LIVE && (!ai.status?.knowledge?.ready || ai.status.knowledge.message_count === 0)) { aiNotice('知识库中还没有可供查询的文字。请等待选定会话的新文字采集完成。'); return; }
     if (!aiScope().length) { aiNotice('请先启用需要关注的会话。'); return; }
     if (LIVE && !ai.provider.is_local && ai.consentKey !== aiScopeKey()) { aiNotice('请先核对下方模型目标，并勾选允许发送本次范围的相关文字片段。'); $('ai-cloud-confirm').focus(); return; }
@@ -1418,6 +1424,14 @@
   const modelPresets = { 'minimax-cn': 'https://api.minimax.cn/v1', 'minimax-global': 'https://api.minimax.io/v1' };
   function modelFeedback(text = '', failure = false) { $('model-feedback').hidden = !text; $('model-feedback').textContent = text; $('model-feedback').classList.toggle('is-error', failure); }
   function modelDirty() { return $('model-base-url').value.trim() !== (ai.provider?.base_url || '') || $('model-name').value.trim() !== (ai.provider?.model || '') || Boolean($('model-api-key').value) || $('model-delete-key').checked; }
+  function renderModelConnectionStatus() {
+    const badge = $('model-connection-status');
+    if (!badge) return;
+    const result = ai.lastTestResult?.fingerprint === ai.provider?.target_fingerprint ? ai.lastTestResult : null;
+    const label = !LIVE ? '虚构预览' : ai.testJob ? '正在测试' : ai.modelBusy ? '正在处理' : result?.stage === 'done' ? '测试通过' : result?.stage === 'error' ? '测试未通过' : ai.provider?.configured ? '已配置' : '未配置';
+    badge.textContent = label;
+    badge.className = 'tag tag-' + (ai.testJob || ai.modelBusy ? 'running' : result?.stage === 'error' ? 'failure' : result?.stage === 'done' ? 'success' : 'neutral');
+  }
   function renderModelControls() {
     const busy = ai.modelBusy || Boolean(ai.testJob);
     for (const id of ['model-preset', 'model-base-url', 'model-name', 'model-delete-key']) $(id).disabled = busy;
@@ -1428,34 +1442,51 @@
     $('model-cancel-test').hidden = !ai.testJob;
     const draft = { base_url: $('model-base-url').value.trim(), model: $('model-name').value.trim() };
     $('model-target-preview').textContent = aiTarget(draft);
+    renderModelConnectionStatus();
     renderAiControls();
   }
 
-  async function openModelDialog() {
-    if (ai.modelBusy || $('model-dialog').open) return;
-    setDrawer(false, false);
+  function clearModelDraft() {
     $('model-api-key').value = '';
     $('model-delete-key').checked = false;
+  }
+
+  function leaveSettings() {
+    clearModelDraft();
+    ai.modelFormRequest = (ai.modelFormRequest || 0) + 1;
+    if (ai.modelAction === 'load') { ai.modelBusy = false; ai.modelAction = null; }
+    if (ai.modelAction === 'test') ai.cancelTestOnLeave = true;
+    if (ai.testJob) cancelModelTest();
+    renderAiControls();
+  }
+
+  async function loadModelSettings() {
+    if (ai.modelBusy || ai.testJob || currentView !== 'settings') { renderModelControls(); return; }
+    const request = ai.modelFormRequest = (ai.modelFormRequest || 0) + 1;
+    clearModelDraft();
     $('model-base-url').value = ai.provider?.base_url || modelPresets['minimax-cn'];
     $('model-name').value = ai.provider?.model || 'MiniMax-M3.1-Flash';
     ai.modelBusy = LIVE && live.connected;
+    ai.modelAction = ai.modelBusy ? 'load' : null;
     renderModelControls();
-    $('model-dialog').showModal();
     modelFeedback(ai.modelBusy ? '正在读取本机配置…' : '');
     let readFailed = false;
     if (LIVE && live.connected) {
-      try { const result = await api('/api/ai/config'); setAiProvider(result.provider || result); }
-      catch (problem) { readFailed = true; modelFeedback(aiErrorText(problem), true); }
+      try { const result = await api('/api/ai/config'); if (request !== ai.modelFormRequest || currentView !== 'settings') return; setAiProvider(result.provider || result); }
+      catch (problem) { if (request !== ai.modelFormRequest || currentView !== 'settings') return; readFailed = true; modelFeedback(aiErrorText(problem), true); }
     }
+    if (request !== ai.modelFormRequest || currentView !== 'settings') return;
     const provider = ai.provider;
     $('model-base-url').value = provider?.base_url || modelPresets['minimax-cn'];
     $('model-name').value = provider?.model || 'MiniMax-M3.1-Flash';
     $('model-preset').value = Object.entries(modelPresets).find(([, url]) => url === $('model-base-url').value)?.[0] || 'custom';
     $('model-delete-key-row').hidden = !provider?.has_key;
+    $('model-api-key').placeholder = provider?.has_key ? '已配置 · 留空保留' : '在本机输入 API Key';
     $('model-key-help').textContent = provider?.has_key ? '已保存本机密钥。留空会保留原密钥，输入新值会替换。' : '请在本机输入密钥，不要发送到聊天里。';
     if (!LIVE) modelFeedback('虚构预览不会保存真实配置，也不会连接模型。');
     else if (!readFailed) modelFeedback();
     ai.modelBusy = false;
+    ai.modelAction = null;
     renderModelControls();
   }
 
@@ -1464,6 +1495,7 @@
     if (aiBusy()) return;
     if (!LIVE) { $('model-api-key').value = ''; modelFeedback('这是虚构预览。没有保存配置或调用模型。'); renderModelControls(); return; }
     ai.modelBusy = true;
+    ai.modelAction = 'save';
     modelFeedback('正在保存到本机…');
     renderModelControls();
     try {
@@ -1476,26 +1508,31 @@
       $('model-api-key').value = '';
       $('model-delete-key').checked = false;
       $('model-delete-key-row').hidden = !ai.provider.has_key;
+      $('model-api-key').placeholder = ai.provider.has_key ? '已配置 · 留空保留' : '在本机输入 API Key';
       $('model-key-help').textContent = ai.provider.has_key ? '本机密钥已保存，输入框已清空。留空会保留原密钥。' : '当前没有已保存的密钥。';
       modelFeedback('已保存到本机。尚未测试连接，也没有发送聊天。');
+      aiNotice();
       refreshAiStatus(true);
     } catch (problem) { modelFeedback(aiErrorText(problem), true); }
-    finally { $('model-api-key').value = ''; ai.modelBusy = false; renderModelControls(); }
+    finally { $('model-api-key').value = ''; ai.modelBusy = false; ai.modelAction = null; renderModelControls(); }
   }
 
   async function testModel() {
     if (aiBusy() || modelDirty() || !ai.provider?.configured) return;
     if (!LIVE) { modelFeedback('虚构预览不会连接模型。'); return; }
     ai.modelBusy = true;
+    ai.modelAction = 'test';
+    ai.cancelTestOnLeave = false;
     modelFeedback('正在请求测试 ' + aiTarget() + '，不发送聊天内容。');
     renderModelControls();
     try {
       const result = await aiPost('/api/ai/test', { target_fingerprint: ai.provider.target_fingerprint });
       if (typeof result?.job_id !== 'string') throw apiError('invalid_response');
-      ai.testJob = { id: result.job_id, target: aiTarget() };
-      pollModelTest();
+      ai.testJob = { id: result.job_id, target: aiTarget(), fingerprint: ai.provider.target_fingerprint };
+      if (ai.cancelTestOnLeave || currentView !== 'settings') cancelModelTest();
+      else pollModelTest();
     } catch (problem) { modelFeedback(aiErrorText(problem), true); }
-    finally { ai.modelBusy = false; renderModelControls(); }
+    finally { ai.modelBusy = false; ai.modelAction = null; renderModelControls(); }
   }
 
   async function pollModelTest() {
@@ -1504,9 +1541,9 @@
     try {
       const result = await api('/api/ai/jobs/' + encodeURIComponent(job.id));
       if (ai.testJob !== job) return;
-      if (result.stage === 'done') { modelFeedback('连接测试通过：' + job.target + '。没有发送聊天内容。'); ai.testJob = null; }
-      else if (result.stage === 'error') { modelFeedback(aiErrorText(result.error), true); ai.testJob = null; }
-      else if (result.stage === 'cancelled') { modelFeedback('已取消连接测试。'); ai.testJob = null; }
+      if (result.stage === 'done') { ai.lastTestResult = { fingerprint: job.fingerprint, stage: 'done' }; modelFeedback('连接测试通过：' + job.target + '。没有发送聊天内容。'); ai.testJob = null; }
+      else if (result.stage === 'error') { ai.lastTestResult = { fingerprint: job.fingerprint, stage: 'error' }; modelFeedback(aiErrorText(result.error), true); ai.testJob = null; }
+      else if (result.stage === 'cancelled') { ai.lastTestResult = { fingerprint: job.fingerprint, stage: 'cancelled' }; modelFeedback('已取消连接测试。'); ai.testJob = null; }
       else { modelFeedback('正在测试 ' + job.target + '…'); ai.testTimer = setTimeout(pollModelTest, 700); }
     } catch (problem) { if (ai.testJob === job) { modelFeedback(aiErrorText(problem), true); ai.testJob = null; } }
     renderModelControls();
@@ -1530,7 +1567,6 @@
     $('ai-cloud-confirm').addEventListener('change', () => { ai.consentKey = $('ai-cloud-confirm').checked ? aiScopeKey() : null; });
     $('ai-new-thread').addEventListener('click', newAiThread);
     $('ai-cancel').addEventListener('click', cancelAiJob);
-    $('ai-model-target').addEventListener('click', openModelDialog);
     $('ai-new-answer').addEventListener('click', () => { $('ai-chat-scroll').scrollTop = $('ai-chat-scroll').scrollHeight; $('ai-new-answer').hidden = true; });
     $('ai-chat-scroll').addEventListener('scroll', () => { if (aiNearBottom()) $('ai-new-answer').hidden = true; }, { passive: true });
     const prompts = { today: '今天有哪些重点？', followup: '最近有哪些客户需要跟进？', agreement: '最近有哪些约定？', risk: '最近有没有需要注意的风险？' };
@@ -1543,16 +1579,14 @@
     $('ai-knowledge-toggle').addEventListener('click', () => $('knowledge-dialog').showModal());
     $('close-knowledge').addEventListener('click', () => $('knowledge-dialog').close());
     $('knowledge-open-messages').addEventListener('click', () => { $('knowledge-dialog').close(); navigate('messages'); });
-    $('close-model').addEventListener('click', () => $('model-dialog').close());
     $('model-form').addEventListener('submit', saveModel);
     $('model-test').addEventListener('click', testModel);
     $('model-cancel-test').addEventListener('click', cancelModelTest);
     $('model-preset').addEventListener('change', () => { const preset = modelPresets[$('model-preset').value]; if (preset) { $('model-base-url').value = preset; $('model-name').value = 'MiniMax-M3.1-Flash'; } modelFeedback(); renderModelControls(); });
     for (const id of ['model-base-url', 'model-name', 'model-api-key', 'model-delete-key']) $(id).addEventListener('input', () => { if ($('model-delete-key').checked) $('model-api-key').value = ''; modelFeedback(); renderModelControls(); });
-    for (const id of ['model-dialog', 'knowledge-dialog']) {
+    for (const id of ['knowledge-dialog']) {
       $(id).addEventListener('click', event => { if (event.target === $(id)) $(id).close(); });
       $(id).addEventListener('close', () => {
-        if (id === 'model-dialog') { $('model-api-key').value = ''; if (ai.testJob) cancelModelTest(); }
         if (window.innerWidth <= 640) $('nav-toggle').focus({ preventScroll: true });
       });
     }
@@ -1607,33 +1641,25 @@
   $('close-preview').addEventListener('click', () => dialog.close());
   $('confirm-preview').addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
-  const settings = $('settings-dialog');
-  $('settings-button').addEventListener('click', () => {
-    setDrawer(false, false);
-    $('pref-density').value = preferences.density;
-    $('pref-autoscroll').checked = preferences.autoScroll;
-    settings.showModal();
-  });
-  $('cancel-settings').addEventListener('click', () => settings.close());
   $('settings-form').addEventListener('submit', event => {
     event.preventDefault();
     preferences.density = $('pref-density').value;
     preferences.autoScroll = $('pref-autoscroll').checked;
     document.body.classList.toggle('compact', preferences.density === 'compact');
-    settings.close();
     toast('显示偏好已应用到本页，刷新后还原。');
   });
-  [dialog, settings].forEach(modal => modal.addEventListener('close', () => {
+  [dialog].forEach(modal => modal.addEventListener('close', () => {
     if (window.innerWidth <= 640) $('nav-toggle').focus({ preventScroll: true });
   }));
-  settings.addEventListener('click', event => { if (event.target === settings) settings.close(); });
+  window.addEventListener('pagehide', clearModelDraft);
+  window.addEventListener('pageshow', event => { if (event.persisted && currentView === 'settings') loadModelSettings(); });
   document.addEventListener('keydown', event => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'k' && !dialog.open && !settings.open && !$('model-dialog').open && !$('knowledge-dialog').open) {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'k' && !dialog.open && !$('knowledge-dialog').open) {
       event.preventDefault(); navigate('messages'); $('workbench').classList.remove('mobile-thread-open'); $('conversation-search').focus();
     }
-    if (event.key === 'Escape' && !dialog.open && !settings.open && !$('model-dialog').open && !$('knowledge-dialog').open) {
+    if (event.key === 'Escape' && !dialog.open && !$('knowledge-dialog').open) {
       if (document.body.classList.contains('nav-open')) setDrawer(false);
-      else setDetails(false);
+      else if (currentView === 'messages') setDetails(false);
     }
     if (event.key === 'Tab' && document.body.classList.contains('nav-open')) {
       const focusable = [...$('sidebar').querySelectorAll('a,button')].filter(node => node.offsetParent !== null);

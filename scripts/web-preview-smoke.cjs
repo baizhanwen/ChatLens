@@ -10,10 +10,10 @@ const root = path.resolve(__dirname, '..');
 const args = process.argv.slice(2);
 const option = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
 const target = option('--url', pathToFileURL(path.join(root, 'apps/web/index.html')).href);
-const output = path.resolve(option('--output', path.join(root, '.build/web-design-system-smoke')));
+const output = path.resolve(option('--output', path.join(root, '.build', 'web-preview-settings-' + Date.now())));
 assert(!fs.existsSync(output), 'Use a new evidence directory; previous results are preserved.');
 fs.mkdirSync(output, { recursive: true });
-const sources = ['apps/web/index.html', 'apps/web/app.js', 'apps/web/styles.css', 'apps/web/assets/chatlens-mark.svg'];
+const sources = ['apps/web/index.html', 'apps/web/app.js', 'apps/web/styles.css', 'apps/web/assets/chatlens-mark.svg', 'scripts/web-preview-smoke.cjs'];
 const hashes = () => Object.fromEntries(sources.map(name => [name, createHash('sha256').update(fs.readFileSync(path.join(root, name))).digest('hex')]));
 const before = hashes();
 const colors = ['#FAFBF9','#F3F5F0','#FCFDFB','#FFFFFF','#242C29','#78856D','#53634A','#5F7054','#E5E9E3','#29322A','#FAFBF6','#40513B','#E3EADB','#34492C','#E9EDE4','#E9F0DF'];
@@ -51,7 +51,7 @@ async function main() {
   }
   async function navigate(name) {
     if (page.viewportSize().width <= 640 && await byId('nav-toggle').getAttribute('aria-expanded') !== 'true') await byId('nav-toggle').click();
-    await byId('nav-' + name).click(); await section(name).waitFor({ state: 'visible' });
+    await byId(name === 'settings' ? 'settings-button' : 'nav-' + name).click(); await section(name).waitFor({ state: 'visible' });
   }
   async function state(value) { await navigate('messages'); await byId('preview-state').selectOption(value); }
   async function bottom() {
@@ -81,8 +81,8 @@ async function main() {
       await page.locator('.ai-inline-citation').first().click();
       assert(await section('messages').isVisible()); assert((await byId('thread-title').innerText()).includes('林'));
     });
-    await check('three_shared_navigation_views_preserve_context', async () => {
-      for (const name of ['collection','overview','messages']) { await navigate(name); await noOverflow(); }
+    await check('four_shared_navigation_views_preserve_context', async () => {
+      for (const name of ['collection','settings','overview','messages']) { await navigate(name); await noOverflow(); }
       assert((await byTest('status-panel').innerText()).includes('尚未接入'));
     });
     await byTest('conversation-search').fill('');
@@ -146,10 +146,10 @@ async function main() {
       const details = section('collection').locator('details').first(); assert(await details.count()); if (!await details.evaluate(n => n.open)) await details.locator('summary').click(); assert(await details.evaluate(n => n.open));
       await byId('collection-toggle').click(); assert.match(await section('collection').innerText(), /暂停/); await byId('collection-toggle').click(); await shot('desktop-collection.png');
     });
-    await check('settings_form_keeps_display_preferences_in_memory', async () => {
-      await byId('settings-button').click(); assert(await byId('settings-dialog').isVisible());
-      await byId('pref-density').selectOption('compact'); await byId('pref-autoscroll').uncheck(); await byId('save-settings').click(); assert.equal(await byId('settings-dialog').isVisible(), false);
-      await byId('settings-button').click(); assert.equal(await byId('pref-density').inputValue(), 'compact'); assert.equal(await byId('pref-autoscroll').isChecked(), false); await shot('desktop-settings.png');
+    await check('dedicated_settings_page_keeps_display_preferences_in_memory', async () => {
+      await navigate('settings'); assert(await section('settings').isVisible()); assert(await byId('model-form').isVisible()); assert(await byId('settings-form').isVisible()); assert.equal(await page.locator('#model-dialog,#settings-dialog').count(), 0);
+      await byId('pref-density').selectOption('compact'); await byId('pref-autoscroll').uncheck(); await byId('save-settings').click(); assert(await section('settings').isVisible());
+      await navigate('overview'); assert.equal(await byId('ai-model-target').evaluate(node => node.tagName), 'SPAN'); await navigate('settings'); assert.equal(await byId('pref-density').inputValue(), 'compact'); assert.equal(await byId('pref-autoscroll').isChecked(), false); await noOverflow(); await shot('desktop-settings.png');
       await byId('pref-density').selectOption('spacious'); await byId('pref-autoscroll').check(); await byId('save-settings').click();
     });
     await check('local_loading_empty_error_and_retry_states', async () => {
@@ -164,8 +164,9 @@ async function main() {
     await check('preview_explanation_modal_closes_with_escape', async () => {
       await byId('preview-help').click(); assert(await byId('preview-dialog').isVisible()); await page.keyboard.press('Escape'); assert.equal(await byId('preview-dialog').isVisible(), false);
     });
-    await check('medium_screen_all_views_have_no_horizontal_overflow', async () => {
-      await page.setViewportSize({ width: 1024, height: 900 }); for (const name of ['overview','messages','collection']) { await navigate(name); await noOverflow(); }
+    await check('988px_screen_all_views_and_settings_have_no_horizontal_overflow', async () => {
+      await page.setViewportSize({ width: 988, height: 776 }); for (const name of ['overview','messages','collection','settings']) { await navigate(name); await noOverflow(); }
+      await shot('desktop-settings-988.png'); await navigate('overview'); await shot('desktop-overview-988.png');
     });
     await page.setViewportSize({ width: 390, height: 844 }); await page.reload(); await section('overview').waitFor();
     await check('mobile_62px_topbar_brand_and_overview_fit', async () => {
@@ -185,9 +186,9 @@ async function main() {
       await byId('toggle-details').click(); assert(await byTest('status-panel').isVisible()); await shot('mobile-details.png'); await byId('close-details').click();
       await byId('mobile-back').click(); assert(await rows().first().isVisible()); await navigate('collection'); await noOverflow(); await shot('mobile-collection.png');
     });
-    await check('mobile_settings_and_help_close_restore_navigation_focus', async () => {
-      await byId('nav-toggle').click(); await byId('settings-button').click(); assert(await byId('settings-dialog').isVisible());
-      await page.keyboard.press('Escape'); await page.waitForFunction(() => document.activeElement === document.querySelector('#nav-toggle'), null, { timeout: 1500 });
+    await check('mobile_settings_page_navigation_and_help_close_restore_drawer_focus', async () => {
+      await navigate('settings'); assert(await section('settings').isVisible()); assert(await byId('model-form').isVisible()); assert(await byId('settings-form').isVisible()); assert.equal(await byId('nav-toggle').getAttribute('aria-expanded'), 'false'); await noOverflow(); await shot('mobile-settings.png');
+      await page.keyboard.press('Escape'); assert(await section('settings').isVisible()); await navigate('overview');
       await byId('nav-toggle').click(); await byId('preview-help').click(); assert(await byId('preview-dialog').isVisible());
       await page.keyboard.press('Escape'); await page.waitForFunction(() => document.activeElement === document.querySelector('#nav-toggle'), null, { timeout: 1500 });
     });
@@ -195,7 +196,7 @@ async function main() {
       for (const values of Object.values(issues)) assert.equal(values.length, 0); assert.equal(requests.filter(x => ['fetch','xhr','websocket','eventsource'].includes(x.type)).length, 0); assert.deepEqual(hashes(), before);
     });
     const result = { schema_version: 1, status: '通过', scope: 'frontend_only_unified_design_system_browser_qa', recorded_at_utc: new Date().toISOString(), entry_protocol: new URL(target).protocol,
-      browser: 'Chromium', browser_version: browser.version(), viewports: ['1440x1000','1024x900','390x844'], passed_checks: checks, passed_check_count: checks.length,
+      browser: 'Chromium', browser_version: browser.version(), viewports: ['1440x1000','988x776','390x844'], settings_surface: 'dedicated_page', passed_checks: checks, passed_check_count: checks.length,
       required_shared_color_tokens: colors, page_errors: issues.page.length, console_errors: issues.console.length, external_requests: issues.external.length, api_requests: issues.api.length,
       total_static_requests: requests.length, source_files_sha256: before, real_wechat_connected: false, backend_contacted: false, real_data_read: false,
       boundary: 'In-memory fictional frontend only. Desktop/narrow Chromium viewports do not verify physical phones, other operating systems or real collection.' };

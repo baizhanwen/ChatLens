@@ -1,0 +1,40 @@
+{
+  "result": "passed",
+  "source": "synthetic_commits_into_actual_collector_store",
+  "transport": "actual_authenticated_loopback_http",
+  "race_check": "actual_db_search_response_delayed_800ms",
+  "viewports": [
+    "1440x1000",
+    "988x776",
+    "390x844"
+  ],
+  "settings_surface": "dedicated_page",
+  "real_wechat_validation": "not_performed",
+  "source_sha256": {
+    "apps/web/app.js": "9698e8c37f50e0160a625592d66345b067532cff5a9a7cfcb333758a397d124a",
+    "apps/web/index.html": "849ff22fedcb5635e89a0c7ea5ad08afac83ade7e922cc6a5315206476c8e3e5",
+    "apps/web/styles.css": "7fd702e72f960540e5172baed811c4ec9983ed444234b6b8ad81beb1797d5e79",
+    "scripts/windows-proof/web_data.py": "ab933ddfdd9cbec1d3dcb4e70b97a8254b67e6c7dc0291330e3fdee7881b482b",
+    "scripts/windows-proof/web_server.py": "4534ae068eb9ad8bc8178b8ef48331563d6bdb4680802e865bf1a14f252a23ce",
+    "tests/web_live_fixture.py": "ef13e72f2214b0861701c9cd0d6796dbf81347f49c045c14ff2c01219091c00f",
+    "scripts/web-live-smoke.cjs": "61f0558468b4a28c1361d0c7b165278d4991568785c1e8aa52da15383daa7d65"
+  },
+  "checks": [
+    "authenticated_real_http_bootstrap_and_fragment_removed",
+    "dedicated_settings_navigation_and_display_preferences_keep_live_data",
+    "988px_ai_and_settings_fit_without_horizontal_overflow",
+    "selected_conversations_real_latest100_and_older_pagination",
+    "server_search_pagination_separate_from_incremental_cursor",
+    "source_commit_polling_xss_literal_unknown_sender_and_no_duplicate",
+    "reading_position_preserved_and_new_message_button",
+    "conversation_switch_search_responses_cannot_replace_other_thread",
+    "actual_service_stop_keeps_rows_then_reconnect_catches_up",
+    "actual_collector_status_does_not_claim_collecting_when_stopped",
+    "390px_drawer_list_thread_detail_and_status_no_overflow",
+    "real_http_without_authorization_shows_error_and_never_fiction"
+  ],
+  "api_request_count": 44,
+  "external_requests": 0,
+  "browser_runtime_errors": 0,
+  "fixture_stderr_bytes": 0
+}

@@ -1,0 +1,31 @@
+{
+  "status": "通过",
+  "date": "2026-11-01",
+  "scope": "ChatLens front-end logo, dedicated settings page and AI workspace refinement",
+  "viewports": [
+    "1440x1000",
+    "988x776",
+    "390x844"
+  ],
+  "browser_checks": {
+    "ai": 23,
+    "preview": 24,
+    "live": 12
+  },
+  "total_browser_checks": 59,
+  "browser_runtime_errors": 0,
+  "external_browser_requests": 0,
+  "backend_source_changed": false,
+  "existing_live_model_configuration_retained": true,
+  "existing_live_collector_state": "collecting",
+  "real_model_call_performed": false,
+  "real_chat_screenshots_saved": false,
+  "new_windows_package_built": false,
+  "actual_mobile_device_validation": "未验证",
+  "source_sha256": {
+    "apps/web/index.html": "849ff22fedcb5635e89a0c7ea5ad08afac83ade7e922cc6a5315206476c8e3e5",
+    "apps/web/app.js": "9698e8c37f50e0160a625592d66345b067532cff5a9a7cfcb333758a397d124a",
+    "apps/web/styles.css": "7fd702e72f960540e5172baed811c4ec9983ed444234b6b8ad81beb1797d5e79",
+    "apps/web/assets/chatlens-mark.svg": "cc731ab7cb50c466e7e9bad19786c7e067619c4d36fb45c7aaf35001ae16f7c0"
+  }
+}

@@ -10,11 +10,11 @@
 
 ## 连接 MiniMax 或其他模型
 
-点击输入框下方的模型设置，在本机选择 MiniMax 国内、国际或自定义服务，填写 API 地址、模型和 API Key，再明确点击「保存到本机」。保存配置不会自动测试或发送聊天。需要核对连接时，点击「测试已保存配置」；测试不带聊天文字。
+从侧栏进入「设置」，在模型配置区域选择 MiniMax 国内、国际或自定义服务，填写 API 地址、模型和 API Key，再明确点击「保存到本机」。保存配置不会自动测试或发送聊天。需要核对连接时，点击「测试已保存配置」；测试不带聊天文字。
 
 MiniMax 预设为 `https://api.minimax.cn/v1`、`https://api.minimax.io/v1`，默认模型 `MiniMax-M3.1-Flash`，也可编辑模型名称。预设依据 [国内官方接入文档](https://platform.minimax.cn/docs/api-reference/text-chat-openai) 与 [国际官方接入文档](https://platform.minimax.io/docs/api-reference/text-chat-openai)。实际 API 授权与连接是否可用，以用户自己的配置和显式测试为准。
 
-密钥输入框使用 password 类型，保存或关闭后清空，不放入 localStorage／sessionStorage，不回显已保存的原值。生产配置与对话记录由本机后端保存在受保护目录中，不进入公开源码或证据。
+密钥输入框使用 password 类型，保存或离开设置页后清空本次输入，不放入 localStorage／sessionStorage，不回显已保存的原值。离页只清除未保存输入，不删除本机已经保存的密钥；删除仍需用户明确选择并保存。生产配置与对话记录由本机后端保存在受保护目录中，不进入公开源码或证据。
 
 同一 API 地址只更换模型时，会保留已存密钥；更换 API 地址后需重新配置密钥。模型目标变化后，云端聊天片段的发送范围仍需重新确认。
 
