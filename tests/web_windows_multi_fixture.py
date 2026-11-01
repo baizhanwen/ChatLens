@@ -141,8 +141,8 @@ class SyntheticWindowsRuntime:
         self.choices = []
         for index in range(60):
             group = index >= 35
-            name = (['青禾客户', '星桥客户', '远帆客户'][index] if index < 3 else '合成客户%02d' % index) if not group else (
-                ['交付讨论群', '订单确认群'][index - 35] if index < 37 else '合成群聊%02d' % index)
+            name = (['合成青禾客户', '合成星桥客户', '合成远帆客户'][index] if index < 3 else '合成客户%02d' % index) if not group else (
+                ['合成交付讨论群', '合成订单确认群'][index - 35] if index < 37 else '合成群聊%02d' % index)
             self.choices.append({'chat_id': 'synthetic-windows-peer-%d' % index if not group else 'synthetic-windows-group-%d@chatroom' % index,
                 'name': name, 'type': 'group' if group else 'private'})
         config = {'conversations': [{'alias': alias, 'chat_id': self.choices[index]['chat_id'],

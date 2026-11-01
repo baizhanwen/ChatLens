@@ -85,7 +85,7 @@ class WindowsWebPackageTests(unittest.TestCase):
             prefix = package.PREFIX + '/'
             entries = {name[len(prefix):]: archive.read(name) for name in archive.namelist()}
         manifest = json.loads(entries.pop(package.MANIFEST))
-        self.assertEqual(manifest['package_revision'], '20261101-r7')
+        self.assertEqual(manifest['package_revision'], '20261101-r8')
         self.assertIn('prefer exactly one visible, unowned main-window candidate', manifest['process_selection'])
         self.assertIn('cached fixed states', manifest['connection_diagnostics'])
         self.assertEqual(manifest['account_process_family']['maximum_members'], 16)
@@ -174,17 +174,19 @@ class WindowsWebPackageTests(unittest.TestCase):
         self.assertTrue(data.startswith(b'\xef\xbb\xbf'))
         self.assertNotIn(b'\n', data.replace(b'\r\n', b''))
         text = data.decode('utf-8-sig')
-        self.assertIn("'--manage-scopes'", text)
-        self.assertIn("'--wait-for-wechat'", text)
+        self.assertIn("'--workspace-dir'", text)
+        self.assertIn("LocalApplicationData", text)
         self.assertNotIn("'--read-only'", text)
         self.assertNotIn("Read-Host '输入候选编号", text)
         self.assertIn('窗口存在不代表已登录', text)
-        self.assertIn('登录原账号后可在网页重新检测', text)
+        self.assertIn('登录后可在网页重新检测', text)
         for required in ('windows_web_manager.py', 'windows_web_server.py', 'windows_account_probe.py', 'windows_process_detection.py', 'windows_mapped_files.py', 'conversation_scope.py',
                          'wechat_identity.py', 'web/connect.html', 'web/connect.js', 'web/connect.css'):
             self.assertIn("'" + required + "'", text)
-        self.assertIn('collector-data 文件夹', text)
-        self.assertIn('Assert-PrivateAcl $dataDirectory $true', text)
+        self.assertNotIn('FolderBrowserDialog', text)
+        self.assertNotIn("Read-PrivateMetadata (Join-Path $privateDirectory 'scope.json')", text)
+        self.assertIn("'windows_workspace.py'", text)
+        self.assertIn("'windows_onboarding.py'", text)
         self.assertIn('保留原会话、消息、检查点与模型配置', text)
 
     def test_collector_builder_includes_account_probe_and_all_local_imports(self):

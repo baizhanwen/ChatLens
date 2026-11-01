@@ -12,15 +12,17 @@ from build_windows_selected_package import ARTIFACTS, CACHE_DIRECTORY, cached_ar
 
 PREFIX = 'ChatLens-Windows-Web'
 MANIFEST = 'WEB-MANIFEST.json'
-PACKAGE_REVISION = '20261101-r7'
+PACKAGE_REVISION = '20261101-r8'
 SOURCES = (
     'Start-Web.ps1', 'Start-ChatLens.cmd', 'README-WEB.txt',
     'web_runtime.py', 'web_server.py', 'windows_web_manager.py', 'windows_web_server.py',
     'windows_account_probe.py', 'windows_process_detection.py', 'windows_mapped_files.py',
+    'windows_workspace.py', 'windows_onboarding.py', 'windows_onboarding_native.py', 'windows_catalog_paging.py',
     'web_data.py', 'collector_web_meta.py',
     'collector_service.py', 'collector_supervisor.py', 'collector_private.py',
     'continuous_reader.py', 'continuous_store.py', 'conversation_scope.py', 'wechat_identity.py', 'windows_selected_engine.py',
     'windows_selected_native.py', 'windows_selected_supervisor.py',
+    'windows_selected_runner.py', 'windows_selected_progress.py',
     'windows_keyproof_core.py', 'windows_keyproof_platform.py',
     'THIRD-PARTY-SELECTED-NOTICES.txt',
 )
@@ -73,7 +75,7 @@ def build(root, output):
         'built_at_utc': datetime.now(timezone.utc).isoformat(),
         'scope': 'explicit_1_to_50_conversation_profiles_with_received_sent_unknown_statistics',
         'conversation_limits': {'minimum': 1, 'maximum': 50},
-        'startup': 'Interactive readiness guide with retryable Windows process and current-account verification; explicit collection start; no automatic read-only fallback.',
+        'startup': 'Interactive readiness guide with an automatic current-user workspace, retryable current-account verification and explicitly requested first-use initialization. Search for and confirm conversations before collection; no automatic read-only fallback.',
         'process_selection': 'After exact executable, supported version, x64 architecture and creation-time checks, prefer exactly one visible, unowned main-window candidate (IsWindowVisible and GW_OWNER == NULL), matching .NET MainWindowHandle filtering without reading titles. Multiple valid main-window candidates remain ambiguous. Only when no valid main-window candidates exist may a unique process-tree root be selected as a hidden/tray candidate; account-reading verification is still required.',
         'account_process_family': {
             'windows_execution_status': '未验证',
@@ -90,12 +92,16 @@ def build(root, output):
         'collector_readiness': 'Only a fresh heartbeat from the currently owned collector establishes actual initialization, collecting, paused or stale state; saved data and a launched process do not establish collection readiness.',
         'native_windows_sdk_execution_status': '未验证',
         'isolation': 'Account-bound profiles with independent store, checkpoint and AI history; stale scope requests are rejected.',
-        'upgrade_handling': 'Reuse the selected existing collector-data in place. Preserve the legacy store, baseline, assistant and configuration. New profiles use separate private directories.',
+        'upgrade_handling': 'Use a current-user machine-bound workspace. Reuse a uniquely matching registered or discovered existing collector-data in place without moving messages, baseline, assistant or configuration. Ambiguous data requires explicit local import; new accounts use separate private directories.',
+        'first_use': 'Detect the current verified WeChat process/account locally, explicitly initialize a new reader with the bounded existing key reader, then search for and confirm selected conversations before any collection. Old explicit data-dir entry remains compatible.',
+        'supported_database_layout': ['message/message_0.db', 'message/message_1.db', 'contact/contact.db'],
+        'catalog_resource_limits': {'valid_conversations': 100000, 'scanned_metadata_rows': 1000000,
+                                    'page_size': 200, 'cooperative_budget_seconds': 30},
         'windows_execution_status': '未验证', 'web_live_end_to_end_status': '未验证',
         'chat_messages_read_during_build': 0,
         'runtime': {'version': '3.14.10', 'architecture': 'x64',
                     'pth_modification': 'Add .. for package-local modules; site remains disabled'},
-        'data_handling': 'User chooses existing collector-data locally; private data is not copied into this package. HTTP binds loopback only.',
+        'data_handling': 'A current-user machine-bound local workspace automatically reuses uniquely matching existing data in place or creates isolated new-account data. A folder dialog is available only after explicit Import. Private data is not copied into this package; HTTP binds loopback only.',
         'upstream_artifacts': list(ARTIFACTS),
         'verification': 'fixed_hashes_and_archive_contents_only; no_native_windows_or_live_web_claim',
         'files': [{'name': name, 'sha256': digest(data), 'bytes': len(data)}

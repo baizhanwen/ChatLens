@@ -1,6 +1,6 @@
 @echo off
 setlocal DisableDelayedExpansion
-echo ChatLens Windows Web r7 - keep this window open and follow the local browser guide.
+echo ChatLens Windows Web r8 - keep this window open and follow the local browser guide.
 set "CHATLENS_PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 if exist "%SystemRoot%\Sysnative\WindowsPowerShell\v1.0\powershell.exe" set "CHATLENS_PS=%SystemRoot%\Sysnative\WindowsPowerShell\v1.0\powershell.exe"
 if not exist "%CHATLENS_PS%" (

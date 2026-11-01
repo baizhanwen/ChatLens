@@ -438,14 +438,15 @@ class MacWebManager:
         with self.lock:
             self._check_generation(expected_generation)
             if self.stage != 'ready_to_select' and not self.catalog_ready:
-                return {'conversations': [], 'has_more': False}
+                return {'conversations': [], 'selected_conversations': [], 'has_more': False}
             matches = [row for row in self.contacts if q.casefold() in row['name'].casefold()]
             if not q:
                 # Current selections must fit in the first picker page even
                 # when the account has thousands of other conversations.
                 matches.sort(key=lambda row: (not row.get('selected', False),
                                               row['type'], row['name'].casefold()))
-            return {'conversations': matches[:200], 'has_more': len(matches) > 200}
+            return {'conversations': matches[:200], 'has_more': len(matches) > 200,
+                    'selected_conversations': [dict(row) for row in self.contacts if row.get('selected')][:50]}
 
     def request_catalog(self, expected_generation=None):
         with self.lock:

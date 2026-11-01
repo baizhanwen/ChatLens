@@ -16,7 +16,7 @@ WINDOWS_STATIC = {'/connect.html': ('connect.html', 'text/html; charset=utf-8'),
               '/connect.js': ('connect.js', 'text/javascript; charset=utf-8'),
               '/connect.css': ('connect.css', 'text/css; charset=utf-8')}
 MUTATIONS = {'/api/setup/initialize', '/api/setup/select', '/api/setup/catalog', '/api/setup/profile',
-             '/api/setup/recheck', '/api/setup/start'}
+             '/api/setup/recheck', '/api/setup/start', '/api/setup/cancel', '/api/setup/import'}
 
 
 def _pairs(rows):
@@ -131,15 +131,18 @@ def make_windows_server(manager, static_dir, *, port=0, token=None):
                     if parsed.path == '/api/setup/diagnostics':
                         return self._operation(lambda: self.server.data.connection_diagnostics(expected_generation=self._generation()))
                     return self._operation(self.server.data.setup)
-                if set(query) - {'q'}:
+                if set(query) - {'q', 'cursor'}:
                     raise ValueError
                 q = query.get('q', [''])[0]
                 if len(q) > 256 or '\0' in q or len(q.encode('utf-8')) > 1024:
                     raise ValueError
+                cursor = query.get('cursor', [''])[0]
+                if len(cursor) > 128 or cursor and not re.fullmatch(r'[A-Za-z0-9_-]+', cursor):
+                    raise ValueError
             except (ValueError, UnicodeError):
                 self._json(400, {'error': {'code': 'windows_setup_query_invalid'}})
                 return
-            self._operation(lambda: self.server.data.list_conversations(q, expected_generation=self._generation())
+            self._operation(lambda: self.server.data.list_conversations(q, cursor=cursor, expected_generation=self._generation())
                             if self._generation() else self.server.data.list_conversations(q))
 
         def do_POST(self):
@@ -181,7 +184,7 @@ def make_windows_server(manager, static_dir, *, port=0, token=None):
                 if supplied_generation is not None and supplied_generation != self._generation():
                     self._json(409, {'error': {'code': 'scope_changed'}})
                     return
-                if parsed.path in ('/api/setup/initialize', '/api/setup/catalog', '/api/setup/recheck', '/api/setup/start'):
+                if parsed.path in ('/api/setup/initialize', '/api/setup/catalog', '/api/setup/recheck', '/api/setup/start', '/api/setup/cancel', '/api/setup/import'):
                     if value:
                         raise ValueError
                 elif parsed.path == '/api/setup/profile':
@@ -210,6 +213,10 @@ def make_windows_server(manager, static_dir, *, port=0, token=None):
             elif parsed.path == '/api/setup/initialize':
                 self._operation(lambda: self.server.data.request_initialize(expected_generation=self._generation())
                                 if self._generation() else self.server.data.request_initialize())
+            elif parsed.path == '/api/setup/cancel':
+                self._operation(lambda: self.server.data.request_cancel(expected_generation=self._generation()))
+            elif parsed.path == '/api/setup/import':
+                self._operation(lambda: self.server.data.request_import(expected_generation=self._generation()))
             elif parsed.path == '/api/setup/catalog':
                 self._operation(lambda: self.server.data.request_catalog(expected_generation=self._generation()))
             elif parsed.path == '/api/setup/profile':

@@ -1,0 +1,40 @@
+{
+  "status": "passed",
+  "scope": "explicit_synthetic_http_windows_onboarding_and_search_pagination_contracts_only",
+  "passed_check_count": 15,
+  "checks": [
+    "new_computer_waits_for_login_without_directory_picker_or_automatic_initialization",
+    "current_account_requires_explicit_local_initialization_action",
+    "cancel_rotates_domain_and_blocks_duplicate_initialization_while_unwinding",
+    "initialization_request_failure_is_local_retryable_and_does_not_fake_disconnect",
+    "successful_first_initialization_opens_search_without_fetching_all_conversations",
+    "reused_workspace_preserves_legacy_focus_and_skips_initialization",
+    "legacy_import_uses_local_action_without_browser_path_or_config_input",
+    "query_during_catalog_build_stays_editable_and_only_latest_name_is_requested",
+    "first_query_seeds_all_existing_selection_even_if_outside_loaded_page",
+    "pagination_search_and_clear_keep_manual_selection_until_explicit_confirmation",
+    "cursor_failure_keeps_current_choices_and_has_explicit_retry",
+    "account_change_drops_old_choices_and_late_cursor_response",
+    "390px_first_run_progress_error_search_and_pagination_are_keyboard_usable",
+    "unsupported_database_layout_explains_compatibility_without_login_or_retry_loop",
+    "search_first_never_issues_blank_query_and_contract_sources_remain_frozen"
+  ],
+  "viewports": [
+    "1440x1000",
+    "390x844"
+  ],
+  "source_sha256": {
+    "apps/web/connect.js": "268625c57b359b671d44b1e30836ccae3a57b4fc34d4b036bbc4bdb116ca0bf5",
+    "apps/web/connect.html": "f569188d6db1043f8830efdbe36b934ae69bddadba2c78d2dcc20ee9ffec328d",
+    "apps/web/connect.css": "b0ab0a34b2da4ba2a4441d70dd924d0e7f3a2e4279d11387da17a64dcbd33d45",
+    "apps/web/styles.css": "1a96f1b4d4e0430eb9fb7040039b72155be64099541d0eabe8c713ca1464c5a3",
+    "scripts/web-windows-onboarding-smoke.cjs": "0c9c008d6e5c2cd52cec07999662c636cae288bb912481a091d789eff4d29792"
+  },
+  "browser_runtime_errors": 0,
+  "browser_external_requests": 0,
+  "empty_query_requests": 0,
+  "explicit_initialization_requests": 4,
+  "real_windows_manager_executed": false,
+  "real_windows_api_executed": false,
+  "real_wechat_or_cloud_used": false
+}

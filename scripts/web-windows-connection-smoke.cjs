@@ -45,6 +45,7 @@ async function main(){
   const setup=async()=>(await api('/api/setup')).body;
   const guide=async()=>{if(new URL(page.url()).pathname!=='/connect.html')await id('workspace-connection-guide').click();await id('windows-connection-card').waitFor();};
   const workspace=async()=>{await page.waitForURL(url=>url.pathname==='/');await page.waitForFunction(()=>document.querySelector('#ai-knowledge-label').textContent.includes('6 条'));};
+  const searchAll=async(p=page)=>{await p.locator('#setup-conversation-search').fill('\u5408\u6210');await p.locator('#search-conversations').click();await p.locator('input.picker-checkbox').first().waitFor();};
   const waitTitle=async text=>page.waitForFunction(text=>document.querySelector('#windows-connection-title')?.textContent.includes(text),text,{timeout:15000});
   const readyState=async()=>{await waitTitle('核验');await page.waitForFunction(()=>document.querySelector('#windows-start').hidden===false&&!document.querySelector('#windows-start').disabled);};
   const start=async()=>{await id('windows-start').click();await workspace();};
@@ -81,7 +82,7 @@ async function main(){
    assert.equal((await command({command:'state'})).children_started,0);assert.equal((await command({command:'state'})).legacy_unchanged,true);
   });
   await check('login_in_same_service_enables_scope_management_without_automatic_collection',async()=>{
-   await command({command:'account_mode',state:'matched'});await readyState();assert(await id('manage-conversations').isEnabled());assert.equal((await command({command:'state'})).children_started,0);assert.equal((await setup()).connection.can_start,true);await id('manage-conversations').click();await page.locator('input.picker-checkbox').first().waitFor();assert.equal(await page.locator('input.picker-checkbox').count(),60);assert.equal(await page.locator('input.picker-checkbox:checked').count(),2);assert.equal((await command({command:'state'})).children_started,0);await shot('desktop-ready-and-can-manage');
+   await command({command:'account_mode',state:'matched'});await readyState();assert(await id('manage-conversations').isEnabled());assert.equal((await command({command:'state'})).children_started,0);assert.equal((await setup()).connection.can_start,true);await id('manage-conversations').click();await searchAll();assert.equal(await page.locator('input.picker-checkbox').count(),60);assert.equal(await page.locator('input.picker-checkbox:checked').count(),2);assert.equal((await command({command:'state'})).children_started,0);await shot('desktop-ready-and-can-manage');
   });
   await check('explicit_start_restores_original_scope_without_changing_baseline_or_messages',async()=>{
    await start();assert.equal((await command({command:'state'})).children_started,1);assert.equal((await command({command:'state'})).legacy_unchanged,true);assert.equal((await api('/api/status')).body.state,'collecting');oldNonce=(await api('/api/session')).body.scope_generation;await noOverflow();await shot('desktop-collecting-workspace');
@@ -105,7 +106,7 @@ async function main(){
    await command({command:'account_mode',state:'matched'});await page.waitForFunction(()=>!document.querySelector('#windows-open-workspace').hidden);await id('windows-open-workspace').click();await workspace();assert.equal((await command({command:'state'})).children_started,3);assert.equal((await command({command:'state'})).legacy_unchanged,true);assert.equal((await api('/api/status')).body.total_messages,6);assert.notEqual((await api('/api/session')).body.scope_generation,oldNonce);
   });
   await check('390px_waiting_ready_and_scope_steps_have_visible_actions_without_overflow',async()=>{
-   await command({command:'process',state:'not_running'});await page.waitForURL(url=>url.pathname==='/connect.html');await waitTitle('等待本机微信');await page.setViewportSize({width:390,height:844});await noOverflow();await shot('mobile-waiting-guide');await command({command:'process',state:'ready',pid:778,creation_time:889});await page.waitForFunction(()=>!document.querySelector('#windows-open-workspace').hidden);await id('manage-conversations').click();await page.locator('input.picker-checkbox').first().waitFor();await noOverflow();await shot('mobile-connected-scope-picker');assert.equal((await command({command:'state'})).legacy_unchanged,true);
+   await command({command:'process',state:'not_running'});await page.waitForURL(url=>url.pathname==='/connect.html');await waitTitle('等待本机微信');await page.setViewportSize({width:390,height:844});await noOverflow();await shot('mobile-waiting-guide');await command({command:'process',state:'ready',pid:778,creation_time:889});await page.waitForFunction(()=>!document.querySelector('#windows-open-workspace').hidden);await id('manage-conversations').click();await searchAll();await noOverflow();await shot('mobile-connected-scope-picker');assert.equal((await command({command:'state'})).legacy_unchanged,true);
   });
   assert.equal((await command({command:'state'})).provider_calls,0);
   await context.close();await current.close();current=null;

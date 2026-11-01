@@ -4,7 +4,7 @@
   const $ = id => document.getElementById(id);
   const stages = new Set(['needs_initialization', 'ready_to_select', 'ready_to_start', 'starting', 'running', 'error', 'waiting_for_wechat', 'needs_connection']);
   const connectionStates = new Set(['waiting_for_wechat', 'checking_account', 'account_unverified', 'wrong_account', 'connected', 'stopped', 'explicit_read_only', 'cleanup_required']);
-  const state = { setup: null, platform: null, generation: null, connected: false, error: null, busy: null, epoch: 0, setupRequest: 0, timer: null, failures: 0, listRequest: 0, listLoading: false, listError: false, catalogError: null, listMore: false, rows: [], selected: new Map(), selectionSeeded: false, pickerGeneration: null, loadedGeneration: null, editing: false, redirecting: false, recovering: false, enterWorkspace: false, stayOnSetup: new URLSearchParams(location.search).get('manage') === '1' };
+  const state = { setup: null, platform: null, generation: null, connected: false, error: null, busy: null, epoch: 0, setupRequest: 0, timer: null, failures: 0, listRequest: 0, listLoading: false, listError: false, catalogError: null, listMore: false, listNextCursor: null, listQuery: null, searchPending: false, pageLoading: false, pageError: false, onboardingError: null, rows: [], selected: new Map(), selectionSeeded: false, pickerGeneration: null, loadedGeneration: null, editing: false, redirecting: false, recovering: false, enterWorkspace: false, stayOnSetup: new URLSearchParams(location.search).get('manage') === '1' };
   const renderedLists = new Map();
   let profilesSignature = '';
   let searchTimer;
@@ -33,10 +33,12 @@
     return state.setup?.stage === 'ready_to_select' ? 'ready' : 'idle';
   }
   function catalogReady() { return catalogStatus() === 'ready'; }
-  function canManageSelection() { return state.connected && Boolean(state.generation) && (windows() ? connection()?.can_modify_scope === true : ['ready_to_select', 'running', 'error'].includes(state.setup?.stage)) && !working(); }
+  function canManageSelection() { return state.connected && Boolean(state.generation) && (windows() ? connection()?.can_modify_scope === true && (!state.setup?.onboarding || state.setup.onboarding.state === 'ready') : ['ready_to_select', 'running', 'error'].includes(state.setup?.stage)) && !working(); }
+  function canSearchConversations() { return state.connected && Boolean(state.generation) && (!state.busy || state.busy === 'catalog') && state.setup?.initialization?.state !== 'working' && state.setup?.stage !== 'starting' && state.setup?.scope_switching !== true && connection()?.state !== 'checking_account' && (windows() ? connection()?.can_modify_scope === true && (!state.setup?.onboarding || state.setup.onboarding.state === 'ready') : ['ready_to_select', 'running', 'error'].includes(state.setup?.stage)); }
+  function searchQuery() { return $('setup-conversation-search').value.trim(); }
   function canSelect() { return canManageSelection() && state.editing && catalogReady(); }
   function scopeLimit() { const value = state.setup?.scope_limits?.total; return Number.isSafeInteger(value) && value > 0 ? Math.min(value, 50) : 50; }
-  function resetPicker() { state.listRequest++; state.rows = []; state.selected.clear(); state.selectionSeeded = false; state.pickerGeneration = null; state.loadedGeneration = null; state.listLoading = false; state.listError = false; state.catalogError = null; state.listMore = false; state.editing = false; clearTimeout(searchTimer); $('setup-conversation-search').value = ''; renderedLists.clear(); }
+  function resetPicker() { state.listRequest++; state.rows = []; state.selected.clear(); state.selectionSeeded = false; state.pickerGeneration = null; state.loadedGeneration = null; state.listLoading = false; state.listError = false; state.catalogError = null; state.listMore = false; state.listNextCursor = null; state.listQuery = null; state.searchPending = false; state.pageLoading = false; state.pageError = false; state.onboardingError = null; state.editing = false; clearTimeout(searchTimer); $('setup-conversation-search').value = ''; renderedLists.clear(); }
 
   async function api(route, { method = 'GET', body, token } = {}) {
     if (!allowedOrigin()) throw error('loopback_required');
@@ -57,7 +59,7 @@
         if (code === 'scope_changed') recoverScope();
         throw error(code, response.status);
       }
-      if (typeof result?.scope_generation === 'string' && result.scope_generation !== generation && !['/api/session', '/api/setup', '/api/setup/select', '/api/setup/profile', '/api/setup/recheck', '/api/setup/start'].includes(route)) { recoverScope(); throw error('scope_changed', 409); }
+      if (typeof result?.scope_generation === 'string' && result.scope_generation !== generation && !['/api/session', '/api/setup', '/api/setup/select', '/api/setup/profile', '/api/setup/recheck', '/api/setup/start', '/api/setup/initialize', '/api/setup/cancel', '/api/setup/import'].includes(route)) { recoverScope(); throw error('scope_changed', 409); }
       return result;
     } finally { clearTimeout(timeout); }
   }
@@ -91,13 +93,14 @@
     state.generation = nextGeneration;
     if (typeof value.platform === 'string') state.platform = value.platform;
     state.setup = value;
+    if (value.onboarding && value.onboarding.state !== 'ready' && (state.editing || state.rows.length || state.selected.size)) resetPicker();
     state.connected = true;
     state.error = null;
     state.failures = 0;
-    if (value.stage === 'ready_to_select' && !value.scope_switching) state.editing = true;
+    if (value.stage === 'ready_to_select' && !value.scope_switching && (!value.onboarding || value.onboarding.state === 'ready')) state.editing = true;
     if (value.stage === 'starting' || value.scope_switching) { state.editing = false; state.listRequest++; state.listLoading = false; }
     render();
-    if (canSelect() && state.loadedGeneration !== state.generation && !state.listLoading && !state.listError) loadConversations();
+    maybeLoadConversations();
     if ((windows() ? state.enterWorkspace && collectorReady() : value.stage === 'running' && (state.enterWorkspace || !state.stayOnSetup)) && !state.redirecting) openWorkspace();
   }
   function openWorkspace() { if (!state.connected || (windows() ? !canOpenWorkspace() : state.setup?.stage !== 'running') || state.setup?.scope_switching || state.redirecting) return; state.redirecting = true; const target = ['/', '/index.html'].includes(state.setup.workspace_path) ? state.setup.workspace_path : '/'; location.assign(target); }
@@ -252,7 +255,67 @@
     $('starting-card').hidden = setup?.scope_switching !== true;
     $('starting-title').textContent = '正在切换关注范围';
     $('starting-description').textContent = '正在停止上一范围并恢复所选范围，各自的消息和采集位置分别保留。';
-    progress(); renderSelection(); renderProfiles();
+    progress(); renderSelection(); renderProfiles(); renderWindowsOnboarding(setup, active);
+  }
+
+  function renderWindowsOnboarding(setup, active) {
+    const value = setup?.onboarding;
+    $('windows-onboarding-card').hidden = !value;
+    if (!value) return;
+    const status = typeof value.state === 'string' ? value.state : 'detecting';
+    const card = $('windows-onboarding-card'), connectionCard = $('windows-connection-card');
+    if (status !== 'ready' && card.nextElementSibling !== connectionCard) connectionCard.before(card);
+    else if (status === 'ready' && connectionCard.nextElementSibling !== card) connectionCard.after(card);
+    const pending = status === 'initializing' || ['initialize', 'import', 'cancel'].includes(state.busy);
+    const reason = state.onboardingError || value.reason, unsupported = reason === 'windows_onboarding_database_layout_unsupported';
+    const failed = status === 'error' || Boolean(state.onboardingError) || unsupported;
+    const copies = {
+      detecting: ['正在识别本机微信', '正在检查', 'running', '请保持要连接的微信账号已登录，检测完成后会显示下一步。'],
+      waiting_for_wechat: ['等待你登录微信', '等待登录', 'waiting', '请在这台电脑打开微信，由你完成扫码或手机确认，然后重新检测。'],
+      ambiguous: ['请先确认要连接的账号', '等待确认', 'waiting', '暂时无法唯一确认当前账号。请在微信中保留要连接的账号，再重新检测。'],
+      needs_initialization: ['为当前账号准备读取能力', '首次连接', 'waiting', '已识别本机微信。由你点击初始化后，在这台电脑准备当前账号的读取配置。'],
+      initializing: ['正在准备本机读取能力', '正在初始化', 'running', '请保持微信登录并等待实际阶段更新。完成后再选择需要关注的会话。'],
+      ready: ['本机连接已准备好', value.mode === 'reused' ? '原资料已复用' : '初始化完成', 'success', value.mode === 'reused' ? '已自动复用这个账号原来的本机资料，消息、配置和采集位置继续保留。' : '当前账号的读取配置已在本机独立保存，可以选择需要关注的会话。'],
+      error: ['本机连接暂未完成', '需要处理', 'failure', '这一步没有完成。原数据和配置保留，请查看状态原因后重新尝试。']
+    };
+    const copy = copies[failed ? 'error' : pending ? 'initializing' : status] || copies.detecting;
+    $('windows-onboarding-card').dataset.onboardingState = failed ? 'error' : status;
+    $('windows-onboarding-title').textContent = copy[0];
+    $('windows-onboarding-state').textContent = copy[1];
+    $('windows-onboarding-state').className = 'tag tag-' + copy[2];
+    $('windows-onboarding-description').textContent = unsupported ? '当前微信数据格式暂未适配，原数据和配置保留。' : !state.onboardingError && typeof value.description === 'string' && value.description.trim() ? value.description.slice(0, 1200) : copy[3];
+    $('windows-onboarding-account').textContent = setup?.account?.detected === true ? '当前登录的微信账号' : status === 'ambiguous' ? '等待唯一账号确认' : '等待识别';
+    $('windows-onboarding-storage').textContent = value.mode === 'reused' ? '已自动复用这个账号的原资料' : '自动管理，按账号独立保存';
+    $('windows-onboarding-progress').hidden = !pending && status !== 'detecting';
+    const progress = value.progress || {}, phases = { detecting_account: '正在识别当前账号', validating_sources: '正在验证本机资料', memory_markers: '正在准备读取配置', memory_references: '正在核对读取配置', validating_keys: '正在验证读取能力', preparing_workspace: '正在建立独立工作空间', importing_workspace: '等待在本机选择已有资料', choosing_existing_data: '等待在本机选择已有资料', cancelling: '正在结束本次初始化' };
+    $('windows-onboarding-phase').textContent = state.busy === 'cancel' ? '正在请求取消' : phases[progress.phase] || (status === 'detecting' ? '正在检查本机微信' : '正在准备本机连接');
+    const completed = count(progress.completed), total = count(progress.total), elapsed = count(progress.elapsed_seconds);
+    $('windows-onboarding-count').textContent = completed === null ? '当前阶段暂无可计算进度，请等待实际状态。' : total !== null && total >= completed ? '已完成 ' + completed + ' / ' + total : '已完成 ' + completed;
+    $('windows-onboarding-elapsed').textContent = elapsed === null ? '' : String(Math.floor(elapsed / 60)).padStart(2, '0') + ':' + String(elapsed % 60).padStart(2, '0');
+    const initialize = $('windows-initialize'), cancel = $('windows-cancel-initialization'), imported = $('windows-import-data'), awaitingImport = ['importing_workspace', 'choosing_existing_data'].includes(progress.phase) || state.busy === 'import';
+    initialize.hidden = unsupported || value.can_initialize !== true && !['needs_initialization', 'error'].includes(status);
+    initialize.disabled = unsupported || !active || !state.generation || Boolean(state.busy) || value.can_initialize !== true;
+    initialize.textContent = state.busy === 'initialize' ? '正在开始初始化' : failed ? '重新尝试初始化' : '初始化当前账号';
+    initialize.classList.toggle('is-loading', state.busy === 'initialize');
+    cancel.hidden = !pending || awaitingImport; cancel.disabled = !active || Boolean(state.busy) || value.can_cancel !== true;
+    cancel.textContent = state.busy === 'cancel' || pending && value.can_cancel !== true ? '正在结束本次初始化' : '取消初始化';
+    imported.hidden = value.can_import !== true; imported.disabled = !active || !state.generation || Boolean(state.busy) || value.can_import !== true;
+    imported.textContent = state.busy === 'import' ? '等待本机选择' : '导入已有数据';
+    $('windows-onboarding-help').textContent = unsupported ? '请保留当前资料，等待支持这种数据格式的版本，无需重复初始化。' : awaitingImport ? '请在这台电脑弹出的窗口中选择已有资料，或取消窗口。路径不会发送到网页。' : pending && value.can_cancel !== true ? '正在等待本次操作结束，不会重复开始另一轮初始化。' : status === 'ready' ? '后续启动自动复用；每个账号分别保存配置、消息和 AI 历史。' : '本人点击初始化后，将只读检查当前微信进程内存，验证所需数据库；仅保存必要读取密钥，不保存内存转储或聊天正文。';
+    $('windows-onboarding-details').hidden = !/^[a-z0-9_]{1,100}$/.test(reason || '');
+    $('windows-onboarding-reason').textContent = /^[a-z0-9_]{1,100}$/.test(reason || '') ? '状态原因：' + reason : '';
+    document.querySelector('.connect-heading p').textContent = '自动识别当前账号并管理本机资料，再由你选择需要关注的会话。';
+    if (status !== 'ready') {
+      $('scope-manager').hidden = $('selection-card').hidden = $('profiles-card').hidden = $('starting-card').hidden = true;
+      $('windows-next-step').textContent = copy[3];
+      $('windows-saved-note').textContent = '不同账号的读取配置、消息和 AI 历史分别保存。账号尚未确认时，不展示其他账号的资料。';
+      $('windows-connection-description').textContent = copy[3];
+      $('windows-connection-title').textContent = copy[0];
+      $('windows-connection-state').textContent = copy[1];
+      $('windows-connection-state').className = 'tag tag-' + copy[2];
+      const readerDetail = document.querySelector('[data-windows-check="reader_ready"] .windows-check-detail');
+      readerDetail.textContent = pending ? '正在为当前账号准备本机读取配置' : '首次连接由你确认初始化后自动保存';
+    }
   }
 
   function render() {
@@ -265,6 +328,7 @@
     $('retry-connection').textContent = expired || fileMode ? '请从启动器重新打开' : '重新连接';
     if (windows()) { renderWindows(setup, active, isWorking); return; }
     $('windows-connection-card').hidden = true;
+    $('windows-onboarding-card').hidden = true;
     $('windows-sidebar-steps').hidden = true;
     $('setup-steps').hidden = false;
     $('mac-account-card').hidden = false;
@@ -306,7 +370,7 @@
     $('starting-title').textContent = '正在启用关注范围';
     $('starting-description').textContent = typeof initialization.description === 'string' && initialization.description.trim() ? initialization.description : '正在准备所选范围。请切回此页面，让微信保持后台，等待状态更新。';
     $('starting-button').textContent = '正在启用关注范围';
-    $('setup-conversation-search').disabled = !canSelect() || !state.selectionSeeded;
+    $('setup-conversation-search').disabled = !canSearchConversations();
     progress(); renderSelection(); renderProfiles();
   }
 
@@ -323,6 +387,7 @@
   }
   function pickerPhase() {
     if (!state.connected) return ['blocked', '等待本机连接', '请先恢复本机服务连接，当前选择会保留。'];
+    if (!searchQuery()) return ['search', '输入名称开始查找', '搜索联系人或群名称，找到后勾选，最后统一确认关注范围。'];
     if (state.busy === 'catalog' || catalogStatus() === 'loading') return ['loading', '正在准备会话目录', catalogProgress() + '。原关注范围保持不变。'];
     if (!canManageSelection()) return ['blocked', '暂时无法修改关注范围', windows() ? $('scope-manage-help').textContent : '请等待当前步骤结束，并确认微信账号与本机读取能力已就绪。'];
     if (catalogStatus() === 'error') {
@@ -337,7 +402,11 @@
   }
   function renderSelection() {
     const phase = pickerPhase(), loading = phase[0] === 'loading', failed = phase[0] === 'error';
-    $('setup-conversation-search').disabled = !canSelect() || !state.selectionSeeded;
+    $('setup-conversation-search').disabled = !canSearchConversations();
+    const search = $('search-conversations');
+    search.disabled = !canSearchConversations() || !searchQuery();
+    search.textContent = searchQuery() && (state.listLoading || catalogStatus() === 'loading') ? '正在查找' : '搜索';
+    search.setAttribute('aria-busy', String(Boolean(searchQuery() && (state.listLoading || catalogStatus() === 'loading'))));
     $('selection-card').dataset.catalogState = phase[0];
     for (const type of ['private', 'group']) {
       const list = $(type + '-list'), rows = phase[0] === 'ready' ? state.rows.filter(row => row.type === type) : [];
@@ -357,7 +426,7 @@
         }
         if (!rows.length) {
           const kind = type === 'group' ? '群聊' : '私聊', searched = Boolean($('setup-conversation-search').value.trim());
-          list.append(pickerEmpty(phase[0] === 'ready' ? (searched ? '没有匹配的' : '暂无可选') + kind : phase[1], phase[0] === 'ready' ? searched ? '试试其他名称，或清空搜索。' : '当前目录中没有可选的' + kind + '。' : phase[2]));
+          list.append(pickerEmpty(phase[0] === 'ready' ? state.listMore ? '当前结果中暂无' + kind : (searched ? '没有匹配的' : '暂无可选') + kind : phase[1], phase[0] === 'ready' ? state.listMore ? '还有结果尚未显示，可以继续加载或输入名称查找。' : searched ? '试试其他名称，或清空搜索。' : '当前目录中没有可选的' + kind + '。' : phase[2]));
         }
         renderedLists.set(type, signature);
         if (focused) [...list.querySelectorAll('.picker-checkbox')].find(checkbox => checkbox.dataset.pickerId === focused)?.focus({ preventScroll: true });
@@ -368,17 +437,24 @@
     $('selected-conversations').replaceChildren();
     for (const row of state.selected.values()) { const generation = state.generation, chip = node('button', 'selected-chip', row.name + ' ×'); chip.type = 'button'; chip.disabled = !canSelect(); chip.setAttribute('aria-label', '移除' + row.name); chip.addEventListener('click', () => { if (generation !== state.generation || !canSelect()) return; state.selected.delete(row.id); renderSelection(); }); $('selected-conversations').append(chip); }
     const total = state.selected.size;
-    $('selection-count').textContent = '已选择 ' + total + ' / ' + scopeLimit();
-    $('start-selected').disabled = total < 1 || total > scopeLimit() || !state.selectionSeeded || !canSelect() || loading || state.listError || state.pickerGeneration !== state.generation;
+    const previousCount = count(state.setup?.active_scope?.count);
+    $('selection-count').textContent = !state.selectionSeeded && previousCount > 0 ? '尚未修改 · 当前关注 ' + previousCount + ' 个会话' : '已选择 ' + total + ' / ' + scopeLimit();
+    $('start-selected').disabled = total < 1 || total > scopeLimit() || !state.selectionSeeded || !canSelect() || loading || state.pageLoading || state.listError || state.pickerGeneration !== state.generation;
     $('start-selected').classList.toggle('is-loading', state.busy === 'select'); $('start-selected').setAttribute('aria-busy', String(state.busy === 'select'));
     $('start-selected').textContent = state.busy === 'select' ? '正在确认所选范围' : '启用所选关注范围';
-    $('conversation-feedback').hidden = phase[0] === 'ready' && !state.listMore;
-    $('conversation-feedback').classList.toggle('is-error', failed);
-    $('conversation-feedback').setAttribute('role', failed ? 'alert' : 'status');
-    $('conversation-feedback-text').textContent = phase[0] === 'ready' ? '只展示部分匹配结果，请输入更具体的名称继续查找。' : phase[2];
+    $('conversation-feedback').hidden = phase[0] === 'ready' && !state.listMore && !state.pageError;
+    $('conversation-feedback').classList.toggle('is-error', failed || state.pageError);
+    $('conversation-feedback').setAttribute('role', failed || state.pageError ? 'alert' : 'status');
+    $('conversation-feedback-text').textContent = phase[0] === 'ready' ? state.pageError ? '更多会话未能加载，已有选择保留。可以重试加载更多，或修改搜索词。' : state.listNextCursor ? '已显示 ' + state.rows.length + ' 个匹配结果，可以继续加载或输入名称查找。' : '只展示部分匹配结果，请输入更具体的名称继续查找。' : phase[2];
     $('retry-conversations').hidden = !failed && phase[0] !== 'idle';
     $('retry-conversations').disabled = !canManageSelection() || state.setup?.catalog?.worker_active === true;
     $('retry-conversations').textContent = catalogReady() && state.listError ? '重新加载列表' : phase[0] === 'idle' ? '读取会话目录' : '重新读取会话目录';
+    $('conversation-pagination').hidden = phase[0] !== 'ready' || !state.listMore || !state.listNextCursor;
+    $('conversation-page-summary').textContent = '已显示 ' + state.rows.length + ' 个结果；搜索和翻页会保留已选会话。';
+    const more = $('load-more-conversations');
+    more.disabled = !canSelect() || state.pageLoading || state.listLoading || !state.listNextCursor;
+    more.textContent = state.pageLoading ? '正在加载更多' : state.pageError ? '重试加载更多' : '继续加载会话';
+    more.classList.toggle('is-loading', state.pageLoading); more.setAttribute('aria-busy', String(state.pageLoading));
   }
   function renderProfiles() {
     const rows = Array.isArray(state.setup?.profiles) ? state.setup.profiles.filter(row => typeof row?.id === 'string' && typeof row.label === 'string' && count(row.count) !== null) : [];
@@ -388,11 +464,33 @@
     for (const profile of rows) { const generation = state.generation, row = node('article', 'scope-profile' + (profile.active ? ' is-active' : '')); const copy = node('div'); copy.append(node('strong', '', profile.label), node('p', '', profile.count + ' 个会话 · ' + (count(profile.private_count) || 0) + ' 个私聊 · ' + (count(profile.group_count) || 0) + ' 个群聊')); const button = node('button', 'button', profile.active ? '当前使用' : '切回此范围'); button.type = 'button'; button.dataset.profileId = profile.id; button.disabled = profile.active || !state.connected || working() || windows() && connection()?.can_modify_scope !== true; button.addEventListener('click', () => { if (generation === state.generation) mutate('profile', profile.id); }); row.append(copy, button); list.append(row); }
   }
 
-  async function loadConversations() {
+  function maybeLoadConversations() {
+    const query = searchQuery();
+    if (query && canSelect() && !state.searchPending && !state.listLoading && !state.pageLoading && !state.listError && (state.loadedGeneration !== state.generation || state.listQuery !== query)) loadConversations();
+  }
+  function searchConversations({ explicit = false } = {}) {
+    clearTimeout(searchTimer); state.searchPending = false;
+    if (!canSearchConversations()) return;
+    if (!searchQuery()) { state.listLoading = false; renderSelection(); return; }
+    if (catalogStatus() === 'loading' || state.busy === 'catalog') { state.listLoading = false; renderSelection(); return; }
+    if (catalogReady()) { state.listError = false; loadConversations(); return; }
+    state.listLoading = false;
+    if (catalogStatus() !== 'error' || explicit) mutate('catalog'); else renderSelection();
+  }
+
+  async function loadConversations({ append = false } = {}) {
     if (!canSelect()) return;
-    const request = ++state.listRequest, generation = state.generation, query = state.selectionSeeded ? $('setup-conversation-search').value.trim() : ''; state.listLoading = true; state.listError = false; renderSelection();
+    const query = searchQuery();
+    if (!query) return;
+    if (append && (state.pageLoading || !state.listNextCursor || state.listQuery !== query)) return;
+    const request = ++state.listRequest, generation = state.generation, cursor = append ? state.listNextCursor : null;
+    state.listLoading = !append; state.pageLoading = append; state.listError = false; state.pageError = false;
+    if (!append) { state.listNextCursor = null; state.listMore = false; }
+    renderSelection();
     try {
-      const result = await api('/api/setup/conversations?' + new URLSearchParams({ q: query }));
+      const parameters = new URLSearchParams({ q: query });
+      if (cursor) parameters.set('cursor', cursor);
+      const result = await api('/api/setup/conversations?' + parameters);
       if (request !== state.listRequest || generation !== state.generation || !canSelect()) return;
       if (result?.catalog && ['idle', 'loading', 'error'].includes(result.catalog.state)) {
         state.setup = { ...state.setup, catalog: result.catalog };
@@ -400,18 +498,27 @@
         return;
       }
       if (!Array.isArray(result?.conversations)) throw error('invalid_response');
-      const seen = new Set();
-      const rows = result.conversations.map(row => { if (!row || typeof row.id !== 'string' || !row.id || seen.has(row.id) || typeof row.name !== 'string' || !row.name.trim() || !['private', 'group'].includes(row.type)) throw error('invalid_response'); seen.add(row.id); return { id: row.id, name: row.name, type: row.type, selected: row.selected === true }; });
+      const decodeRows = entries => {
+        const seen = new Set();
+        return entries.map(row => { if (!row || typeof row.id !== 'string' || !row.id || seen.has(row.id) || typeof row.name !== 'string' || !row.name.trim() || !['private', 'group'].includes(row.type)) throw error('invalid_response'); seen.add(row.id); return { id: row.id, name: row.name, type: row.type, selected: row.selected === true }; });
+      };
+      const rows = decodeRows(result.conversations);
+      if (result.next_cursor != null && (typeof result.next_cursor !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(result.next_cursor) || result.has_more !== true)) throw error('invalid_response');
       if (!state.selectionSeeded) {
-        const selected = rows.filter(row => row.selected);
+        if (result.selected_conversations !== undefined && !Array.isArray(result.selected_conversations)) throw error('invalid_response');
+        const selected = result.selected_conversations === undefined ? rows.filter(row => row.selected) : decodeRows(result.selected_conversations);
         if (selected.length > scopeLimit()) throw error('invalid_response');
         state.selected = new Map(selected.map(row => [row.id, row]));
         state.selectionSeeded = true;
       }
-      state.rows = rows;
-      state.listMore = result.has_more === true; state.pickerGeneration = generation; state.loadedGeneration = generation;
-    } catch (problem) { if (request === state.listRequest && !ignored(problem)) { state.listError = true; if (problem.status === 401) setError(problem); } }
-    finally { if (request === state.listRequest) { state.listLoading = false; renderSelection(); } }
+      if (append) {
+        const combined = new Map(state.rows.map(row => [row.id, row]));
+        for (const row of rows) { const previous = combined.get(row.id); if (previous && (previous.name !== row.name || previous.type !== row.type)) throw error('invalid_response'); combined.set(row.id, row); }
+        state.rows = [...combined.values()];
+      } else state.rows = rows;
+      state.listMore = result.has_more === true; state.listNextCursor = result.next_cursor || null; state.listQuery = query; state.pickerGeneration = generation; state.loadedGeneration = generation;
+    } catch (problem) { if (request === state.listRequest && !ignored(problem)) { if (append) state.pageError = true; else state.listError = true; if (problem.status === 401) setError(problem); } }
+    finally { if (request === state.listRequest) { state.listLoading = false; state.pageLoading = false; renderSelection(); } }
   }
 
   function connectionDiagnostics(value) {
@@ -428,7 +535,7 @@
     if (!object(detail) || Object.keys(detail).some(key => !['schema_version', ...counters, ...booleans].includes(key)) || Object.keys(detail).length > 0 && detail.schema_version !== 1 || booleans.some(key => Object.hasOwn(detail, key) && typeof detail[key] !== 'boolean') || counters.some(key => Object.hasOwn(detail, key) && (!Number.isSafeInteger(detail[key]) || detail[key] < 0 || detail[key] > 32768))) throw error('invalid_diagnostics');
     if (Object.hasOwn(value, 'catalog')) {
       const catalog = value.catalog, numbers = ['databases_checked', 'tables_seen', 'contacts_seen', 'conversations_found'];
-      if (!keys(catalog, ['schema_version', 'state', 'phase', 'reason', 'elapsed_seconds', 'worker_active', ...numbers]) || catalog.schema_version !== 1 || !['idle', 'loading', 'ready', 'error'].includes(catalog.state) || !['idle', 'queued', 'validating_sources', 'opening_message', 'reading_message_tables', 'opening_contacts', 'reading_contacts', 'preparing_choices', 'complete', 'cancelled', 'failed'].includes(catalog.phase) || !code(catalog.reason) || typeof catalog.worker_active !== 'boolean' || count(catalog.elapsed_seconds) === null || catalog.elapsed_seconds > 86400 || numbers.some(key => count(catalog[key]) === null || catalog[key] > 1000000)) throw error('invalid_diagnostics');
+      if (!keys(catalog, ['schema_version', 'state', 'phase', 'reason', 'elapsed_seconds', 'worker_active', ...numbers]) || catalog.schema_version !== 1 || !['idle', 'loading', 'ready', 'error'].includes(catalog.state) || !['idle', 'queued', 'validating_sources', 'opening_message', 'reading_message_tables', 'opening_contacts', 'reading_contacts', 'preparing_choices', 'complete', 'cancelled', 'failed'].includes(catalog.phase) || !code(catalog.reason) || typeof catalog.worker_active !== 'boolean' || count(catalog.elapsed_seconds) === null || catalog.elapsed_seconds > 86400 || numbers.some(key => count(catalog[key]) === null || catalog[key] > 1000001)) throw error('invalid_diagnostics');
     }
     return Object.fromEntries(fields.map(key => [key, value[key]]));
   }
@@ -456,11 +563,13 @@
   }
   async function mutate(kind, profileId) {
     if (!state.connected || !state.generation || working()) return;
+    if (['initialize', 'import'].includes(kind) && windows() && state.setup?.onboarding && state.setup.onboarding['can_' + kind] !== true) return;
     if (['recheck', 'start'].includes(kind) && (!windows() || !connectionAction(kind))) return;
     if (['select', 'profile', 'catalog'].includes(kind) && windows() && connection()?.can_modify_scope !== true) return;
-    if (kind === 'select' && (!canSelect() || !state.selectionSeeded || state.selected.size < 1 || state.selected.size > scopeLimit() || state.pickerGeneration !== state.generation || state.listLoading || state.listError)) return;
+    if (kind === 'select' && (!canSelect() || !state.selectionSeeded || state.selected.size < 1 || state.selected.size > scopeLimit() || state.pickerGeneration !== state.generation || state.listLoading || state.pageLoading || state.listError)) return;
     if (kind === 'profile' && !state.setup?.profiles?.some(row => row.id === profileId && row.active !== true)) return;
     const epoch = state.epoch, generation = state.generation;
+    if (['initialize', 'import', 'recheck'].includes(kind)) state.onboardingError = null;
     if (kind === 'select' || kind === 'profile' || kind === 'start') state.enterWorkspace = true;
     if (kind === 'recheck') { state.enterWorkspace = false; state.stayOnSetup = true; }
     if (kind === 'catalog') {
@@ -476,33 +585,53 @@
     } catch (problem) {
       if (epoch === state.epoch && !ignored(problem)) {
         state.enterWorkspace = false;
-        if (kind === 'catalog' && problem.status !== 401) { state.catalogError = problem.code || 'catalog_request_failed'; feedback('会话目录读取没有完成，可以在下方重试。'); }
+        if (['initialize', 'import'].includes(kind) && state.setup?.onboarding && problem.status !== 401) { state.onboardingError = problem.code || 'initialization_request_failed'; feedback('本机初始化没有完成，请按当前状态重试。'); }
+        else if (kind === 'catalog' && problem.status !== 401) { state.catalogError = problem.code || 'catalog_request_failed'; feedback('会话目录读取没有完成，可以在下方重试。'); }
         else setError(problem);
       }
     }
-    finally { if (epoch === state.epoch) { state.busy = null; render(); if (canSelect() && state.loadedGeneration !== state.generation && !state.listLoading && !state.listError) loadConversations(); schedule(state.epoch); } }
+    finally { if (epoch === state.epoch) { state.busy = null; render(); maybeLoadConversations(); schedule(state.epoch); } }
+  }
+  async function cancelInitialization() {
+    if (!state.connected || !state.generation || state.busy || state.setup?.onboarding?.can_cancel !== true) return;
+    const epoch = state.epoch;
+    state.busy = 'cancel'; state.onboardingError = null; state.setupRequest++; render();
+    try {
+      const result = await api('/api/setup/cancel', { method: 'POST', body: {} });
+      if (epoch === state.epoch) acceptSetup(result);
+    } catch (problem) {
+      if (epoch === state.epoch && !ignored(problem)) {
+        if (problem.status === 401) setError(problem);
+        else { state.onboardingError = problem.code || 'initialization_cancel_failed'; feedback('取消请求未完成，请等待当前任务状态。'); }
+      }
+    } finally { if (epoch === state.epoch) { state.busy = null; render(); schedule(epoch); } }
   }
   function beginSelection() {
     if (!canManageSelection()) { feedback(windows() ? $('scope-manage-help').textContent || '请先完成上方账号与读取条件核验。' : '请等待本机读取条件就绪，再修改关注范围。'); return; }
     state.editing = true;
     render();
     $('selection-card').scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-    if (!catalogReady()) { mutate('catalog'); return; }
-    if (state.loadedGeneration !== state.generation && !state.listLoading && !state.listError) loadConversations();
+    $('setup-conversation-search').focus({ preventScroll: true });
+    if (searchQuery()) searchConversations();
   }
   function retryConversations() {
     if (!canManageSelection()) { feedback('请等待当前步骤结束，并确认账号与读取条件已就绪。'); return; }
+    if (!searchQuery()) { feedback('请先输入联系人或群名称。'); $('setup-conversation-search').focus(); return; }
     if (!catalogReady()) mutate('catalog'); else loadConversations();
   }
 
+  $('windows-initialize').addEventListener('click', () => mutate('initialize')); $('windows-cancel-initialization').addEventListener('click', cancelInitialization); $('windows-import-data').addEventListener('click', () => mutate('import'));
   $('initialize-button').addEventListener('click', () => mutate('initialize')); $('retry-initialization').addEventListener('click', () => mutate('initialize'));
   $('start-selected').addEventListener('click', () => mutate('select')); $('manage-conversations').addEventListener('click', beginSelection); $('open-workspace').addEventListener('click', openWorkspace);
   $('windows-recheck').addEventListener('click', () => mutate('recheck')); $('windows-start').addEventListener('click', () => mutate('start'));
   $('download-connection-diagnostics').addEventListener('click', downloadDiagnostics);
   $('windows-offline').addEventListener('click', openWorkspace); $('windows-open-workspace').addEventListener('click', openWorkspace);
   $('retry-connection').addEventListener('click', connect); $('check-status').addEventListener('click', () => poll()); $('retry-conversations').addEventListener('click', retryConversations);
+  $('load-more-conversations').addEventListener('click', () => loadConversations({ append: true }));
+  $('search-conversations').addEventListener('click', () => searchConversations({ explicit: true }));
+  $('setup-conversation-search').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); searchConversations({ explicit: true }); } });
   for (const type of ['private', 'group']) $(type + '-list').addEventListener('keydown', event => { if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return; const rows = [...$(type + '-list').querySelectorAll('.picker-checkbox:not(:disabled)')]; if (!rows.length) return; const current = rows.indexOf(document.activeElement), next = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : (current + (['ArrowUp', 'ArrowLeft'].includes(event.key) ? -1 : 1) + rows.length) % rows.length; event.preventDefault(); rows[next].focus(); });
-  $('setup-conversation-search').addEventListener('input', () => { clearTimeout(searchTimer); state.listRequest++; state.rows = []; state.listLoading = true; state.listError = false; renderSelection(); searchTimer = setTimeout(loadConversations, 250); });
+  $('setup-conversation-search').addEventListener('input', () => { clearTimeout(searchTimer); state.listRequest++; state.rows = []; state.listLoading = Boolean(searchQuery()); state.listError = false; state.listNextCursor = null; state.listMore = false; state.listQuery = null; state.loadedGeneration = null; state.searchPending = true; state.pageLoading = false; state.pageError = false; renderSelection(); searchTimer = setTimeout(searchConversations, 250); });
   window.addEventListener('pagehide', () => { state.epoch++; state.setupRequest++; clearTimeout(state.timer); resetPicker(); state.setup = null; state.generation = null; state.connected = false; state.busy = null; state.enterWorkspace = false; render(); });
   window.addEventListener('pageshow', event => { if (event.persisted) { resetPicker(); state.setup = null; state.generation = null; state.stayOnSetup = true; state.redirecting = false; connect(); } });
   if (allowedOrigin()) connect(); else { setError(error('loopback_required')); $('setup-announcer').textContent = '请从本机启动器打开连接页面。'; }

@@ -84,13 +84,14 @@ def stop_collection(child, child_output, *, grace=20, clock=time.monotonic, slee
 
 def run(data_dir, output, *, package, pid=None, creation_time=None, read_only=False,
         no_open=False, popen_factory=subprocess.Popen, open_browser=webbrowser.open,
-        wait=None, server_factory=make_server, manage_scopes=False, manager_factory=None, wait_for_wechat=False):
+        wait=None, server_factory=make_server, manage_scopes=False, manager_factory=None, wait_for_wechat=False,
+        workspace_dir=None):
     """The CLI fixes package/runtime paths; test seams use synthetic data only."""
-    if manage_scopes:
+    if manage_scopes or workspace_dir is not None:
         return run_managed(data_dir, output, package=package, pid=pid, creation_time=creation_time,
                            read_only=read_only, no_open=no_open, popen_factory=popen_factory,
                            open_browser=open_browser, wait=wait, manager_factory=manager_factory,
-                           wait_for_wechat=wait_for_wechat)
+                           wait_for_wechat=wait_for_wechat, workspace_dir=workspace_dir)
     if wait_for_wechat:
         raise ValueError('windows_wait_requires_scope_manager')
     data_dir, output, package = Path(data_dir), Path(output), Path(package)
@@ -201,17 +202,22 @@ def run(data_dir, output, *, package, pid=None, creation_time=None, read_only=Fa
 
 def run_managed(data_dir, output, *, package, pid=None, creation_time=None, read_only=False,
                 no_open=False, popen_factory=subprocess.Popen, open_browser=webbrowser.open,
-                wait=None, manager_factory=None, wait_for_wechat=False):
+                wait=None, manager_factory=None, wait_for_wechat=False, workspace_dir=None):
     """Production multi-scope owner; old single-scope callers remain compatible."""
     from windows_web_manager import WindowsWebManager
     from windows_web_server import make_windows_server
-    data_dir, output, package = Path(data_dir), Path(output), Path(package)
+    data_dir, output, package = Path(workspace_dir if workspace_dir is not None else data_dir), Path(output), Path(package)
     if output.exists() or output.is_symlink():
         raise ValueError('web_output_already_exists')
     validate_local_path(output.parent, require_dir=True)
-    ensure_private_dir(data_dir)
-    ensure_private_dir(data_dir / 'private')
-    ensure_private_dir(data_dir / 'private' / 'store')
+    if workspace_dir is None:
+        ensure_private_dir(data_dir)
+        ensure_private_dir(data_dir / 'private')
+        ensure_private_dir(data_dir / 'private' / 'store')
+    else:
+        if read_only:
+            raise ValueError('windows_workspace_explicit_read_only_conflict')
+        wait_for_wechat = True
     if read_only and (pid is not None or creation_time is not None):
         raise ValueError('web_read_only_process_conflict')
     if read_only and wait_for_wechat:
@@ -220,7 +226,8 @@ def run_managed(data_dir, output, *, package, pid=None, creation_time=None, read
     if not read_only and (not wait_for_wechat or identity_supplied) and (
             type(pid) is not int or pid <= 0 or type(creation_time) is not int or creation_time <= 0):
         raise ValueError('web_collector_identity_required')
-    CollectorWebData(data_dir).status()  # Existing legacy data is required, never re-baselined here.
+    if workspace_dir is None:
+        CollectorWebData(data_dir).status()  # Legacy entry never re-baselines data.
     output.mkdir()
     report = {'schema_version': 1, 'stage': 'windows_multi_scope_web_runtime', 'started_at_utc': now(),
               'status': '未验证', 'reason': 'not_started', 'read_only': bool(read_only),
@@ -243,6 +250,9 @@ def run_managed(data_dir, output, *, package, pid=None, creation_time=None, read
         command = owned_command(package, target, child_output, manager.pid, manager.creation_time) + ['--verify-active-account']
         return popen_factory(command, **options)
     try:
+        if workspace_dir is not None and manager_factory is None:
+            from windows_onboarding import WindowsOnboardingManager
+            manager_factory = WindowsOnboardingManager
         manager = (manager_factory or WindowsWebManager)(data_dir, package, output, pid=pid,
             creation_time=creation_time, read_only=read_only, start_collector=start_collector,
             stop_collector=stop_collection, wait_for_wechat=wait_for_wechat)
@@ -339,7 +349,9 @@ def run_managed(data_dir, output, *, package, pid=None, creation_time=None, read
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--data-dir', type=Path, required=True)
+    location = parser.add_mutually_exclusive_group(required=True)
+    location.add_argument('--data-dir', type=Path)
+    location.add_argument('--workspace-dir', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--pid', type=int)
     parser.add_argument('--creation-time', type=int)
@@ -355,7 +367,7 @@ def main():
     try:
         result = run(args.data_dir, args.output, package=package, pid=args.pid, creation_time=args.creation_time,
                      read_only=args.read_only, no_open=args.no_open, manage_scopes=args.manage_scopes,
-                     wait_for_wechat=args.wait_for_wechat)
+                     wait_for_wechat=args.wait_for_wechat, workspace_dir=args.workspace_dir)
     except Exception:
         print('reason=web_runtime_start_or_report_failed', flush=True)
         return 2

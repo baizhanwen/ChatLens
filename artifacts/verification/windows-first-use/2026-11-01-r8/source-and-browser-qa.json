@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "unit_test_count": 819,
+  "unit_test_seconds": 28.255,
+  "new_onboarding_tests": 28,
+  "new_workspace_tests": 14,
+  "new_large_catalog_tests": 12,
+  "mac_selected_seed_regression": true,
+  "package_metadata_followup_tests": 8,
+  "fresh_browser_checks": 78,
+  "browser_sets": [
+    {
+      "kind": "windows-connection",
+      "passed_checks": 16,
+      "source_hashes_match": true,
+      "scope": "Windows waiting-login-to-collection production manager HTTP UI with explicit synthetic native/source adapters",
+      "runtime_errors": 0,
+      "external_requests": 0
+    },
+    {
+      "kind": "windows-multi",
+      "passed_checks": 14,
+      "source_hashes_match": true,
+      "scope": "actual_windows_manager_http_store_and_ai_with_explicit_synthetic_native_source_provider",
+      "runtime_errors": 0,
+      "external_requests": 0
+    },
+    {
+      "kind": "mac-multi",
+      "passed_checks": 14,
+      "source_hashes_match": true,
+      "scope": "actual_macos_manager_http_sqlite_ai_profiles_with_synthetic_source_and_provider",
+      "runtime_errors": 0,
+      "external_requests": 0
+    },
+    {
+      "kind": "picker-contract",
+      "passed_checks": 10,
+      "source_hashes_match": true,
+      "scope": "explicit_synthetic_http_picker_contracts_only",
+      "runtime_errors": 0,
+      "external_requests": 0
+    },
+    {
+      "kind": "onboarding-contract",
+      "passed_checks": 15,
+      "source_hashes_match": true,
+      "scope": "explicit_synthetic_http_windows_onboarding_and_search_pagination_contracts_only",
+      "runtime_errors": 0,
+      "external_requests": 0
+    },
+    {
+      "kind": "actual-first-use-http",
+      "passed_checks": 9,
+      "source_hashes_match": true,
+      "scope": "actual_windows_onboarding_workspace_manager_http_store_ai_persistence_with_explicit_synthetic_windows_and_source_adapters",
+      "runtime_errors": 0,
+      "external_requests": 0
+    }
+  ],
+  "actual_coordinator_http_fixture_native_and_message_sources": "explicit_synthetic_adapters_real_workspace_coordinator_legacy_manager_http_sqlite_and_local_ai_persistence",
+  "mock_http_contract_checks": 25,
+  "actual_first_use_http_checks": 9,
+  "browser_sources_frozen": true,
+  "real_windows_api_executed": false,
+  "real_wechat_or_cloud_used": false,
+  "r8_windows_fresh_initialization_automatic_legacy_discovery_and_new_messages_status": "未验证",
+  "second_windows_machine_status": "待外部条件",
+  "catalog_limits": {
+    "valid_conversations": 100000,
+    "scanned_metadata_rows": 1000000,
+    "page_size": 200,
+    "cooperative_seconds": 30
+  },
+  "original_data_not_moved_or_copied": true,
+  "new_dependencies_or_global_environment_changes": false,
+  "uninitialized_account_recheck_rotates_nonce": true
+}

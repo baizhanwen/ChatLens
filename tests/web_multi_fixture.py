@@ -149,8 +149,8 @@ class SyntheticRuntime:
             self.accounts.append(ActiveAccount(path, 100 + index, 1700000000 + index, '4.1.15'))
         self.current = self.accounts[0]
         self.choices = []
-        private_names = ['青禾客户', '星桥客户', '远帆客户']
-        group_names = ['交付讨论群', '订单确认群']
+        private_names = ['合成青禾客户', '合成星桥客户', '合成远帆客户']
+        group_names = ['合成交付讨论群', '合成订单确认群']
         for index in range(60):
             kind = 'private' if index < 35 else 'group'
             name = (private_names[index] if index < 3 else '合成客户%02d' % index) if kind == 'private' else (

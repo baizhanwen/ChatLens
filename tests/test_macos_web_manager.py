@@ -162,10 +162,19 @@ class MacWebManagerTests(unittest.TestCase):
         forbidden.assert_not_called()
         self.assertIsNone(self.manager.collector)
         self.assertIsNone(self.manager.pending_session)
-        self.assertEqual(self.manager.list_conversations(), {'conversations': [], 'has_more': False})
+        self.assertEqual(self.manager.list_conversations(), {'conversations': [], 'selected_conversations': [], 'has_more': False})
         self.assertEqual(self.manager.setup()['stage'], 'needs_initialization')
         self.assertTrue(self.manager.setup()['account']['detected'])
         self.assert_public(self.manager.setup())
+
+    def test_search_seed_keeps_already_selected_conversations_outside_query(self):
+        self.ready_to_select()
+        self.manager.contacts[1]['selected'] = True
+        self.manager.contacts[0]['selected'] = False
+        result = self.manager.list_conversations('客户')
+        self.assertEqual([row['id'] for row in result['conversations']], [OPAQUE_PRIVATE])
+        self.assertEqual([row['id'] for row in result['selected_conversations']], [OPAQUE_GROUP])
+        self.assert_public(result)
 
     def test_http_initialize_only_enqueues_and_duplicate_clicks_do_not_initialize_twice(self):
         self.manager.start()

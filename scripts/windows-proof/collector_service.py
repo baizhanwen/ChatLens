@@ -96,8 +96,14 @@ def validate_scope(scope, keys):
         raise CollectorError('collector_configuration_account_mismatch')
     if exe.name.lower() not in ('weixin.exe', 'wechat.exe'):
         raise CollectorError('collector_executable_unsupported')
-    chats = _config(scope.get('config'))
-    managed = scope.get('scope_kind') == 'selected_conversations'
+    unselected = scope.get('scope_kind') == 'unselected_reader'
+    if unselected:
+        if scope.get('config') != {'conversations': []} or scope.get('test_tokens') != {}:
+            raise CollectorError('collector_unselected_reader_invalid')
+        chats = {}
+    else:
+        chats = _config(scope.get('config'))
+    managed = scope.get('scope_kind') in ('selected_conversations', 'unselected_reader')
     expected = {}
     for row in scope['config']['conversations']:
         value = row.get('expected_sender_id')
@@ -160,6 +166,8 @@ def prepare_session(data_dir, selected_config=None):
         write_private_json_new(private / 'keys.json', keys)
         write_private_json_new(private / 'scope.json', scope)
     root, exe, values, expected = validate_scope(scope, keys)
+    if scope.get('scope_kind') == 'unselected_reader':
+        raise CollectorError('collector_explicit_selection_required')
     identity = root.stat()
     binding = {'schema_version': 1, 'session_id': scope['session_id'], 'root': str(root),
                'root_identity': [identity.st_dev, identity.st_ino], 'executable': str(exe),

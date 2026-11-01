@@ -59,8 +59,9 @@ async function main() {
     await context.route('**/*', route => {const url = new URL(route.request().url()); if (url.origin !== origin && url.protocol !== 'data:') {issues.external++; return route.abort();} return route.continue();});
     page = await context.newPage(); page.on('pageerror', () => issues.runtime++);
     const id = name => page.locator('#' + name), shot = name => page.screenshot({path:path.join(output, name + '.png'), fullPage:true});
+    const beginSearch=async()=>{await id('manage-conversations').click();await id('setup-conversation-search').fill('\u5408\u6210');await id('search-conversations').click();};
     const phase = value => page.waitForFunction(value => document.querySelector('#selection-card').dataset.catalogState === value, value);
-    const beginLoadingCatalog = async () => {await Promise.all([page.waitForResponse(response => new URL(response.url()).pathname === '/api/setup/catalog' && response.request().method() === 'POST'), id('manage-conversations').click()]); await phase('loading');};
+    const beginLoadingCatalog = async () => {await Promise.all([page.waitForResponse(response => new URL(response.url()).pathname === '/api/setup/catalog' && response.request().method() === 'POST'), beginSearch()]); await phase('loading');};
     const noOverflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     const open = async ({state = 'idle', post = 'loading', list = 'ready'} = {}) => {
       if (held) {held(); held = null;}
@@ -72,7 +73,7 @@ async function main() {
     await check('delayed_catalog_readiness_loads_once_without_second_click', async () => {
       await open(); const lists = counts.conversations, posts = counts.catalog;
       await beginLoadingCatalog();
-      assert(await id('setup-conversation-search').isDisabled()); assert.equal(counts.conversations, lists);
+      assert(await id('setup-conversation-search').isEnabled()); assert.equal(counts.conversations, lists);
       assert((await id('conversation-feedback-text').innerText()).includes('正在读取联系人名称'));
       assert((await id('conversation-feedback-text').innerText()).includes('28 条联系人'));
       assert(!(await id('private-list').innerText()).includes('没有匹配'));
@@ -98,26 +99,28 @@ async function main() {
       catalog = makeCatalog('error'); await page.waitForFunction(() => !document.querySelector('#retry-conversations').disabled);
     });
     await check('post_catalog_error_stays_local_and_is_retryable', async () => {
-      await open({post:'reject'}); await id('manage-conversations').click(); await phase('error');
+      await open({post:'reject'}); await beginSearch(); await phase('error');
       assert(await id('connection-notice').isHidden()); assert(await id('retry-conversations').isEnabled());
       postMode = 'ready'; await id('retry-conversations').click(); await phase('ready');
     });
     await check('not_ready_empty_response_does_not_seed_or_claim_no_matches', async () => {
-      await open({state:'ready', list:'loading'}); await id('manage-conversations').click(); await phase('loading');
-      assert(await id('setup-conversation-search').isDisabled()); assert(await id('start-selected').isDisabled());
+      await open({state:'ready', list:'loading'}); await beginSearch(); await phase('loading');
+      assert(await id('setup-conversation-search').isEnabled()); assert(await id('start-selected').isDisabled());
       assert(!(await id('private-list').innerText()).includes('没有匹配'));
       listMode = 'ready'; catalog = makeCatalog('ready'); await phase('ready');
       assert.equal(await page.locator('.selected-chip').count(), 2);
     });
-    await check('real_empty_and_filtered_empty_have_distinct_messages', async () => {
-      await open({state:'ready', list:'empty'}); await id('manage-conversations').click(); await phase('ready');
-      assert((await id('private-list').innerText()).includes('暂无可选私聊')); assert(await id('setup-conversation-search').isEnabled());
+    await check('empty_query_stays_search_first_and_filtered_empty_has_clear_feedback', async () => {
+      await open({state:'ready', list:'empty'}); await beginSearch(); await phase('ready');
+      assert((await id('private-list').innerText()).includes('没有匹配的私聊')); assert(await id('setup-conversation-search').isEnabled());
+      await id('setup-conversation-search').fill(''); await phase('search');
+      assert((await id('private-list').innerText()).includes('输入名称开始查找'));
       listMode = 'ready'; await id('setup-conversation-search').fill('不存在的合成名称');
       await page.waitForFunction(() => document.querySelector('#private-list').textContent.includes('没有匹配的私聊'));
       assert((await id('private-list').innerText()).includes('清空搜索'));
     });
     await check('list_failure_waits_for_explicit_retry_and_keeps_selection', async () => {
-      await open({state:'ready'}); await id('manage-conversations').click(); await phase('ready');
+      await open({state:'ready'}); await beginSearch(); await phase('ready');
       listMode = 'error'; await id('setup-conversation-search').fill('客户'); await phase('error');
       const requests = counts.conversations, setups = counts.setup;
       await page.waitForResponse(response => new URL(response.url()).pathname === '/api/setup');
@@ -129,13 +132,13 @@ async function main() {
       await open({state:'ready', list:'held'});
       let heldTimer;
       const requestHeld = new Promise((resolve, reject) => {heldReady = resolve; heldTimer = setTimeout(() => reject(new Error('Synthetic held response was not requested.')), 10000);});
-      await id('manage-conversations').click();
+      await beginSearch();
       await page.waitForFunction(() => document.querySelector('#selection-card').dataset.catalogState === 'loading');
       await requestHeld; clearTimeout(heldTimer); heldReady = null;
       generation = generationB; catalog = makeCatalog('idle');
       await page.waitForFunction(() => document.querySelector('#selection-card').hidden && document.querySelectorAll('.selected-chip').length === 0);
       held(); held = null; listMode = 'ready'; postMode = 'ready';
-      await id('manage-conversations').click(); await phase('ready');
+      await beginSearch(); await phase('ready');
       assert.equal(await page.locator('.picker-checkbox').count(), 1); assert.equal(await page.locator('.selected-chip').count(), 0);
       assert((await id('private-list').innerText()).includes('新范围合成客户')); assert(!(await id('group-list').innerText()).includes('合成测试群'));
     });

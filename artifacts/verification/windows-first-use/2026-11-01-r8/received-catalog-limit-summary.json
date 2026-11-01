@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "kind": "chatlens_received_catalog_limit_screenshot_summary",
+  "source": "user_supplied_cropped_screenshot_not_a_native_diagnostic_json",
+  "source_image_sha256": "e9f0600276ec11e40098d017eefe8b9c0ce97cacedb18843d31f71a73399ba84",
+  "visible_status": "会话目录超出当前读取上限，原关注范围保留",
+  "mapped_fixed_reason": "windows_scope_catalog_limit",
+  "reason_mapping": "inferred_from_existing_UI_copy_not_independently_exported",
+  "exact_contact_or_table_count_provided": false,
+  "raw_image_or_private_paths_published": false
+}

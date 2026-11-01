@@ -104,7 +104,7 @@ function Verify-Payload {
         if (-not [string]::Equals($digest, [string]$entry.sha256, [StringComparison]::OrdinalIgnoreCase)) { Stop-Check 'manifest_payload_hash_mismatch' }
         $names[$lower] = $true
     }
-    foreach ($required in @('runtime/python.exe', 'runtime/python314.dll', 'runtime/python314.zip', 'runtime/python314._pth', 'runtime/_sqlite3.pyd', 'runtime/sqlite3.dll', 'runtime/sqlcipher3/_sqlite3.cp314-win_amd64.pyd', 'runtime/zstandard/backend_c.cp314-win_amd64.pyd', 'collector_service.py', 'collector_supervisor.py', 'collector_private.py', 'continuous_reader.py', 'continuous_store.py', 'conversation_scope.py', 'wechat_identity.py', 'windows_selected_engine.py', 'windows_selected_native.py', 'windows_selected_supervisor.py', 'windows_keyproof_core.py', 'windows_keyproof_platform.py', 'Start-Web.ps1', 'Start-ChatLens.cmd', 'README-WEB.txt', 'web_runtime.py', 'web_server.py', 'windows_web_manager.py', 'windows_web_server.py', 'windows_account_probe.py', 'windows_process_detection.py', 'windows_mapped_files.py', 'web_data.py', 'collector_web_meta.py', 'ai_knowledge.py', 'ai_provider.py', 'ai_query.py', 'ai_statistics.py', 'ai_service.py', 'ai_web_server.py', 'web/index.html', 'web/app.js', 'web/styles.css', 'web/connect.html', 'web/connect.js', 'web/connect.css', 'web/assets/chatlens-mark.svg', 'THIRD-PARTY-SELECTED-NOTICES.txt')) {
+    foreach ($required in @('runtime/python.exe', 'runtime/python314.dll', 'runtime/python314.zip', 'runtime/python314._pth', 'runtime/_sqlite3.pyd', 'runtime/sqlite3.dll', 'runtime/sqlcipher3/_sqlite3.cp314-win_amd64.pyd', 'runtime/zstandard/backend_c.cp314-win_amd64.pyd', 'collector_service.py', 'collector_supervisor.py', 'collector_private.py', 'continuous_reader.py', 'continuous_store.py', 'conversation_scope.py', 'wechat_identity.py', 'windows_selected_engine.py', 'windows_selected_native.py', 'windows_selected_supervisor.py', 'windows_keyproof_core.py', 'windows_keyproof_platform.py', 'Start-Web.ps1', 'Start-ChatLens.cmd', 'README-WEB.txt', 'web_runtime.py', 'web_server.py', 'windows_web_manager.py', 'windows_web_server.py', 'windows_account_probe.py', 'windows_process_detection.py', 'windows_mapped_files.py', 'windows_workspace.py', 'windows_onboarding.py', 'windows_onboarding_native.py', 'windows_catalog_paging.py', 'windows_selected_runner.py', 'windows_selected_progress.py', 'web_data.py', 'collector_web_meta.py', 'ai_knowledge.py', 'ai_provider.py', 'ai_query.py', 'ai_statistics.py', 'ai_service.py', 'ai_web_server.py', 'web/index.html', 'web/app.js', 'web/styles.css', 'web/connect.html', 'web/connect.js', 'web/connect.css', 'web/assets/chatlens-mark.svg', 'THIRD-PARTY-SELECTED-NOTICES.txt')) {
         if (-not $names.ContainsKey($required.ToLowerInvariant())) { Stop-Check 'manifest_required_payload_missing' }
     }
     # Enumerate payload only; never descend into local reports or private collector data.
@@ -141,47 +141,16 @@ try {
     Push-Location -LiteralPath $packageRoot
     $locationPushed = $true
     Write-Host '文件完整性检查完成。本包使用固定便携 Python，无需安装其他运行环境。'
-    Write-Host '本次原位连接此前已验证的 collector-data，保留原会话、消息、检查点与模型配置。'
+    Write-Host '本机数据目录自动管理，保留原会话、消息、检查点与模型配置。'
+    Write-Host '新电脑将在网页引导初始化；已有账号按本机资料精确匹配并原位复用。'
     Write-Host '网页仅在本机 127.0.0.1 访问。统计在本机计算；云端分析需在网页另行配置和确认。'
     Write-Host '若旧采集窗口仍运行，请先在旧窗口按一次 Ctrl+C 正常停止，再继续启动。'
-    Write-Host '请选择原 collector-data 文件夹。设置中可多选1至50个会话；新旧范围独立保存，可切回恢复。'
-    Add-Type -AssemblyName System.Windows.Forms
-    $dataDirectory = $null
-    $dialog = New-Object Windows.Forms.FolderBrowserDialog
-    try {
-        $dialog.Description = '选择之前持续采集验证通过的 collector-data 文件夹；保留 private 子目录。'
-        $dialog.ShowNewFolderButton = $false
-        if ($dialog.ShowDialog() -eq [Windows.Forms.DialogResult]::OK) { $dataDirectory = $dialog.SelectedPath }
-    } finally { $dialog.Dispose() }
-    if ([string]::IsNullOrEmpty($dataDirectory)) { Stop-Check 'web_existing_collector_data_selection_cancelled' }
-    Assert-PrivateAcl $dataDirectory $true
-    $privateDirectory = Join-Path $dataDirectory 'private'
-    Assert-PrivateAcl $privateDirectory $true
-    $scope = Read-PrivateMetadata (Join-Path $privateDirectory 'scope.json')
-    if ($scope.schema_version -ne 1) { Stop-Check 'web_scope_schema_unsupported' }
-    $expectedExe = [string]$scope.exe_path
-    $scope = $null
-    # Best-effort window metadata only. The Python readiness guide independently rechecks the process and account.
-    $script:FailureReason = 'web_current_main_process_revalidation_failed'
-    $candidates = @()
-    if ((Local-File $expectedExe) -and [IO.Path]::GetFileName($expectedExe) -match '^(Weixin|WeChat)\.exe$') {
-        try {
-            $rows = @(Get-CimInstance -ClassName Win32_Process -Filter "Name='Weixin.exe' OR Name='WeChat.exe'" -Property 'ProcessId', 'ExecutablePath' -ErrorAction Stop)
-        } catch { $rows = @() }
-        foreach ($row in $rows) {
-            try {
-                $currentExe = [string]$row.ExecutablePath
-                if (-not [string]::Equals($currentExe, $expectedExe, [StringComparison]::OrdinalIgnoreCase)) { continue }
-                if (-not (Local-File $currentExe)) { continue }
-                $version = [string][Diagnostics.FileVersionInfo]::GetVersionInfo($currentExe).ProductVersion
-                if ($version -cne '4.1.15.56') { continue }
-                $process = Get-Process -Id ([int]$row.ProcessId) -ErrorAction Stop
-                if ($process.ProcessName -ine 'Weixin' -and $process.ProcessName -ine 'WeChat') { continue }
-                if ($process.MainWindowHandle -eq [IntPtr]::Zero) { continue }
-                $candidates += $process
-            } catch { continue }
-        }
+    Write-Host '微信程序与账号由网页检测；窗口存在不代表已登录。登录后可在网页重新检测。'
+    $localAppData = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+    if ([string]::IsNullOrEmpty($localAppData) -or -not (Local-Directory $localAppData)) {
+        Stop-Check 'windows_workspace_local_appdata_unavailable'
     }
+    $workspaceDirectory = Join-Path $localAppData 'ChatLens'
     $resultsRoot = Join-Path $packageRoot 'results'
     $existingResults = Get-Item -LiteralPath $resultsRoot -Force -ErrorAction SilentlyContinue
     if ($null -ne $existingResults) {
@@ -191,24 +160,7 @@ try {
     $outputDirectory = Join-Path $resultsRoot ($stamp + '-web')
     $runtime = Join-Path $packageRoot 'runtime\python.exe'
     $core = Join-Path $packageRoot 'web_runtime.py'
-    $runtimeArguments = @('-I', '-S', '-B', '-X', 'utf8', $core, '--data-dir', $dataDirectory, '--output', $outputDirectory, '--manage-scopes', '--wait-for-wechat')
-    if ($candidates.Count -eq 1) {
-        try {
-            $process = $candidates[0]
-            $processNumber = [int]$process.Id
-            $creationTime = [long]$process.StartTime.ToFileTimeUtc()
-            if ($creationTime -le 0) { throw [InvalidOperationException]::new('process_metadata_unavailable') }
-            $runtimeArguments += @('--pid', $processNumber.ToString([Globalization.CultureInfo]::InvariantCulture),
-                                   '--creation-time', $creationTime.ToString([Globalization.CultureInfo]::InvariantCulture))
-            Write-Host '发现符合原路径和版本的微信窗口；窗口存在不代表已登录，将在网页核验当前账号。'
-        } catch {
-            Write-Host '启动时的微信窗口信息已变化，将在网页重新检测；不会锁定为只读模式。'
-        }
-    } elseif ($candidates.Count -gt 1) {
-        Write-Host '检测到多个微信窗口，将在网页按原账号重新核验；不会自动切换到其他账号。'
-    } else {
-        Write-Host '暂未检测到匹配的微信窗口，现在打开接入引导。登录原账号后可在网页重新检测，无需重启本工具。'
-    }
+    $runtimeArguments = @('-I', '-S', '-B', '-X', 'utf8', $core, '--workspace-dir', $workspaceDirectory, '--output', $outputDirectory)
     Write-Host '网页核验微信与账号后，请点击开始采集；未就绪时会显示原因与重试入口。'
     $script:FailureReason = 'fixed_runtime_web_start_failed'
     $savedPreference = $ErrorActionPreference

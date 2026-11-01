@@ -1040,12 +1040,15 @@ class WindowsManagerTests(unittest.TestCase):
         self.create_encrypted_catalog_sources(contact_count=10001)
         manager = self.manager(catalog_loader=load_contact_catalog)
         child = manager.child
-        manager.request_catalog(expected_generation=manager.scope_generation)
-        manager.tick()
-        self.finish_catalog(manager)
+        # Keep this a small explicit resource-guard test. Production now scans
+        # up to one million raw metadata rows and filters before retaining names.
+        with patch('windows_web_manager.CATALOG_SCAN_LIMIT', 10000):
+            manager.request_catalog(expected_generation=manager.scope_generation)
+            manager.tick()
+            self.finish_catalog(manager)
         self.assertEqual(manager.setup()['catalog']['reason'], 'windows_scope_catalog_limit')
         self.assertEqual(manager.setup()['catalog']['phase'], 'reading_contacts')
-        self.assertLessEqual(manager.setup()['catalog']['contacts_seen'], 10000)
+        self.assertEqual(manager.setup()['catalog']['contacts_seen'], 10001)
         self.assertIs(manager.child, child)
         self.assertEqual(manager.contacts, [])
 

@@ -1,0 +1,33 @@
+{
+  "status": "passed",
+  "scope": "explicit_synthetic_http_picker_contracts_only",
+  "passed_check_count": 10,
+  "checks": [
+    "delayed_catalog_readiness_loads_once_without_second_click",
+    "catalog_failure_is_visible_and_retry_rebuilds_without_disconnect",
+    "failed_worker_cleanup_blocks_retry_until_actual_completion",
+    "post_catalog_error_stays_local_and_is_retryable",
+    "not_ready_empty_response_does_not_seed_or_claim_no_matches",
+    "empty_query_stays_search_first_and_filtered_empty_has_clear_feedback",
+    "list_failure_waits_for_explicit_retry_and_keeps_selection",
+    "late_old_generation_response_cannot_seed_new_scope",
+    "390px_loading_error_retry_and_keyboard_controls_fit",
+    "safe_catalog_diagnostics_download_and_unknown_fields_rejected"
+  ],
+  "viewports": [
+    "1440x1000",
+    "390x844"
+  ],
+  "source_sha256": {
+    "apps/web/connect.js": "268625c57b359b671d44b1e30836ccae3a57b4fc34d4b036bbc4bdb116ca0bf5",
+    "apps/web/connect.html": "f569188d6db1043f8830efdbe36b934ae69bddadba2c78d2dcc20ee9ffec328d",
+    "apps/web/connect.css": "b0ab0a34b2da4ba2a4441d70dd924d0e7f3a2e4279d11387da17a64dcbd33d45",
+    "apps/web/styles.css": "1a96f1b4d4e0430eb9fb7040039b72155be64099541d0eabe8c713ca1464c5a3",
+    "scripts/web-picker-smoke.cjs": "ff7ef3f6146921ef363f55719835b55aa5d2b9ddd0ec0084d0ffefa3bd7d7f91"
+  },
+  "browser_runtime_errors": 0,
+  "browser_external_requests": 0,
+  "real_windows_manager_executed": false,
+  "real_windows_api_executed": false,
+  "real_wechat_or_cloud_used": false
+}
