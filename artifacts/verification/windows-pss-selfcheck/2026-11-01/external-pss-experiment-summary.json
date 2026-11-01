@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "kind": "chatlens_external_reported_pss_name_experiments",
+  "evidence_type": "user_forwarded_screenshots_of_another_ai_experiment_report",
+  "raw_experiment_scripts_reviewed": false,
+  "experiments_executed_on_this_host": false,
+  "reported_windows_build": 26200,
+  "reported_type_name_has_single_trailing_nul": true,
+  "reported_file_type_count_after_nul_handling": 367,
+  "reported_file_handles_with_object_names": 0,
+  "reported_control_process_file_handles": 11,
+  "reported_control_process_file_handles_with_names": 0,
+  "reported_control_open_modes": [
+    "ordinary_python_file",
+    "file_read_attributes"
+  ],
+  "reported_capture_flag_variants": [
+    "handles_only",
+    "handles_and_names",
+    "additional_basic_or_type_specific_metadata"
+  ],
+  "reported_helper_only_database_claim_retracted": true,
+  "interpretation": "The forwarded report supports fixing the single-terminal-NUL decoder boundary and indicates that the tested PSS file handles provided no path names. It does not by itself prove behavior for every Windows build or every process. A separate self-owned mapping-path canary tests a different documented API before changing account-path evidence.",
+  "raw_screenshot_paths_names_ids_or_chat_published": false
+}

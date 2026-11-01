@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "scope": "single terminal NUL source fix and standalone self-owned metadata canaries; synthetic native contracts on macOS",
+  "selfcheck_tool_version": "20261101-02",
+  "selfcheck_tests": 26,
+  "account_probe_tests": 28,
+  "full_source_tests": 727,
+  "full_source_elapsed_seconds": 27.267,
+  "fresh_windows_http_browser_checks": 30,
+  "unit_log_sha256": "dd6a9fc757f4b9be28e22b6c0afa6bd0cb757ad4aebeeccb8bea29f4d1f81338",
+  "isolated_single_file_cli_results": [
+    {
+      "mode": "pss-handles",
+      "kind": "chatlens_windows_pss_selfcheck",
+      "reason": "pss_selfcheck_windows_x64_required",
+      "status": "未验证"
+    },
+    {
+      "mode": "mapped-path",
+      "kind": "chatlens_windows_mapped_path_selfcheck",
+      "reason": "mapped_selfcheck_windows_x64_required",
+      "status": "未验证"
+    }
+  ],
+  "real_windows_native_calls_executed": false,
+  "windows_mapping_canary_status": "未验证",
+  "r5_format_user_account_diagnostic_status": "失败",
+  "formal_probe_source_change": "bounded single-terminal-NUL decoding only; no new account-path evidence route",
+  "collector_and_web_source_changed": false,
+  "r5_zip_sha256": "53ef8517386e6837802524c0aa5dc0389fc3b203c89749a3b0866d318bbf51e8",
+  "r5_zip_unchanged": true,
+  "new_runtime_dependencies": 0,
+  "native_selfcheck_contains_wechat_other_pid_paths_names_chat_keys_or_addresses_in_output": false,
+  "source_sha256": {
+    "scripts/windows-proof/windows_pss_selfcheck.py": "a9024e44643b889aa90331c3cc9529ee370a68fbaf0fa21651e5db7049357b48",
+    "tests/test_windows_pss_selfcheck.py": "33e03d18696ba8708df9415b463187cb509298c6eb8bdce897c94efcf26909dc",
+    "scripts/windows-proof/windows_account_probe.py": "9def7dd48963792af146812e319dce78da220e0806fba53a66ec65ec03a9c23d",
+    "tests/test_windows_account_probe.py": "d7cf645925a55b03b22eb5a001da1fae24314dfcbeb454f540b251e8f2cd1c12"
+  }
+}

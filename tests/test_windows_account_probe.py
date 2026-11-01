@@ -148,6 +148,72 @@ class WindowsAccountProbeTests(unittest.TestCase):
         with patch.object(probe, '_api', return_value=SimpleNamespace(GetCurrentProcess=lambda: 99)):
             return probe.snapshot_paths(api, 42, **options)
 
+    def test_sdk_byte_count_decodes_exact_or_one_terminal_nul_including_bmp_path(self):
+        path = r'C:\Users\synthetic\中文账号\db_storage\message\message_0.db'
+        for raw, expected in (('File', 'File'), ('File\0', 'File'), (path + '\0', path)):
+            with self.subTest(raw=raw):
+                buffer = C.create_unicode_buffer(raw)
+                pointer, byte_length = C.addressof(buffer), len(raw) * 2
+                with patch.object(probe.C, 'wstring_at', wraps=C.wstring_at) as read:
+                    self.assertEqual(probe._wide(pointer, byte_length), expected)
+                read.assert_called_once_with(pointer, byte_length // 2)
+
+    def test_snapshot_single_terminal_nuls_preserve_file_type_and_database_evidence(self):
+        path = ROOT + r'\message\message_0.db'
+        counts = {}
+        api = Snapshot([('File\0', path + '\0')])
+        self.assertEqual(self.snapshot(api, diagnostics=counts), [path])
+        self.assertEqual(counts['file_type_handles'], 1)
+        self.assertEqual(counts['file_names_retained'], 1)
+        self.assertTrue(counts['query_completed'])
+        result = self.direct(Snapshot([('File\0', path + '\0')]), diagnostics={})
+        self.assertEqual(result['state'], 'matched')
+        self.assertEqual(result['diagnostics']['matching_root_paths'], 1)
+        self.assertTrue(result['diagnostics']['query_completed'])
+        # Decoding a File type alone cannot supply the missing object name.
+        class TypeOnly(Snapshot):
+            def PssWalkSnapshot(self, *arguments):
+                status = super().PssWalkSnapshot(*arguments)
+                if status == 0:
+                    C.cast(arguments[3], C.POINTER(probe.HandleEntry)).contents.Flags = 0
+                return status
+        missing = self.direct(TypeOnly([('File\0', '')]), diagnostics={})
+        self.assertEqual(missing['state'], 'unknown')
+        self.assertEqual(missing['reason'], 'windows_account_open_database_unavailable')
+        self.assertEqual(missing['diagnostics']['file_type_handles'], 1)
+        self.assertEqual(missing['diagnostics']['file_names_retained'], 0)
+        self.assertTrue(missing['diagnostics']['query_completed'])
+
+    def test_empty_embedded_or_repeated_nuls_are_rejected_and_cannot_match(self):
+        path = ROOT + r'\message\message_0.db'
+        for raw in ('\0', 'Fi\0le', 'File\0\0', path + '\0extra', path + '\0\0'):
+            with self.subTest(raw=raw):
+                buffer = C.create_unicode_buffer(raw)
+                with self.assertRaises(probe.PlatformError) as raised:
+                    probe._wide(C.addressof(buffer), len(raw) * 2)
+                self.assertEqual(raised.exception.code, 'windows_account_handle_name_invalid')
+        for kind, name in (('Fi\0le', path), ('File\0\0', path),
+                           ('File', path + '\0extra'), ('File', path + '\0\0'), ('File', '\0')):
+            with self.subTest(kind=kind, name=name):
+                result = self.direct(Snapshot([(kind, name)]), diagnostics={})
+                self.assertEqual(result['state'], 'unknown')
+                self.assertFalse(result['matched'])
+                self.assertFalse(result['diagnostics']['query_completed'])
+                self.assertNotIn(ROOT, json.dumps(result))
+
+    def test_terminal_nul_does_not_accept_another_root_or_swallow_whitespace(self):
+        result = self.direct(Snapshot([('File\0', OTHER + r'\message\message_0.db' + '\0')]), diagnostics={})
+        self.assertEqual(result['state'], 'mismatch')
+        self.assertEqual(result['diagnostics']['other_root_paths'], 1)
+        for raw in ('File ', 'File\n', 'File\u00a0', ROOT + r'\message\message_0.db' + ' '):
+            with self.subTest(raw=raw):
+                buffer = C.create_unicode_buffer(raw + '\0')
+                self.assertEqual(probe._wide(C.addressof(buffer), (len(raw) + 1) * 2), raw)
+        for kind, name in (('File \0', ROOT + r'\message\message_0.db' + '\0'),
+                           ('File\0', ROOT + r'\message\message_0.db' + ' \0')):
+            with self.subTest(kind=kind, name=name):
+                self.assertEqual(self.direct(Snapshot([(kind, name)]))['state'], 'unknown')
+
     def test_sdk_layout_flags_and_file_names_only_and_local_resources_freed(self):
         api = Snapshot([('File', ROOT + r'\message\message_0.db'), ('Mutant', 'SYNTHETIC_NAMED_MUTEX')])
         self.assertEqual(C.sizeof(probe.HandleEntry), 136)

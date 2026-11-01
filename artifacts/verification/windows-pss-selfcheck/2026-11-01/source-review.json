@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "scope": "current source-only NUL fix and selfcheck tools plus pending Git history; no new public screenshots",
+  "history_commits_scanned": 23,
+  "unique_history_blobs_scanned": 819,
+  "working_files_scanned": 656,
+  "sensitive_findings": 0,
+  "formal_probe_source_change": "single terminal NUL decoding boundary only",
+  "account_root_and_family_matching_strategy_changed": false,
+  "collector_or_web_production_assets_changed": false,
+  "portable_r5_stdlib_inputs_verified": true,
+  "portable_r5_ctypes_extension_present": true,
+  "r5_package_changed": false,
+  "windows_mapped_path_selfcheck_status": "未验证",
+  "private_source_material_published": false,
+  "license_state_preserved": true
+}

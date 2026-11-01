@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "kind": "chatlens_received_complete_family_no_file_summary",
+  "evidence_type": "user_returned_connection_diagnostics_r5_schema",
+  "account_verification_status": "失败",
+  "family_enumeration_status": "通过",
+  "source_build_identity_verified": false,
+  "checks": {
+    "process_running": true,
+    "account_verified": false,
+    "reader_ready": false,
+    "scope_selected": true,
+    "collecting": false
+  },
+  "account_reason": "windows_account_open_database_unavailable",
+  "connection_state": "account_unverified",
+  "account_diagnostics": {
+    "schema_version": 1,
+    "handles_seen": 3591,
+    "handles_with_name": 277,
+    "type_names_present": 2776,
+    "file_type_handles": 0,
+    "file_names_retained": 0,
+    "all_named_db_candidates": 0,
+    "database_names_seen": 0,
+    "matching_root_paths": 0,
+    "other_root_paths": 0,
+    "unresolved_database_paths": 0,
+    "family_process_count": 5,
+    "family_processes_completed": 5,
+    "main_database_names_seen": 0,
+    "helper_database_names_seen": 0,
+    "query_completed": true
+  },
+  "selected_conversation_count": 2,
+  "collector_running": false,
+  "collector_stage": "stopped",
+  "interpretation": "All five family members completed enumeration, but no File types or database names were recognized. This does not establish logout or a missing helper; string decoding and API name availability remain to be checked with a self-owned synthetic file.",
+  "raw_paths_names_ids_or_chat_included": false
+}

@@ -150,7 +150,14 @@ def classify_paths(paths, expected_root, device_map=None, *, diagnostics=None):
 def _wide(pointer, length):
     if not pointer or not 0 < length <= 65532 or length % 2:
         raise PlatformError('windows_account_handle_name_invalid')
-    return C.wstring_at(pointer, length // 2)
+    # SDK lengths remain byte counts. A captured name may include one terminal
+    # UTF-16 NUL; remove exactly that terminator without accepting embedded NULs.
+    value = C.wstring_at(pointer, length // 2)
+    if value.endswith('\0'):
+        value = value[:-1]
+    if not value or '\0' in value:
+        raise PlatformError('windows_account_handle_name_invalid')
+    return value
 
 
 def snapshot_paths(api, process_handle, *, clock=time.monotonic, diagnostics=None, deadline=None, max_handles=None):
