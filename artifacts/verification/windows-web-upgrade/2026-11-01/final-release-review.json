@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "scope": "independent final Windows multi-scope source, archive and pre-publication history review",
+  "historical_review": {
+    "schema_version": 1,
+    "scope": "all reachable pre-release Git history plus tracked tree at reviewed head; unpublished working changes and final ZIP require separate review",
+    "reviewed_head": "e09114e12d9f865bcd1e50442ba89a9cc86a3597",
+    "status": "通过",
+    "history": {
+      "commits": 16,
+      "unique_blobs": 655,
+      "unique_blob_bytes": 33297138,
+      "binary_blobs": 187,
+      "largest_binary_blob_bytes": 1016157,
+      "strong_secret_or_account_regex_findings": 0,
+      "binary_types": [
+        "PNG",
+        "ICO",
+        "ICNS"
+      ],
+      "executables_archives_databases_or_private_directory_entries_tracked": false
+    },
+    "png_review": {
+      "method": "local macOS Vision accurate zh-Hans and en-US OCR; redacted matching results only",
+      "unique_historical_pngs": 185,
+      "successful_ocr": 185,
+      "failed_ocr": 0,
+      "credential_account_phone_authenticated_url_or_controlled_contact_findings": 0,
+      "boundary": "OCR is a supplementary heuristic; historical screenshot paths and browser reports identify synthetic test datasets, and real verification reports contain counters/booleans rather than images or chat bodies."
+    },
+    "licenses": {
+      "current_application_license": "UNLICENSED in apps/desktop/package.json",
+      "new_open_source_license_granted": false,
+      "third_party_notice_files_present": true,
+      "final_binary_notice_inclusion": "未验证"
+    },
+    "private_source_accessed": false,
+    "remote_writes_performed": false,
+    "release_package_final_review": "未验证",
+    "uncommitted_changes_final_review": "未验证",
+    "finding_details_exported": false
+  },
+  "new_working_tree": {
+    "status": "通过",
+    "tracked_and_unignored_file_count": 550,
+    "text_files_scanned": 327,
+    "private_material_findings": [],
+    "frozen_windows_browser_source_hashes_match": true
+  },
+  "new_screenshot_review": {
+    "status": "通过",
+    "synthetic_pngs": 9,
+    "successful_local_ocr": 9,
+    "credential_account_phone_authenticated_url_or_controlled_contact_findings": 0,
+    "real_chat_images_in_review": false
+  },
+  "source_review": {
+    "status": "通过",
+    "source_sha256": {
+      "scripts/windows-proof/windows_web_manager.py": "4d29955f6229128e96d3268bee59ddb298fac006110371bc19e61a26f84c3698",
+      "scripts/windows-proof/windows_web_server.py": "917b0b04be8fde6a5c615d64bf4898f88ea4c1a2d87efa028bd98b2b50838ef7",
+      "scripts/windows-proof/windows_account_probe.py": "883f7d61b022599217f5185a236c8f455c7f639f3cdabd21bc90735ad21d711b",
+      "scripts/windows-proof/web_runtime.py": "fb3258c98e8080928640d402f243f9e72427202d342ecca5614ef1cb0fc2ad0c",
+      "scripts/windows-proof/collector_service.py": "17b1c143b295eec132d452049260657b516f56a6b663e11af42b908ee0fbab2d",
+      "scripts/windows-proof/collector_supervisor.py": "b83f2a1397fe204695753c92361b567e2414ed8ea2e61200c3828343452e4034"
+    },
+    "legacy_data_config_and_baseline_preserved": true,
+    "per_account_and_per_scope_store_checkpoints_and_ai_history": true,
+    "only_same_account_first_model_config_copy": true,
+    "active_account_metadata_proof_required_for_live_capture": true,
+    "old_scope_nonce_and_late_ai_results_rejected": true,
+    "owned_child_stop_unconfirmed_or_exception_keeps_handle_and_blocks_new_capture": true,
+    "durable_launch_intent_before_popen_and_uncertain_launch_blocks_retries": true,
+    "restarted_owner_requires_previous_supervisor_cleanup_report": true,
+    "source_native_catalog_and_reading_stay_inside_explicit_account_and_known_shards": true,
+    "resolved_findings": [
+      "QueryFullProcessImageNameW capacity reset before both checks",
+      "retain child after unconfirmed stop",
+      "journal launch intent before process creation",
+      "uncertain launch blocks same-owner retry"
+    ],
+    "remaining_definite_blockers": []
+  },
+  "account_probe_sdk_review": {
+    "status": "通过",
+    "scope": "independent read-only SDK, account-classifier and subprocess-boundary source review",
+    "source_sha256": {
+      "scripts/windows-proof/windows_account_probe.py": "883f7d61b022599217f5185a236c8f455c7f639f3cdabd21bc90735ad21d711b",
+      "tests/test_windows_account_probe.py": "81f3d3d19b8e12c613867485f46876cd26e121f02fe45fd8e65bbfc81d64f2ac"
+    },
+    "native_windows_execution": "未验证",
+    "resolved_during_review": [
+      "QueryFullProcessImageNameW in/out size reset before both identity queries; native outer mock regression added"
+    ],
+    "reviewed": [
+      "x64 PSS_HANDLE_ENTRY 136-byte layout and ObjectName offset80",
+      "capture flags0x0c exclude VA clone/thread/context capture",
+      "WALK_HANDLES2, name-present flag2, length-bounded UTF16 object names",
+      "complete snapshot only,32768 handle limit and3s walk deadline",
+      "owned six-second subprocess with shell disabled and redacted output",
+      "unique matching db_storage required; no/ambiguous/unmapped roots fail closed",
+      "process executable and creation time checked before and after snapshot",
+      "local snapshot/marker and selected process handle cleanup"
+    ],
+    "sources": [
+      "https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/ns-processsnapshot-pss_handle_entry",
+      "https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/ne-processsnapshot-pss_capture_flags",
+      "https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/ne-processsnapshot-pss_handle_flags",
+      "https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/ne-processsnapshot-pss_walk_information_class",
+      "https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/nf-processsnapshot-pssfreesnapshot",
+      "https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-queryfullprocessimagenamew"
+    ],
+    "limits": [
+      "Windows PSS API/permissions/performance and WeChat open-handle behavior require actual Windows validation",
+      "unavailable or incomplete account proof blocks live data rather than inferring another account"
+    ],
+    "private_files_read": false,
+    "source_edited_by_reviewer": false,
+    "definite_remaining_blockers": []
+  },
+  "package_review": {
+    "schema_version": 1,
+    "status": "通过",
+    "scope": "independent offline Windows r2 archive review; no Windows or private data execution",
+    "package_name": "ChatLens-Windows-Web-20261101-r2.zip",
+    "package_bytes": 15615794,
+    "package_sha256": "0a74637781551b7cd52faae39fe6b9ec6042b05001188966788df70ea6649469",
+    "archive_files": 93,
+    "public_source_files_byte_compared": 36,
+    "all_payload_bytes_match_source_or_fixed_upstream": true,
+    "manifest_and_crc_verified": true,
+    "safe_unique_names_and_no_private_payload": true,
+    "windows_text_encoding_and_line_endings_verified": true,
+    "pinned_upstream": [
+      {
+        "artifact_name": "python-3.14.10-embed-amd64.zip",
+        "sha256": "90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159",
+        "status": "通过"
+      },
+      {
+        "artifact_name": "sqlcipher3-0.6.4-cp314-cp314-win_amd64.whl",
+        "sha256": "33a4bb79d5bffbdcc1443ff7fd10556ad781fd4986a710c0c577b817b06e11ac",
+        "status": "通过"
+      },
+      {
+        "artifact_name": "zstandard-0.25.0-cp314-cp314-win_amd64.whl",
+        "sha256": "c19bcdd826e95671065f8692b5a4aa95c52dc7a02a4c5a0cac46deb879a017a2",
+        "status": "通过"
+      }
+    ],
+    "runtime_pth_only_declared_modification": true,
+    "compiled_payload_x64_machine_verified": 36,
+    "python_local_import_closure_verified": true,
+    "license_files_present_and_original": [
+      "runtime/LICENSE.txt",
+      "runtime/sqlcipher3-0.6.4.dist-info/licenses/LICENSE",
+      "runtime/zstandard-0.25.0.dist-info/licenses/LICENSE",
+      "THIRD-PARTY-SELECTED-NOTICES.txt"
+    ],
+    "old_web_and_collector_packages_unchanged": true,
+    "strong_secret_credential_or_user_material_findings": [],
+    "real_windows_api_execution": "未验证",
+    "real_wechat_new_multi_scope_execution": "未验证",
+    "real_cloud_model_calls": 0,
+    "private_source_material_read": false,
+    "current_application_license": "UNLICENSED; no new application license granted by this review"
+  },
+  "release_boundaries": {
+    "windows_real_api_and_new_multi_chat_test": "未验证",
+    "long_running_stability": "未验证",
+    "real_model_calls_this_review": 0,
+    "private_material_read": false,
+    "github_upload_by_reviewer": false,
+    "application_license_changed": false
+  }
+}

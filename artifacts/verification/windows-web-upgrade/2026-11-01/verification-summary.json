@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-01",
+  "status": "通过",
+  "scope": "Windows upgrade implementation, synthetic HTTP/browser integration and offline portable archive review",
+  "python": {
+    "passed_tests": 646,
+    "elapsed_seconds": 27.357,
+    "evidence": "python-unittest.txt"
+  },
+  "windows_manager_tests": 19,
+  "windows_account_probe_mock_tests": 9,
+  "package_tests": 8,
+  "browser": {
+    "passed_checks": 14,
+    "viewports": [
+      "1440x1000",
+      "988x776",
+      "390x844"
+    ],
+    "runtime_errors": 0,
+    "external_requests": 0,
+    "evidence": "browser-qa.json",
+    "synthetic_native_source_and_model_only": true,
+    "legacy_six_rows_checkpoint_and_baseline_preserved": true
+  },
+  "package": {
+    "package_name": "ChatLens-Windows-Web-20261101-r2.zip",
+    "bytes": 15615794,
+    "sha256": "0a74637781551b7cd52faae39fe6b9ec6042b05001188966788df70ea6649469",
+    "archive_files": 93,
+    "source_and_runtime_bytes_match": true,
+    "previous_packages_unchanged": [
+      {
+        "file": "ChatLens-Windows-Web-20261101.zip",
+        "bytes": 15514607,
+        "sha256": "b7d5f8899327a95a8bc7da192d82059e7aa68a0542041875b653dc3cc6fbb188"
+      },
+      {
+        "file": "ChatLens-Windows-Collector-20261101.zip",
+        "bytes": 15470275,
+        "sha256": "075aebd5b88d4f3db821084daafd6184eef9bea6cf38c3d23bb4f1727fde9f6d"
+      }
+    ]
+  },
+  "isolation": [
+    "account-bound source and profiles",
+    "independent checkpoints/messages/AI histories",
+    "generation-bound stale request rejection",
+    "same-account first model config copy only",
+    "unconfirmed collector stop blocks range switch",
+    "durable startup intent protects uncertain process launch"
+  ],
+  "new_third_party_dependencies": false,
+  "build_network_access": false,
+  "real_private_chat_or_model_credentials_accessed": false,
+  "historical_packages_overwritten": false,
+  "windows_native_account_probe_execution": "未验证",
+  "windows_upgraded_package_startup": "未验证",
+  "windows_actual_multiple_new_chats_and_direction_statistics": "未验证",
+  "windows_actual_upgrade_stop_recovery": "未验证",
+  "physical_phone_and_long_duration": "未验证",
+  "source_sha256": {
+    "scripts/build_windows_collector_package.py": "10ccd86129628c9f36a74edd9d36cf0ffc9b9ff2d655098df2d537833b7c5614",
+    "scripts/build_windows_web_package.py": "5fab3c140561374ee996b9e5b806821fbeaf9cc64212d13389e24ca04e2dbdb9",
+    "scripts/web-windows-multi-smoke.cjs": "638d16a276c30a2efc12f526609f3b0fe458ad4f6231bf4b834dfcdfe38bf324",
+    "scripts/windows-proof/README-WEB.txt": "282f4d6ae7a2d8ef4c79b295e6fbf505d900d6ed44c66a91b62a74247e4cad5b",
+    "scripts/windows-proof/Start-Web.ps1": "e008d62fedc6911a92d5aea2a2905f0660420f0d51c27b1df2c7464603d22f00",
+    "scripts/windows-proof/collector_service.py": "17b1c143b295eec132d452049260657b516f56a6b663e11af42b908ee0fbab2d",
+    "scripts/windows-proof/collector_supervisor.py": "b83f2a1397fe204695753c92361b567e2414ed8ea2e61200c3828343452e4034",
+    "scripts/windows-proof/web_runtime.py": "fb3258c98e8080928640d402f243f9e72427202d342ecca5614ef1cb0fc2ad0c",
+    "scripts/windows-proof/windows_account_probe.py": "883f7d61b022599217f5185a236c8f455c7f639f3cdabd21bc90735ad21d711b",
+    "scripts/windows-proof/windows_web_manager.py": "4d29955f6229128e96d3268bee59ddb298fac006110371bc19e61a26f84c3698",
+    "scripts/windows-proof/windows_web_server.py": "917b0b04be8fde6a5c615d64bf4898f88ea4c1a2d87efa028bd98b2b50838ef7",
+    "tests/test_windows_account_probe.py": "81f3d3d19b8e12c613867485f46876cd26e121f02fe45fd8e65bbfc81d64f2ac",
+    "tests/test_windows_web_manager.py": "9366408ff71c849c2317ab21a5c5b67fe53190d1f4c9203f6cfddda6d5781ed4",
+    "tests/test_windows_web_package.py": "30ed44c2c328fa8cb3281b7389f86a05e4daef215ff06cda8243dd800a4af093",
+    "tests/web_windows_multi_fixture.py": "39f0604f058b317e42ef930eb8cf40477d69ff4d84870af79804c3dfec6349bd"
+  },
+  "release_review": {
+    "status": "通过",
+    "evidence": "final-release-review.json",
+    "historical_commits_reviewed": 16,
+    "historical_png_ocr_count": 185,
+    "new_synthetic_png_ocr_count": 9,
+    "secret_findings": 0,
+    "independent_package_evidence": "independent-package-review.json",
+    "remote_upload_performed_during_build_review": false
+  }
+}

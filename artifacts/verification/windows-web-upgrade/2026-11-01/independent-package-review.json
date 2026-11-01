@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "scope": "independent offline Windows r2 archive review; no Windows or private data execution",
+  "package_name": "ChatLens-Windows-Web-20261101-r2.zip",
+  "package_bytes": 15615794,
+  "package_sha256": "0a74637781551b7cd52faae39fe6b9ec6042b05001188966788df70ea6649469",
+  "archive_files": 93,
+  "public_source_files_byte_compared": 36,
+  "all_payload_bytes_match_source_or_fixed_upstream": true,
+  "manifest_and_crc_verified": true,
+  "safe_unique_names_and_no_private_payload": true,
+  "windows_text_encoding_and_line_endings_verified": true,
+  "pinned_upstream": [
+    {
+      "artifact_name": "python-3.14.10-embed-amd64.zip",
+      "sha256": "90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159",
+      "status": "通过"
+    },
+    {
+      "artifact_name": "sqlcipher3-0.6.4-cp314-cp314-win_amd64.whl",
+      "sha256": "33a4bb79d5bffbdcc1443ff7fd10556ad781fd4986a710c0c577b817b06e11ac",
+      "status": "通过"
+    },
+    {
+      "artifact_name": "zstandard-0.25.0-cp314-cp314-win_amd64.whl",
+      "sha256": "c19bcdd826e95671065f8692b5a4aa95c52dc7a02a4c5a0cac46deb879a017a2",
+      "status": "通过"
+    }
+  ],
+  "runtime_pth_only_declared_modification": true,
+  "compiled_payload_x64_machine_verified": 36,
+  "python_local_import_closure_verified": true,
+  "license_files_present_and_original": [
+    "runtime/LICENSE.txt",
+    "runtime/sqlcipher3-0.6.4.dist-info/licenses/LICENSE",
+    "runtime/zstandard-0.25.0.dist-info/licenses/LICENSE",
+    "THIRD-PARTY-SELECTED-NOTICES.txt"
+  ],
+  "old_web_and_collector_packages_unchanged": true,
+  "strong_secret_credential_or_user_material_findings": [],
+  "real_windows_api_execution": "未验证",
+  "real_wechat_new_multi_scope_execution": "未验证",
+  "real_cloud_model_calls": 0,
+  "private_source_material_read": false,
+  "current_application_license": "UNLICENSED; no new application license granted by this review"
+}

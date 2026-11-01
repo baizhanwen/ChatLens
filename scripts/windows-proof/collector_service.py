@@ -97,14 +97,20 @@ def validate_scope(scope, keys):
     if exe.name.lower() not in ('weixin.exe', 'wechat.exe'):
         raise CollectorError('collector_executable_unsupported')
     chats = _config(scope.get('config'))
+    managed = scope.get('scope_kind') == 'selected_conversations'
     expected = {}
     for row in scope['config']['conversations']:
         value = row.get('expected_sender_id')
+        if managed and value is None:
+            continue
         if not isinstance(value, str) or ID.fullmatch(value) is None:
             raise CollectorError('collector_sender_configuration_invalid')
         expected[row['alias']] = value
     tokens = scope.get('test_tokens')
-    if (not isinstance(tokens, dict) or set(tokens) != set(expected)
+    if managed:
+        if tokens != {} or expected:
+            raise CollectorError('collector_managed_test_plan_invalid')
+    elif (not isinstance(tokens, dict) or set(tokens) != set(expected)
             or any(not isinstance(rows, list) or len(rows) != 3 for rows in tokens.values())
             or any(not isinstance(token, str) or re.fullmatch(r'[A-Z0-9_-]{8,96}', token) is None
                    for rows in tokens.values() for token in rows)
@@ -164,7 +170,9 @@ def prepare_session(data_dir, selected_config=None):
 def show_plan(scope, summary, resumed):
     print('READY：持续采集已启动；本地保存所选私聊和群的新文字。按一次 Ctrl+C 正常停止。', flush=True)
     print('恢复时使用同一个包和 collector-data；不会重新建立旧消息基线。', flush=True)
-    if resumed:
+    if scope.get('scope_kind') == 'selected_conversations':
+        print('当前关注 %d 个会话；各会话独立保存进度，不自动扩大范围。' % len(scope['config']['conversations']), flush=True)
+    elif resumed:
         print('已从持久检查点恢复；不要重发已发送的编号，停机消息会自动补采。', flush=True)
     else:
         print('首次验收：现在再让同一位测试朋友发送下面前四条，每条各一次。', flush=True)
@@ -227,6 +235,7 @@ def main():
     parser.add_argument('--creation-time', type=int, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--web-metadata', action='store_true')
+    parser.add_argument('--verify-active-account', action='store_true')
     args = parser.parse_args()
     report = {'schema_version': 1, 'stage': 'continuous_collection', 'started_at_utc': now(),
               'status': '未验证', 'reason': 'not_started', 'scope': 'two_previously_selected_conversations_new_text_only',
@@ -247,6 +256,21 @@ def main():
         heartbeat = Heartbeat(args.output)
         heartbeat.emit('starting')
         scope, root, exe, keys, expected, binding = prepare_session(args.data_dir, args.selected_config)
+        account_probe = None
+        account_checked = [float('-inf')]
+        def verify_account():
+            if account_probe is not None and time.monotonic() - account_checked[0] >= 3:
+                result = account_probe()
+                if result.get('state') != 'matched' or result.get('matched') is not True:
+                    raise CollectorError('collector_active_account_not_verified')
+                account_checked[0] = time.monotonic()
+        if args.verify_active_account:
+            from windows_account_probe import WindowsAccountProbe
+            account_probe = WindowsAccountProbe(args.pid, args.creation_time, str(exe), str(root))
+            verify_account()
+        if scope.get('scope_kind') == 'selected_conversations':
+            report['scope'] = 'explicitly_selected_conversations_new_text_only'
+            report['selected_conversation_count'] = len(scope['config']['conversations'])
         report['private_acl_verified'] = True
         import windows_keyproof_core as proof
         import windows_keyproof_platform as platform
@@ -258,10 +282,14 @@ def main():
         import sqlcipher3.dbapi2 as driver
         store = CollectorStore(args.data_dir / 'private' / 'store', binding)
         report['restored_messages'] = report['total_messages'] = store.stats()['total_messages']
-        report['controlled_summary_before'] = store.controlled_summary(scope['test_tokens'], expected)
+        report['controlled_summary_before'] = (store.controlled_summary(scope['test_tokens'], expected)
+                                               if scope.get('scope_kind') != 'selected_conversations' else None)
         if args.web_metadata:
             from collector_web_meta import WebMetadata
-            metadata = WebMetadata(args.data_dir / 'private', store.binding_digest, report['started_at_utc'])
+            hint_file = args.data_dir / 'private' / 'identity-hint.json'
+            hint = read_private_json(hint_file) if hint_file.exists() or hint_file.is_symlink() else None
+            metadata = WebMetadata(args.data_dir / 'private', store.binding_digest, report['started_at_utc'],
+                                   **({'identity_hint': hint} if hint is not None else {}))
             heartbeat.metadata = metadata
             heartbeat.emit('starting', report['total_messages'])
             metadata.ensure_catalog(scope['config'])
@@ -277,6 +305,7 @@ def main():
             heartbeat.emit('collecting', report['total_messages'], resumed=reader.resumed)
             show_plan(scope, report['controlled_summary_before'], reader.resumed)
             def preflight():
+                verify_account()
                 ensure_private_dir(args.data_dir)
                 ensure_private_dir(args.data_dir / 'private')
                 ensure_private_dir(args.data_dir / 'private' / 'store')
@@ -302,7 +331,8 @@ def main():
                 report['checkpoint_saved'] = snapshot['initialized']
                 report['last_commit_at_utc'] = snapshot['last_commit_at']
                 report['total_messages'] = store.stats()['total_messages']
-                report['controlled_summary_after'] = store.controlled_summary(scope['test_tokens'], expected)
+                report['controlled_summary_after'] = (store.controlled_summary(scope['test_tokens'], expected)
+                                                      if scope.get('scope_kind') != 'selected_conversations' else None)
             except Exception:
                 report['status'], report['reason'] = '失败', 'collector_final_checkpoint_query_failed'
             if metadata is not None:

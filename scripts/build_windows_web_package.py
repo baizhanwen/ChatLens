@@ -12,16 +12,19 @@ from build_windows_selected_package import ARTIFACTS, CACHE_DIRECTORY, cached_ar
 
 PREFIX = 'ChatLens-Windows-Web'
 MANIFEST = 'WEB-MANIFEST.json'
+PACKAGE_REVISION = '20261101-r2'
 SOURCES = (
     'Start-Web.ps1', 'Start-ChatLens.cmd', 'README-WEB.txt',
-    'web_runtime.py', 'web_server.py', 'web_data.py', 'collector_web_meta.py',
+    'web_runtime.py', 'web_server.py', 'windows_web_manager.py', 'windows_web_server.py', 'windows_account_probe.py',
+    'web_data.py', 'collector_web_meta.py',
     'collector_service.py', 'collector_supervisor.py', 'collector_private.py',
     'continuous_reader.py', 'continuous_store.py', 'conversation_scope.py', 'wechat_identity.py', 'windows_selected_engine.py',
     'windows_selected_native.py', 'windows_selected_supervisor.py',
     'windows_keyproof_core.py', 'windows_keyproof_platform.py',
     'THIRD-PARTY-SELECTED-NOTICES.txt',
 )
-WEB_FILES = ('index.html', 'app.js', 'styles.css', 'assets/chatlens-mark.svg')
+WEB_FILES = ('index.html', 'app.js', 'styles.css', 'connect.html', 'connect.js', 'connect.css',
+             'assets/chatlens-mark.svg')
 AI_SOURCES = ('ai_knowledge.py', 'ai_provider.py', 'ai_query.py', 'ai_statistics.py', 'ai_service.py', 'ai_web_server.py')
 
 
@@ -65,8 +68,12 @@ def build(root, output):
             raise RuntimeError('required_stdlib_sqlite3_package_missing')
     manifest = {
         'schema_version': 1, 'kind': 'chatlens_windows_local_web_package',
+        'package_revision': PACKAGE_REVISION,
         'built_at_utc': datetime.now(timezone.utc).isoformat(),
-        'scope': 'local_web_view_of_two_previously_selected_conversations_and_owned_collector',
+        'scope': 'explicit_1_to_50_conversation_profiles_with_received_sent_unknown_statistics',
+        'conversation_limits': {'minimum': 1, 'maximum': 50},
+        'isolation': 'Account-bound profiles with independent store, checkpoint and AI history; stale scope requests are rejected.',
+        'upgrade_handling': 'Reuse the selected existing collector-data in place. Preserve the legacy store, baseline, assistant and configuration. New profiles use separate private directories.',
         'windows_execution_status': '未验证', 'web_live_end_to_end_status': '未验证',
         'chat_messages_read_during_build': 0,
         'runtime': {'version': '3.14.10', 'architecture': 'x64',
@@ -95,7 +102,7 @@ def main():
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    output = args.output or root / 'artifacts/deliverables/windows-check/ChatLens-Windows-Web-20261101.zip'
+    output = args.output or root / f'artifacts/deliverables/windows-check/ChatLens-Windows-Web-{PACKAGE_REVISION}.zip'
     print(json.dumps(build(root, output), ensure_ascii=False, indent=2))
 
 

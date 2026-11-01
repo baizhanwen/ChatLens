@@ -1,0 +1,37 @@
+{
+  "status": "通过",
+  "scope": "independent read-only SDK, account-classifier and subprocess-boundary source review",
+  "source_sha256": {
+    "scripts/windows-proof/windows_account_probe.py": "883f7d61b022599217f5185a236c8f455c7f639f3cdabd21bc90735ad21d711b",
+    "tests/test_windows_account_probe.py": "81f3d3d19b8e12c613867485f46876cd26e121f02fe45fd8e65bbfc81d64f2ac"
+  },
+  "native_windows_execution": "未验证",
+  "resolved_during_review": [
+    "QueryFullProcessImageNameW in/out size reset before both identity queries; native outer mock regression added"
+  ],
+  "reviewed": [
+    "x64 PSS_HANDLE_ENTRY 136-byte layout and ObjectName offset80",
+    "capture flags0x0c exclude VA clone/thread/context capture",
+    "WALK_HANDLES2, name-present flag2, length-bounded UTF16 object names",
+    "complete snapshot only,32768 handle limit and3s walk deadline",
+    "owned six-second subprocess with shell disabled and redacted output",
+    "unique matching db_storage required; no/ambiguous/unmapped roots fail closed",
+    "process executable and creation time checked before and after snapshot",
+    "local snapshot/marker and selected process handle cleanup"
+  ],
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/ns-processsnapshot-pss_handle_entry",
+    "https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/ne-processsnapshot-pss_capture_flags",
+    "https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/ne-processsnapshot-pss_handle_flags",
+    "https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/ne-processsnapshot-pss_walk_information_class",
+    "https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/nf-processsnapshot-pssfreesnapshot",
+    "https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-queryfullprocessimagenamew"
+  ],
+  "limits": [
+    "Windows PSS API/permissions/performance and WeChat open-handle behavior require actual Windows validation",
+    "unavailable or incomplete account proof blocks live data rather than inferring another account"
+  ],
+  "private_files_read": false,
+  "source_edited_by_reviewer": false,
+  "definite_remaining_blockers": []
+}

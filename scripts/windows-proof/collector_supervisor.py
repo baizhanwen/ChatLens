@@ -147,6 +147,7 @@ def main():
     parser.add_argument('--creation-time', type=int, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--web-metadata', action='store_true')
+    parser.add_argument('--verify-active-account', action='store_true')
     args = parser.parse_args()
     package = Path(__file__).resolve().parent
     expected = package / 'runtime' / 'python.exe'
@@ -160,6 +161,8 @@ def main():
         command += ['--selected-config', str(args.selected_config)]
     if args.web_metadata:
         command += ['--web-metadata']
+    if args.verify_active_account:
+        command += ['--verify-active-account']
     try:
         result = supervise(command, args.output)
     except Exception:

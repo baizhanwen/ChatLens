@@ -1,0 +1,19 @@
+{
+  "browser-qa.json": "2743e8a4b7dd26796dd56c3d2948d0fb6f1c12622ee76d1d3ccff9d23254007b",
+  "desktop-direction-statistics.png": "f7acb5e9eba91377c7974fd13f147cbaca1662ebd304ea23853b0225c38e8aef",
+  "desktop-five-message-directions.png": "f2b552df8e76d198711547f8cd9b4d49f09bc70b1eb461d3fbbc915158b2c8fb",
+  "desktop-five-selected.png": "f98204d42a1733928b08d08b51e607e875fb466a062c0b5a85ce52d03e9d45aa",
+  "desktop-independent-scope.png": "c84dcaef4d703a45c08ae251a584d083e8316b8554a6bbceb7c86b615775b831",
+  "desktop-legacy-preserved.png": "70e3f254303ecb77713b8682ff3228e8c9fae625e313a76e6fb2340c2cc1a755",
+  "desktop-restored-legacy.png": "8eaf58a4cf03be9e4be119a1356692be16da632c328da7657011e8eaa32fd097",
+  "desktop-settings-988.png": "98d8629a5c79fcf53a1246a654f236fc062fa8749e885365dc59a61a1178f6e8",
+  "final-release-review.json": "e380b378d7d3ef7efedc83efa62e9bd10fc6e65cdcc9c3a1d798b7f8c9f09de1",
+  "historical-release-review.json": "a3a2c8ff8d9401456c75c2ee8396d16e8c93cebad2af078c1f7d580e3284778f",
+  "independent-package-review.json": "8539afeb33c0041d505ec31a54a1cc2a530abe72aabe872f3588f3d4de8e9813",
+  "mobile-scope-picker.png": "080e913bc4c684409fc09d2102558de856360740891751a2973cdc8967d6d216",
+  "mobile-settings.png": "ef0530723e0d97195531c051efb9c2b0fd2a71d4cdd8e4be0535449b3ae9a0f0",
+  "package-summary.json": "8353a4af2aa8ba15ee7332074bc5fcc50884042909acc66b0e29eadcba5fb3f6",
+  "python-unittest.txt": "cc835fa5e17f287fe14eb23396612afa984165454a502038fd7203174b110fc3",
+  "verification-summary.json": "981555948436694e7aa4a0a02faabd284165258a530bf83d15f9effcc93c51c8",
+  "windows-account-source-review.json": "3e30f6ce54b2e6941a68878f49fe69baa3486ece57ecfe733e2cd3682aecda87"
+}

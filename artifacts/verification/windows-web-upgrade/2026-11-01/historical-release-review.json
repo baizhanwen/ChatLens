@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "scope": "all reachable pre-release Git history plus tracked tree at reviewed head; unpublished working changes and final ZIP require separate review",
+  "reviewed_head": "e09114e12d9f865bcd1e50442ba89a9cc86a3597",
+  "status": "通过",
+  "history": {
+    "commits": 16,
+    "unique_blobs": 655,
+    "unique_blob_bytes": 33297138,
+    "binary_blobs": 187,
+    "largest_binary_blob_bytes": 1016157,
+    "strong_secret_or_account_regex_findings": 0,
+    "binary_types": [
+      "PNG",
+      "ICO",
+      "ICNS"
+    ],
+    "executables_archives_databases_or_private_directory_entries_tracked": false
+  },
+  "png_review": {
+    "method": "local macOS Vision accurate zh-Hans and en-US OCR; redacted matching results only",
+    "unique_historical_pngs": 185,
+    "successful_ocr": 185,
+    "failed_ocr": 0,
+    "credential_account_phone_authenticated_url_or_controlled_contact_findings": 0,
+    "boundary": "OCR is a supplementary heuristic; historical screenshot paths and browser reports identify synthetic test datasets, and real verification reports contain counters/booleans rather than images or chat bodies."
+  },
+  "licenses": {
+    "current_application_license": "UNLICENSED in apps/desktop/package.json",
+    "new_open_source_license_granted": false,
+    "third_party_notice_files_present": true,
+    "final_binary_notice_inclusion": "未验证"
+  },
+  "private_source_accessed": false,
+  "remote_writes_performed": false,
+  "release_package_final_review": "未验证",
+  "uncommitted_changes_final_review": "未验证",
+  "finding_details_exported": false
+}

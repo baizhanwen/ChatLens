@@ -104,7 +104,7 @@ function Verify-Payload {
         if (-not [string]::Equals($digest, [string]$entry.sha256, [StringComparison]::OrdinalIgnoreCase)) { Stop-Check 'manifest_payload_hash_mismatch' }
         $names[$lower] = $true
     }
-    foreach ($required in @('runtime/python.exe', 'runtime/python314.dll', 'runtime/python314.zip', 'runtime/python314._pth', 'runtime/_sqlite3.pyd', 'runtime/sqlite3.dll', 'runtime/sqlcipher3/_sqlite3.cp314-win_amd64.pyd', 'runtime/zstandard/backend_c.cp314-win_amd64.pyd', 'collector_service.py', 'collector_supervisor.py', 'collector_private.py', 'continuous_reader.py', 'continuous_store.py', 'windows_selected_engine.py', 'windows_selected_native.py', 'windows_selected_supervisor.py', 'windows_keyproof_core.py', 'windows_keyproof_platform.py', 'Start-Web.ps1', 'Start-ChatLens.cmd', 'README-WEB.txt', 'web_runtime.py', 'web_server.py', 'web_data.py', 'collector_web_meta.py', 'web/index.html', 'web/app.js', 'web/styles.css', 'web/assets/chatlens-mark.svg', 'THIRD-PARTY-SELECTED-NOTICES.txt')) {
+    foreach ($required in @('runtime/python.exe', 'runtime/python314.dll', 'runtime/python314.zip', 'runtime/python314._pth', 'runtime/_sqlite3.pyd', 'runtime/sqlite3.dll', 'runtime/sqlcipher3/_sqlite3.cp314-win_amd64.pyd', 'runtime/zstandard/backend_c.cp314-win_amd64.pyd', 'collector_service.py', 'collector_supervisor.py', 'collector_private.py', 'continuous_reader.py', 'continuous_store.py', 'conversation_scope.py', 'wechat_identity.py', 'windows_selected_engine.py', 'windows_selected_native.py', 'windows_selected_supervisor.py', 'windows_keyproof_core.py', 'windows_keyproof_platform.py', 'Start-Web.ps1', 'Start-ChatLens.cmd', 'README-WEB.txt', 'web_runtime.py', 'web_server.py', 'windows_web_manager.py', 'windows_web_server.py', 'windows_account_probe.py', 'web_data.py', 'collector_web_meta.py', 'ai_knowledge.py', 'ai_provider.py', 'ai_query.py', 'ai_statistics.py', 'ai_service.py', 'ai_web_server.py', 'web/index.html', 'web/app.js', 'web/styles.css', 'web/connect.html', 'web/connect.js', 'web/connect.css', 'web/assets/chatlens-mark.svg', 'THIRD-PARTY-SELECTED-NOTICES.txt')) {
         if (-not $names.ContainsKey($required.ToLowerInvariant())) { Stop-Check 'manifest_required_payload_missing' }
     }
     # Enumerate payload only; never descend into local reports or private collector data.
@@ -141,10 +141,10 @@ try {
     Push-Location -LiteralPath $packageRoot
     $locationPushed = $true
     Write-Host '文件完整性检查完成。本包使用固定便携 Python，无需安装其他运行环境。'
-    Write-Host '本次连接此前已验证的 collector-data，保留原有两个会话、消息和检查点。'
-    Write-Host '网页仅在本机 127.0.0.1 访问；消息只保存在本机，不上传，不调用模型。'
+    Write-Host '本次原位连接此前已验证的 collector-data，保留原会话、消息、检查点与模型配置。'
+    Write-Host '网页仅在本机 127.0.0.1 访问。统计在本机计算；云端分析需在网页另行配置和确认。'
     Write-Host '若旧采集窗口仍运行，请先在旧窗口按一次 Ctrl+C 正常停止，再继续启动。'
-    Write-Host '请选择原持续采集包中的 collector-data 文件夹；不需要上传配置或密钥。'
+    Write-Host '请选择原 collector-data 文件夹。设置中可多选1至50个会话；新旧范围独立保存，可切回恢复。'
     Add-Type -AssemblyName System.Windows.Forms
     $dataDirectory = $null
     $dialog = New-Object Windows.Forms.FolderBrowserDialog
@@ -204,7 +204,7 @@ try {
     $outputDirectory = Join-Path $resultsRoot ($stamp + '-web')
     $runtime = Join-Path $packageRoot 'runtime\python.exe'
     $core = Join-Path $packageRoot 'web_runtime.py'
-    $runtimeArguments = @('-I', '-S', '-B', '-X', 'utf8', $core, '--data-dir', $dataDirectory, '--output', $outputDirectory)
+    $runtimeArguments = @('-I', '-S', '-B', '-X', 'utf8', $core, '--data-dir', $dataDirectory, '--output', $outputDirectory, '--manage-scopes')
     if ($candidates.Count -eq 0) {
         Write-Host '未找到原路径、已测版本的已登录微信。本次仅展示已保存消息；启动微信后重开可继续采集。'
         $runtimeArguments += '--read-only'
