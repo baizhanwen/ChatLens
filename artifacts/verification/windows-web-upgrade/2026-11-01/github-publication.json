@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-01",
+  "status": "通过",
+  "repository_url": "https://github.com/baizhanwen/ChatLens",
+  "visibility": "public",
+  "branch": "main",
+  "source_commit": "e42dccef324f61e45ae11b3c3cfb4bb28308780e",
+  "release_tag": "windows-web-20261101-r2",
+  "release_url": "https://github.com/baizhanwen/ChatLens/releases/tag/windows-web-20261101-r2",
+  "prerelease": true,
+  "draft": false,
+  "assets": [
+    {
+      "name": "ChatLens-Windows-Web-20261101-r2.zip",
+      "bytes": 15615794,
+      "sha256": "0a74637781551b7cd52faae39fe6b9ec6042b05001188966788df70ea6649469",
+      "url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r2/ChatLens-Windows-Web-20261101-r2.zip",
+      "download_roundtrip": "通过"
+    },
+    {
+      "name": "ChatLens-Windows-Web-20261101-r2-SHA256SUMS.txt",
+      "bytes": 103,
+      "sha256": "4eb6afa264a002dc4048138e6395475c3b32f64457429b41775580d6d39aabc3",
+      "url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r2/ChatLens-Windows-Web-20261101-r2-SHA256SUMS.txt",
+      "download_roundtrip": "通过"
+    },
+    {
+      "name": "Windows-Upgrade-Test-Guide.md",
+      "bytes": 6640,
+      "sha256": "f1e16eb3ef00d3fc158bee191adc65124dd17ae440578a3c2cfd90aecd51b824",
+      "url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r2/Windows-Upgrade-Test-Guide.md",
+      "download_roundtrip": "通过"
+    }
+  ],
+  "private_chat_keys_or_config_uploaded": false,
+  "native_windows_execution": "未验证",
+  "new_license_granted": false
+}
