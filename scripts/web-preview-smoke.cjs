@@ -72,8 +72,13 @@ async function main() {
       assert.equal(await byTest('app-sidebar').evaluate(n => getComputedStyle(n).backgroundColor), 'rgb(243, 245, 240)'); await noOverflow();
     });
     await shot('desktop-overview.png');
-    await check('overview_primary_search_action_opens_business_messages', async () => {
-      await byTest('overview-search').fill('林'); await byId('open-messages').click();
+    await check('ai_preview_prompt_and_explicit_fictional_answer_open_original_evidence', async () => {
+      await page.locator('[data-ai-prompt="agreement"]').click();
+      assert((await byId('ai-question').inputValue()).includes('约定'));
+      await byId('ai-send').click();
+      await page.waitForFunction(() => document.querySelectorAll('.ai-inline-citation').length === 2);
+      assert((await byId('ai-turns').innerText()).includes('虚构回答示例'));
+      await page.locator('.ai-inline-citation').first().click();
       assert(await section('messages').isVisible()); assert((await byId('thread-title').innerText()).includes('林'));
     });
     await check('three_shared_navigation_views_preserve_context', async () => {
@@ -90,9 +95,9 @@ async function main() {
       await page.locator('[data-filter="all"]').click(); await rows().first().click(); assert.equal(await rows().count(), 3);
     });
     await shot('desktop-messages.png');
-    await check('overview_entry_resets_old_type_filter_to_reveal_selected_contact', async () => {
+    await check('ai_evidence_jump_resets_type_filter_to_reveal_source_contact', async () => {
       await page.locator('[data-filter="group"]').click(); await navigate('overview');
-      await byTest('overview-search').fill('林'); await byId('open-messages').click();
+      await page.locator('.ai-inline-citation').first().click();
       assert(await section('messages').isVisible()); assert((await byId('thread-title').innerText()).includes('林'));
       assert((await rows().allTextContents()).some(text => text.includes('林')));
       assert.equal(await page.locator('[data-filter="all"]').getAttribute('aria-pressed'), 'true');
@@ -192,7 +197,7 @@ async function main() {
     const result = { schema_version: 1, status: '通过', scope: 'frontend_only_unified_design_system_browser_qa', recorded_at_utc: new Date().toISOString(), entry_protocol: new URL(target).protocol,
       browser: 'Chromium', browser_version: browser.version(), viewports: ['1440x1000','1024x900','390x844'], passed_checks: checks, passed_check_count: checks.length,
       required_shared_color_tokens: colors, page_errors: issues.page.length, console_errors: issues.console.length, external_requests: issues.external.length, api_requests: issues.api.length,
-      total_static_requests: requests.length, source_files_sha256: before, real_wechat_connected: false, backend_implemented: false, real_data_read: false,
+      total_static_requests: requests.length, source_files_sha256: before, real_wechat_connected: false, backend_contacted: false, real_data_read: false,
       boundary: 'In-memory fictional frontend only. Desktop/narrow Chromium viewports do not verify physical phones, other operating systems or real collection.' };
     fs.writeFileSync(path.join(output,'browser-qa.json'),JSON.stringify(result,null,2)+'\n',{flag:'wx'}); console.log(JSON.stringify(result,null,2));
   } catch (error) {

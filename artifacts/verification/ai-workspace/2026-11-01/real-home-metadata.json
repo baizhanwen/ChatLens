@@ -1,0 +1,18 @@
+{
+  "ai_home_visible": true,
+  "ai_composer_present": true,
+  "knowledge_present": true,
+  "scope_options": 3,
+  "password_input": true,
+  "key_input_empty": true,
+  "stored_browser_entries": 0,
+  "horizontal_overflow": false,
+  "schema_version": 1,
+  "status": "通过",
+  "scope": "actual_local_ai_home_metadata_without_model_call",
+  "browser_errors": 0,
+  "external_requests": 0,
+  "real_model_request_triggered_by_verifier": false,
+  "real_chat_or_credentials_exported": false,
+  "screenshots_saved": false
+}

@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-11-01T05:45:45.307196+00:00",
+  "status": "通过",
+  "python_tests": {
+    "passed": 488,
+    "skipped": 0,
+    "elapsed_seconds": 21.643,
+    "test_log_sha256": "9d79ad7d4054ef4278d316c96cf0a7bd5838bf4eb9cd0f801a8f624905d22c24"
+  },
+  "browser_reports": [
+    {
+      "scope": "synthetic-ai-browser",
+      "passed_checks": 20
+    },
+    {
+      "scope": "preview-browser",
+      "passed_checks": 24
+    },
+    {
+      "scope": "synthetic-reader-browser",
+      "passed_checks": 10
+    }
+  ],
+  "actual_mac_ai_home_status": "通过",
+  "actual_minimax_connection_user_verified": "通过",
+  "actual_minimax_selected_chat_answer_and_citations": "通过",
+  "actual_cited_original_messages_matched": 4,
+  "real_question_answer_chat_or_credentials_exported": false,
+  "actual_screenshots_saved": false,
+  "new_windows_ai_archive_built": false,
+  "windows_actual_ai_status": "未验证",
+  "long_running_stability_status": "未验证",
+  "all_answer_claims_semantically_verified_status": "未验证",
+  "source_sha256": {
+    "README.md": "2f6bb879d025b5aa4ebd6559c08095eccebb92abb90d0913a6634253e6c32dab",
+    "apps/web/README.md": "9f3c715a398a9788a58c4a918021e651a1ddad7b84e50599d9422a12307cbcea",
+    "apps/web/index.html": "3a255aefd9b737012c1136c1a543dc72c9de1a6334b4004ac86f4b126c06adff",
+    "apps/web/app.js": "f90b4807bff35b06781a01e584c8e53a19934dc5f8ae453a2a3011d24395ed59",
+    "apps/web/styles.css": "6dcbaf6397669cd120bf435b28c59b7d04c7453bfae06c04e10fa3f91d3f9359",
+    "docs/AI聊天知识库.md": "bb13a3b11fbb98a341f6bf31beeb31ae28ff9eae088481399345d6def6745ccb",
+    "scripts/ai_knowledge.py": "2c4b9b7e1113ffbd1e14c3f22fe9371650561cc6c75c22ce6410831722ae503f",
+    "scripts/ai_provider.py": "279be60690934c5994bc7a99b928859c06ae6f610c820c071a22c78b08b110f7",
+    "scripts/ai_service.py": "6d74419db437911bd7eb19c33730fe48d49a33ac5a4b403d7a4f76524e7f92ab",
+    "scripts/ai_web_server.py": "1326f7b13cf9b21731beb10eeb6faf8ea9f837d90a76425643a3a547af6c540b",
+    "scripts/macos_web.py": "52937c1c29d6c44c915114ae8e869e9ebedd50392485884dbd4b1cffc84c1cb0",
+    "scripts/windows-proof/web_runtime.py": "9afd4e6b973743e00f940619f63ff73e6bb6b182fe56e75ff26565903d1f64e4",
+    "scripts/build_windows_web_package.py": "76b308e3d8c42eec6c95b68e93278fcba55c8d098641866ab9e57cafd347e744",
+    "scripts/web-ai-smoke.cjs": "e3b19ac1bc2a0418b1a99e31b478045184f35bf3234da346b1926d79107a769d",
+    "scripts/web-preview-smoke.cjs": "3f7db329799adb9d0ec2d67c5e5906d46faae7a2d01a5456f45fec58e584ccf9",
+    "scripts/web-live-smoke.cjs": "75383a6b7a22c4eda9c76b584e7b9cb4e91a5640873001750835faa0b8c5325a",
+    "tests/web_ai_fixture.py": "f5f44b907d858fbbb427c35ee7bf83eb306bbad64e9cf2204431a66e6ff509ad",
+    "tests/test_ai_knowledge.py": "25dc25915944283e6318b0da8c98314fe21a77b8fc383a6ba168efddba34a41b",
+    "tests/test_ai_provider.py": "e19032cc1b9c41d90523a6591603d1cd60e711bac7638904fe2684c39e6bcdb8",
+    "tests/test_ai_service.py": "a15ba5a7e68a255cd869ce2dd9e7ae6e1ca31461839a4ce4937f42f3ca2ed060",
+    "tests/test_ai_web_server.py": "bbe8889096d3804bbb71ac200b4563b56e36b90c5b2d698c959aee0c83040ac6",
+    "tests/test_ai_lifecycle.py": "3253dabfc758626ee2786c83b3f3eabe5d37f9c8bc355bd00f57f3ee6ec6a40f"
+  },
+  "boundaries": [
+    "Browser automation used actual AI service and loopback HTTP with an explicitly synthetic provider.",
+    "User separately configured MiniMax in the actual page, tested connection and submitted the selected-scope question.",
+    "Real citation checks compared saved evidence against local original messages without exporting texts, IDs or credentials.",
+    "Old Windows archives and historical evidence are preserved; no remote publication."
+  ]
+}

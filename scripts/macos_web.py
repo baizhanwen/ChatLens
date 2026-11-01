@@ -74,6 +74,8 @@ class MacWebManager:
         self.lock, self.commands = threading.RLock(), SimpleQueue()
         self.account = self.directory = self.data_dir = self.key_file = None
         self.initializer = self.collector = self.provider = self.pending_session = None
+        self.assistant = None
+        self.closed = False
         self.contacts, self.catalog = [], {}
         self.stage, self.reason = 'needs_initialization', None
         self.description = '正在自动识别当前登录的微信。'
@@ -333,10 +335,26 @@ class MacWebManager:
         return self._data().status()
 
     def close(self):
+        with self.lock:
+            self.closed = True
+            assistant = self.assistant
+        if assistant is not None:
+            assistant.close()
         if self.initializer is not None:
             self.initializer.close()
         if self.collector is not None:
             self.collector.close()
+
+    def ai_service(self):
+        from ai_service import AiAssistant, AiError
+        with self.lock:
+            if self.closed:
+                raise AiError('ai_service_stopped', 'AI 服务正在关闭。', 503)
+            if self.provider is None or self.directory is None:
+                raise AiError('ai_knowledge_not_ready', '请先完成微信接入并选择会话。', 409)
+            if self.assistant is None:
+                self.assistant = AiAssistant(self.provider.data_dir, self.directory / 'assistant')
+            return self.assistant
 
 
 def main(argv=None):
@@ -357,6 +375,8 @@ def main(argv=None):
         manager = MacWebManager(PROJECT, args.workspace, PROJECT / 'scripts/native/bin/macos-probe-web')
         manager.start()
         server = make_macos_server(manager, PROJECT / 'apps/web')
+        from ai_web_server import attach_ai_routes
+        attach_ai_routes(server, manager.ai_service)
         thread = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': .1}, daemon=True)
         thread.start()
         atomic_private(args.workspace / 'session.json', {'launch_url': server.launch_url,

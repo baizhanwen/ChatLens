@@ -24,6 +24,7 @@
   const preferences = { density: 'spacious', autoScroll: true };
   const pending = new Map();
   const scrollPositions = new Map();
+  const ai = { initialized: false, status: null, provider: null, statusError: false, statusAt: 0, statusRequest: 0, threadId: null, turns: [], threads: [], threadRequest: 0, job: null, jobTimer: null, jobRequest: 0, cancelledRequest: false, consentKey: null, scopeSignature: null, evidenceRequest: 0, testJob: null, testTimer: null, modelBusy: false, previewThreads: new Map() };
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -166,7 +167,8 @@
     const query = $('message-search').value.trim();
     const lowered = query.toLocaleLowerCase();
     const searched = LIVE && query ? (live.search?.chatId === chat.id && live.search?.query === query ? live.search.messages : []) : null;
-    const messages = searched || chat.messages.filter((message) => !query || (message.body + ' ' + message.sender).toLocaleLowerCase().includes(lowered));
+    const context = LIVE && !query && live.evidence?.chatId === chat.id ? live.evidence : null;
+    const messages = context?.messages || searched || chat.messages.filter((message) => !query || (message.body + ' ' + message.sender).toLocaleLowerCase().includes(lowered));
     const list = $('message-list');
     list.replaceChildren();
     let previousDay = '';
@@ -176,7 +178,7 @@
         list.append(element('div', 'day-divider', dayLabel(message.date)));
         previousDay = key;
       }
-      const row = element('article', 'message-row' + (message.own ? ' own' : '') + (message.id === options.newId ? ' new-arrival' : ''));
+      const row = element('article', 'message-row' + (message.own ? ' own' : '') + (message.id === options.newId ? ' new-arrival' : '') + (context?.targetId === message.id ? ' is-evidence-target' : ''));
       row.setAttribute('data-message-id', message.id);
       const avatar = element('div', 'avatar ' + (message.own ? 'own' : chat.color), message.own ? '我' : message.sender.slice(0, 1));
       avatar.setAttribute('aria-hidden', 'true');
@@ -191,13 +193,13 @@
       row.append(avatar, content);
       list.append(row);
     }
-    $('message-count').textContent = query ? (live.searching && LIVE ? '查找中…' : messages.length + ' 条结果') : (LIVE ? (chat.count || 0) : chat.messages.length) + ' 条';
+    $('message-count').textContent = context ? '原文附近 ' + messages.length + ' 条' : query ? (live.searching && LIVE ? '查找中…' : messages.length + ' 条结果') : (LIVE ? (chat.count || 0) : chat.messages.length) + ' 条';
     if (!messages.length) {
       if (LIVE && (live.searching || liveCache.get(chat.id)?.loading)) list.append(emptyState('正在读取消息', '正在从本机采集库读取已保存的文字。', 'refresh'));
       else list.append(emptyState(query ? '没有找到相关消息' : '等待新的文字消息', query ? (LIVE ? '换个关键词试试。搜索仅限当前所选会话。' : '换个关键词试试。搜索仅限当前虚构会话。') : '启用采集后收到的新文字会显示在这里。', query ? 'search' : 'messages'));
     }
     if (LIVE) updateOlderButton();
-    if (options.bottom) {
+    if (options.bottom && !context) {
       scrollToBottom(false);
     } else if (options.restore !== undefined) {
       scroll.scrollTop = options.restore;
@@ -217,6 +219,7 @@
 
   function selectConversation(id) {
     if (LIVE) { selectLiveConversation(id); return; }
+    $('citation-context').hidden = true;
     if ($('message-scroll').clientHeight > 0) scrollPositions.set(activeId, $('message-scroll').scrollTop);
     navigate('messages');
     const changed = activeId !== id;
@@ -311,7 +314,6 @@
 
   function renderStatus() {
     if (LIVE) { renderLiveStatus(); return; }
-    if ($('overview-scope-count')) $('overview-scope-count').replaceChildren(document.createTextNode(String(conversations.length)), element('small', '', ' 个'));
     if ($('collection-scope-count')) $('collection-scope-count').replaceChildren(document.createTextNode(String(conversations.length)), element('small', '', ' 个会话'));
     $('conversation-total').textContent = conversations.length;
     const states = {
@@ -330,9 +332,6 @@
     $('fact-state').textContent = state.short;
     $('last-update').textContent = timeText(lastUpdate) + '（演示）';
     $('total-messages').textContent = total + ' 条';
-    $('overview-count').replaceChildren(document.createTextNode(String(total)), element('small', '', ' 条'));
-    $('overview-state').textContent = state.short;
-    $('overview-state').style.color = 'var(--' + state.color + '-text)';
     $('collection-total').replaceChildren(document.createTextNode(String(total)), element('small', '', ' 条'));
     $('collection-stage-title').textContent = state.stage;
     $('collection-stage-description').textContent = state.description;
@@ -352,21 +351,7 @@
   }
 
   function renderRecent() {
-    const list = $('recent-conversations');
-    list.replaceChildren();
-    const sorted = [...conversations].sort((a, b) => (LIVE ? b.latestDate || 0 : b.messages.at(-1)?.date || 0) - (LIVE ? a.latestDate || 0 : a.messages.at(-1)?.date || 0));
-    for (const chat of sorted) {
-      const last = LIVE ? { date: chat.latestDate, body: chat.latestPreview || '尚未采集到新文字' } : chat.messages.at(-1);
-      const row = element('button', 'recent-row');
-      row.type = 'button';
-      row.setAttribute('aria-label', '打开' + chat.name);
-      const copy = element('span', 'recent-copy');
-      copy.append(element('strong', '', chat.name), element('span', '', last.body.replace(/\n/g, ' ')));
-      row.append(element('span', 'avatar ' + chat.color, chat.short), copy, element('time', '', timeText(last.date)), icon('chevron'));
-      row.addEventListener('click', () => selectConversation(chat.id));
-      list.append(row);
-    }
-    if (!sorted.length) list.append(emptyState(LIVE ? '等待采集会话' : '暂无会话', LIVE ? '只会展示本机已授权的会话，连接中不会填入虚构数据。' : '请查看关注的会话。', 'messages'));
+    if (ai.initialized) { renderAiScopes(); renderAiKnowledge(); }
   }
 
   function addLog(kind) {
@@ -407,10 +392,12 @@
       if (active) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     });
-    $('breadcrumb-current').textContent = { overview: '沟通总览', messages: '会话消息', collection: '采集状态' }[view];
+    $('breadcrumb-current').textContent = { overview: 'AI 助手', messages: '会话消息', collection: '采集状态' }[view];
+    if (changed) ai.evidenceRequest++;
+    if (view === 'overview' && ai.initialized) refreshAiStatus();
     setDrawer(false, false);
     if (view === 'messages' && changed) {
-      if (LIVE && activeChat().id && !liveCache.get(activeId)?.loaded) ensureLiveMessages(activeId);
+      if (LIVE && activeChat().id && !live.evidence && !liveCache.get(activeId)?.loaded) ensureLiveMessages(activeId);
       renderMessages({ bottom: !scrollPositions.has(activeId), restore: scrollPositions.get(activeId) });
       renderNewMessageButton();
     }
@@ -506,17 +493,20 @@
     return error;
   }
 
-  async function api(route, token) {
+  async function api(route, token, options = {}) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
+      const headers = token ? { Authorization: 'Bearer ' + token } : {};
+      if (options.method === 'POST') headers['Content-Type'] = 'application/json';
       const response = await fetch(new URL(route, location.origin), {
         credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
-        headers: token ? { Authorization: 'Bearer ' + token } : {}
+        headers, method: options.method || 'GET', body: options.method === 'POST' ? JSON.stringify(options.body || {}) : undefined
       });
-      if (!response.ok) throw apiError('http_' + response.status, response.status);
-      try { return await response.json(); }
-      catch { throw apiError('invalid_response'); }
+      let result;
+      try { result = await response.json(); } catch { throw apiError('invalid_response', response.status); }
+      if (!response.ok) throw apiError(/^[a-z0-9_]{1,100}$/.test(result?.error?.code || '') ? result.error.code : 'http_' + response.status, response.status);
+      return result;
     } finally { clearTimeout(timeout); }
   }
 
@@ -559,7 +549,7 @@
       seen.add(row.id);
       const old = previous.get(row.id);
       const delta = old ? Math.max(0, row.count - old.count) : 0;
-      const reading = row.id === activeId && currentView === 'messages' && !$('message-search').value.trim() && atBottom() && preferences.autoScroll;
+      const reading = row.id === activeId && currentView === 'messages' && !live.evidence && !$('message-search').value.trim() && atBottom() && preferences.autoScroll;
       if (delta && row.id === activeId && !reading) pending.set(row.id, (pending.get(row.id) || 0) + delta);
       return { id: row.id, name: row.name, type: row.type, short: row.name.slice(0, row.type === 'group' ? 2 : 1) || '聊', color: row.type === 'group' ? 'sand' : 'sage', subtitle: (row.type === 'group' ? '群聊' : '私聊') + ' · 仅所选会话', count: row.count, latestDate: liveDate(row.latest_at), latestPreview: typeof row.latest_preview === 'string' ? row.latest_preview : '', latestId: row.latest_id, messages: cacheFor(row.id).messages, unread: reading ? 0 : (old?.unread || 0) + delta };
     });
@@ -575,9 +565,9 @@
       renderMessages();
     }
     renderConversations();
+    renderHeader();
     renderRecent();
     renderNewMessageButton();
-    document.querySelector('.entry-footer > span').textContent = '在已选的 ' + rows.length + ' 个会话内查找';
     const scope = document.querySelector('.sidebar-scope > span:nth-child(2)');
     scope.replaceChildren(icon('messages'), document.createTextNode(rows.filter(row => row.type === 'private').length + ' 个私聊 · ' + rows.filter(row => row.type === 'group').length + ' 个群聊'));
   }
@@ -620,13 +610,9 @@
     $('fact-state').textContent = title;
     $('last-update').textContent = saved ? saved.toLocaleString('zh-CN', { hour12: false }) : '尚无保存记录';
     $('total-messages').textContent = total + ' 条';
-    $('overview-count').replaceChildren(document.createTextNode(String(total)), element('small', '', ' 条'));
     $('collection-total').replaceChildren(document.createTextNode(String(total)), element('small', '', ' 条'));
-    $('overview-scope-count').replaceChildren(document.createTextNode(String(conversations.length)), element('small', '', ' 个'));
     $('collection-scope-count').replaceChildren(document.createTextNode(String(conversations.length)), element('small', '', ' 个会话'));
     $('conversation-total').textContent = conversations.length;
-    $('overview-state').textContent = title;
-    $('overview-state').style.color = 'var(--' + color + '-text)';
     $('nav-state-dot').style.background = 'var(--' + color + '-text)';
     $('nav-unread').textContent = String(conversations.reduce((sum, chat) => sum + chat.unread, 0));
     $('live-connection-notice').hidden = !live.error;
@@ -702,6 +688,8 @@
       live.connected = true;
       live.failures = 0;
       renderLiveStatus();
+      refreshAiStatus(true);
+      refreshAiThreads();
       if (activeId) await ensureLiveMessages(activeId);
     } catch (error) { if (epoch === live.cycle) showLiveFailure(error); }
     finally { scheduleLive(epoch); }
@@ -717,6 +705,7 @@
       live.error = null;
       live.failures = 0;
       renderLiveStatus();
+      refreshAiStatus();
       if (activeId) await appendLiveMessages(activeId);
     } catch (error) { if (epoch === live.cycle) showLiveFailure(error); }
     finally { scheduleLive(epoch); }
@@ -753,10 +742,10 @@
 
   async function appendLiveMessages(id) {
     const cache = cacheFor(id);
-    if (!cache.loaded) { await ensureLiveMessages(id); return; }
+    if (!cache.loaded) { if (!live.evidence) await ensureLiveMessages(id); return; }
     if (cache.loading || cache.deferred) return;
     const request = ++cache.request;
-    const canFollow = () => id === activeId && currentView === 'messages' && atBottom() && preferences.autoScroll && !$('message-search').value.trim();
+    const canFollow = () => id === activeId && currentView === 'messages' && !live.evidence && atBottom() && preferences.autoScroll && !$('message-search').value.trim();
     const wasFollowing = canFollow();
     const previousCursor = cache.cursor || 0;
     cache.loading = true;
@@ -783,7 +772,7 @@
       if (id === activeId) {
         const follow = canFollow();
         if (wasFollowing && !follow) pending.set(id, Math.max(pending.get(id) || 0, cache.messages.filter(row => row.id > previousCursor).length));
-        if (!$('message-search').value.trim()) renderMessages({ bottom: follow });
+        if (!$('message-search').value.trim() && !live.evidence) renderMessages({ bottom: follow });
         renderNewMessageButton();
       }
       renderConversations();
@@ -791,8 +780,10 @@
     finally { if (request === cache.request) cache.loading = false; }
   }
 
-  async function selectLiveConversation(id) {
+  async function selectLiveConversation(id, options = {}) {
     if (!conversations.some(row => row.id === id)) return;
+    live.evidence = options.context || null;
+    $('citation-context').hidden = !options.context;
     if ($('message-scroll').clientHeight > 0) scrollPositions.set(activeId, $('message-scroll').scrollTop);
     const changed = id !== activeId;
     activeId = id;
@@ -811,7 +802,7 @@
     renderMessages({ bottom: !scrollPositions.has(id), restore: scrollPositions.get(id) });
     renderNewMessageButton();
     renderLiveStatus();
-    await ensureLiveMessages(id);
+    if (!options.context) await ensureLiveMessages(id);
     announce('已切换至' + (conversations.find(row => row.id === id)?.name || '所选会话') + '。');
   }
 
@@ -838,6 +829,7 @@
   function updateOlderButton() {
     const query = $('message-search').value.trim();
     const cache = cacheFor(activeId);
+    if (live.evidence?.chatId === activeId) { $('load-older').hidden = true; return; }
     $('load-older').hidden = query ? !live.search?.hasMore : !cache.hasMore;
     $('load-older').disabled = cache.loading || live.searching;
     $('load-older').textContent = cache.loading || live.searching ? '正在读取…' : query ? '加载更早的匹配消息' : '加载更早消息';
@@ -883,20 +875,10 @@
     }
   }
 
-  async function openLiveOverviewQuery() {
-    const query = $('overview-search').value.trim();
-    setFilter('all');
-    $('conversation-search').value = '';
-    const match = query && conversations.find(row => row.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
-    if (match) { await selectLiveConversation(match.id); return; }
-    await selectLiveConversation(activeId || conversations[0]?.id);
-    navigate('messages');
-    $('message-search').value = query;
-    if (query) requestLiveSearch();
-  }
-
   async function jumpLiveLatest() {
     const id = activeId;
+    live.evidence = null;
+    $('citation-context').hidden = true;
     $('message-search').value = '';
     live.searchRequest++;
     live.search = null;
@@ -922,11 +904,6 @@
     document.querySelector('.sidebar-scope > span:nth-child(2)').replaceChildren(icon('messages'), document.createTextNode('正在读取所选会话'));
     document.querySelector('.sidebar-version > span:last-child').textContent = 'v0.3 · LOCAL WORKSPACE';
     $('preview-help').querySelector('span').textContent = '使用说明';
-    document.querySelector('.entry-label > .tag').textContent = '仅所选会话';
-    document.querySelector('.entry-footer > span').textContent = '正在读取所选会话';
-    document.querySelectorAll('.overview-stats > div > span')[1].textContent = '已保存文字';
-    document.querySelectorAll('.overview-stats > div > span')[2].textContent = '采集状态';
-    document.querySelector('.overview-note > p').replaceChildren(document.createTextNode('只阅读你选择的内容。'), element('span', '', '真实文字来自本机采集库。当前没有启用云端模型。'));
     document.querySelector('#view-messages .page-heading > .tag').textContent = '本机真实数据';
     document.querySelector('.conversation-note').replaceChildren(icon('shield'), document.createTextNode('仅所选会话 · 启用后的新文字'));
     document.querySelector('.ribbon-preview').textContent = '真实采集状态';
@@ -960,14 +937,13 @@
     $('activity-log').append(emptyState('正在读取状态', '状态变化会记录在本页，刷新后还原。', 'pulse'));
     document.querySelectorAll('.property-list dd').forEach((node, index) => { node.textContent = ['本机采集库', '每秒检查已保存消息', '正在连接', '未启用'][index]; });
     document.querySelector('.technical-details summary').textContent = '本机读取说明';
-    document.querySelector('.technical-details p').textContent = '页面通过本机接口读取已选会话的文字与采集心跳。停止采集后内容仍可查看；重新启动会从已保存位置继续。不会读取未选会话或向云端发送聊天。';
+    document.querySelector('.technical-details p').textContent = '采集只写入本机已选会话的新文字。主动向 AI 提问时，只检索提问范围内的相关片段，并使用你确认的目标模型。';
     $('preview-dialog-title').textContent = '关注你选择的沟通。';
     const help = document.querySelectorAll('#preview-dialog > p');
     help[0].textContent = '这是本机采集工作台，只展示采集程序中已经选择的会话及启用后保存的文字消息。';
-    help[1].textContent = '请保持电脑、微信与采集程序运行。页面关闭不等于停止采集；采集异常、停止或心跳过期会明确显示。当前不调用模型，也不会代发消息。';
+    help[1].textContent = '请保持电脑、微信与采集程序运行。AI 模型需要你在本机配置，只在主动提问或测试时连接。采集异常、停止或心跳过期会明确显示，不会代发微信消息。';
     $('confirm-preview').textContent = '知道了';
-    $('overview-search').placeholder = '输入会话名称，或在当前会话内查找文字';
-    ['message-search', 'overview-search'].forEach(id => { $(id).maxLength = 256; });
+    ['message-search'].forEach(id => { $(id).maxLength = 256; });
     $('live-retry').addEventListener('click', connectLive);
     $('load-older').addEventListener('click', loadOlder);
   }
@@ -982,9 +958,615 @@
     connectLive();
   }
 
+  function aiPost(route, body = {}) { return api(route, null, { method: 'POST', body }); }
+  function aiBusy() { return Boolean(ai.job || ai.testJob || ai.modelBusy || ai.threadLoading); }
+  function aiScope() { const selected = $('ai-scope').value; return selected === 'all' ? conversations.map(row => row.id) : conversations.filter(row => row.id === selected).map(row => row.id); }
+  function aiScopeKey() { return (ai.provider?.target_fingerprint || '') + '|' + aiScope().sort().join(',') + '|' + $('ai-time-range').value; }
+  function aiTarget(provider = ai.provider) {
+    if (!provider?.base_url || !provider?.model) return '未配置模型';
+    try { return new URL(provider.base_url).host + ' · ' + provider.model; } catch { return '模型地址需要检查'; }
+  }
+  function aiNearBottom() { const scroll = $('ai-chat-scroll'); return scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 85; }
+  function aiNotice(text = '') { $('ai-form-notice').hidden = !text; $('ai-form-notice').textContent = text; }
+  function aiErrorText(problem) {
+    const code = problem?.code || '';
+    if (code === 'ai_history_limit') return '当前对话记录已较长，本轮未调用模型，请开始新对话继续。';
+    if (code === 'ai_answer_too_large') return '本轮回答过长或格式异常，请缩小问题范围后重试。';
+    if (code === 'ai_provider_output_limit') return '模型输出达到长度上限，请缩小问题范围后重试。';
+    if (problem?.status === 401) return '本机会话已失效，请从启动器重新打开工作台。';
+    if (code === 'ai_provider_url_invalid') return '请填写 HTTPS 模型 API 地址，或本机回环地址。';
+    if (code === 'ai_provider_model_invalid') return '请填写有效的模型名称。';
+    if (code === 'ai_question_invalid') return '请输入不超过 2000 字的问题。';
+    if (/target|fingerprint|confirm/.test(code)) return '模型目标或提问范围已变化，请核对下方目标并重新确认。';
+    if (/key|auth|credential/.test(code)) return '模型认证没有通过，请在本机检查 API Key 和服务地址。';
+    if (/citation/.test(code)) return '模型回答的引用没有通过核对，本轮没有展示未核实的回答。可以重新提问。';
+    if (/empty|evidence|knowledge|no_context/.test(code)) return '所选范围内暂时没有足够的原消息证据。试试调整范围，或等待新的文字采集完成。';
+    if (/configured|configuration|provider_missing/.test(code)) return '请先在本机配置模型服务。';
+    if (/busy/.test(code)) return '本机正在处理另一项请求，请稍后再试。';
+    if (/timeout|deadline/.test(code)) return '本次请求等待超时，可以检查服务后重试。';
+    return '本次请求没有完成，请检查本机服务与模型设置后重试。';
+  }
+
+  function setAiProvider(provider) {
+    if (!provider || typeof provider.configured !== 'boolean') throw apiError('invalid_response');
+    if (ai.provider?.target_fingerprint !== provider.target_fingerprint) { ai.consentKey = null; $('ai-cloud-confirm').checked = false; }
+    ai.provider = { base_url: typeof provider.base_url === 'string' ? provider.base_url : '', model: typeof provider.model === 'string' ? provider.model : '', has_key: provider.has_key === true, configured: provider.configured, target_fingerprint: typeof provider.target_fingerprint === 'string' ? provider.target_fingerprint : '', is_local: provider.is_local === true };
+    renderAiControls();
+  }
+
+  function renderAiScopes() {
+    const select = $('ai-scope');
+    const previous = select.value || 'all';
+    const signature = JSON.stringify(conversations.map(row => [row.id, row.name]));
+    if (select.dataset.signature !== signature) {
+      select.replaceChildren(new Option('全部关注会话', 'all'));
+      for (const chat of conversations) select.append(new Option(chat.name, chat.id));
+      select.value = [...select.options].some(option => option.value === previous) ? previous : 'all';
+      select.dataset.signature = signature;
+      if (select.value !== previous) resetAiScope();
+    }
+    renderAiControls();
+  }
+
+  function renderAiKnowledge() {
+    if (!ai.initialized) return;
+    const previewTotal = conversations.reduce((sum, chat) => sum + chat.messages.length, 0);
+    const knowledge = LIVE ? ai.status?.knowledge : { ready: true, conversation_count: conversations.length, message_count: previewTotal, baseline_at: initialDate.toISOString(), last_saved_at: lastUpdate.toISOString() };
+    $('ai-knowledge-label').textContent = knowledge ? (LIVE ? '已采文字 · ' : '虚构知识库 · ') + knowledge.conversation_count + ' 个会话 · ' + knowledge.message_count + ' 条' : ai.statusError ? '知识库状态暂不可用' : '正在读取知识库状态';
+    $('ai-kb-conversations').textContent = knowledge ? String(knowledge.conversation_count) + ' 个' : '—';
+    $('ai-kb-messages').textContent = knowledge ? String(knowledge.message_count) + ' 条' : '—';
+    for (const [id, value] of [['ai-kb-baseline', knowledge?.baseline_at], ['ai-kb-last', knowledge?.last_saved_at]]) {
+      const date = liveDate(value);
+      $(id).textContent = date ? date.toLocaleString('zh-CN', { hour12: false }) + (LIVE ? '' : '（虚构）') : '暂无记录';
+    }
+    $('ai-kb-state').textContent = !knowledge ? '等待本机状态' : knowledge.ready ? '可检索已采文字' : '等待知识库就绪';
+    $('knowledge-description').textContent = LIVE ? '只覆盖选定会话中，启用后已经采集并保存的文字。' : '这是虚构知识库示例，没有读取真实聊天。';
+    $('ai-welcome-boundary').textContent = LIVE ? '仅使用选定会话中启用后已采集的文字。' : '当前为虚构对话预览，不连接模型或真实聊天。';
+  }
+
+  function renderAiControls() {
+    if (!ai.initialized) return;
+    const busy = aiBusy();
+    const provider = ai.provider;
+    const configured = provider?.configured === true;
+    $('ai-send').disabled = busy || (LIVE && (!live.connected || ai.status?.busy === true));
+    $('ai-send').querySelector('span').textContent = LIVE && !configured ? '配置模型' : '发送';
+    $('ai-time-range').disabled = busy;
+    $('ai-scope').disabled = busy;
+    $('ai-new-thread').disabled = busy;
+    $('ai-model-target').disabled = Boolean(ai.job);
+    $('ai-model-target').querySelector('span').textContent = LIVE ? aiTarget() : '虚构预览 · 不连接模型';
+    const cloud = LIVE && configured && !provider.is_local;
+    $('ai-cloud-consent').hidden = !cloud;
+    $('ai-cloud-confirm').disabled = busy;
+    $('ai-cloud-confirm').checked = cloud && ai.consentKey === aiScopeKey();
+    $('ai-cloud-confirm-label').textContent = '允许将本次所选范围内，与问题相关的文字片段发送至 ' + aiTarget() + '。';
+    document.querySelectorAll('[data-ai-prompt]').forEach(button => { button.disabled = busy; });
+    $('ai-runtime').hidden = !ai.job;
+    if (ai.job) {
+      const stage = ai.job.stage;
+      const stages = { submitting: '正在提交问题', retrieving: '正在检索原消息', generating: '正在生成回答', cancelling: '正在请求取消', connection_error: '任务连接暂时中断' };
+      $('ai-stage-text').textContent = (LIVE ? '' : '虚构演示：') + (stages[stage] || '正在处理');
+      $('ai-stage-detail').textContent = stage === 'retrieving' ? '只检索你选择的会话与时间范围。' : stage === 'connection_error' ? '已显示内容保留，正在重新读取本机任务状态。' : ai.job.target || (LIVE ? aiTarget() : '没有真实模型请求');
+      $('ai-cancel').disabled = !ai.job.id || stage === 'cancelling';
+      $('ai-cancel').textContent = stage === 'cancelling' ? '正在取消' : '取消';
+    }
+    const modelFact = document.querySelectorAll('.property-list dd')[3];
+    if (modelFact && LIVE) modelFact.textContent = configured ? '主动提问时使用' : '尚未配置';
+    $('ai-bottom-note').textContent = LIVE ? '回答依据已采集文字。点击原消息证据，可以继续核对上下文。' : '虚构交互示例，不代表模型回答或真实采集结果。';
+  }
+
+  function evidenceButton(evidence, compact = false) {
+    const button = element('button', compact ? 'ai-inline-citation' : 'ai-evidence-card');
+    button.type = 'button';
+    button.setAttribute('aria-label', '查看原消息证据 ' + evidence.id);
+    if (compact) button.textContent = '[' + evidence.id + ']';
+    else {
+      const top = element('span', 'ai-evidence-top');
+      top.append(element('strong', '', evidence.id + ' · ' + evidence.conversation_name), element('span', '', evidence.sender || '未知发送人'));
+      button.append(top, element('span', 'ai-evidence-excerpt', typeof evidence.body === 'string' ? evidence.body.slice(0, 160) : '查看原文与上下文'), element('span', 'ai-evidence-open', '查看原消息 →'));
+    }
+    button.addEventListener('click', () => openAiEvidence(evidence));
+    return button;
+  }
+
+  function appendAiText(container, content, evidence = []) {
+    const known = new Map(evidence.map(row => [row.id, row]));
+    const pattern = /\[(E[1-9][0-9]*)\]/g;
+    let cursor = 0;
+    for (const match of content.matchAll(pattern)) {
+      container.append(document.createTextNode(content.slice(cursor, match.index)));
+      container.append(known.has(match[1]) ? evidenceButton(known.get(match[1]), true) : document.createTextNode(match[0]));
+      cursor = match.index + match[0].length;
+    }
+    container.append(document.createTextNode(content.slice(cursor)));
+  }
+
+  function renderAiTurns(options = {}) {
+    const scroll = $('ai-chat-scroll');
+    const previousTop = scroll.scrollTop;
+    const follow = options.bottom || (currentView === 'overview' && aiNearBottom());
+    const list = $('ai-turns');
+    list.replaceChildren();
+    $('ai-welcome').hidden = ai.turns.length > 0;
+    for (const turn of ai.turns) {
+      const row = element('article', 'ai-turn ai-' + turn.role);
+      const label = turn.role === 'user' ? '你' : turn.role === 'system' ? '系统提示' : LIVE ? 'ChatLens' : 'ChatLens · 虚构回答示例';
+      const header = element('div', 'ai-turn-header');
+      header.append(element('strong', '', label));
+      if (turn.role === 'assistant' && turn.model) header.append(element('span', '', turn.model));
+      row.append(header);
+      const content = element('div', 'ai-answer-text');
+      appendAiText(content, turn.content || '', turn.evidence || []);
+      row.append(content);
+      if (turn.evidence?.length && (turn.content || ['done', 'error'].includes(turn.status))) {
+        const cited = new Set([...(turn.content || '').matchAll(/\[(E[1-9][0-9]*)\]/g)].map(match => match[1]));
+        const preferred = turn.evidence.filter(item => cited.has(item.id));
+        const visible = (preferred.length ? preferred : turn.evidence).slice(0, 4);
+        const remaining = turn.evidence.filter(item => !visible.includes(item));
+        const source = element('div', 'ai-evidence-list');
+        for (const evidence of visible) source.append(evidenceButton(evidence));
+        row.append(element('p', 'ai-evidence-label', (preferred.length ? '引用 ' + preferred.length + ' 条原消息' : '检索到 ' + turn.evidence.length + ' 条片段') + (turn.coverage?.truncated ? ' · 当前只覆盖部分相关片段' : '')), source);
+        if (remaining.length) {
+          const details = element('details', 'ai-other-evidence');
+          details.append(element('summary', '', '展开其余 ' + remaining.length + ' 条检索片段'));
+          const extra = element('div', 'ai-evidence-list');
+          for (const evidence of remaining) extra.append(evidenceButton(evidence));
+          details.append(extra);
+          row.append(details);
+        }
+      }
+      if (turn.role !== 'user' && turn.status === 'cancelled') row.append(element('p', 'ai-turn-note', '已取消本次请求。'));
+      if (turn.status === 'error' || turn.status === 'connection_error') {
+        const feedback = element('div', 'ai-turn-error');
+        feedback.append(element('p', '', turn.error || '本次回答没有完成。'));
+        const retry = element('button', 'text-button', turn.status === 'connection_error' ? '重新读取任务状态' : '重新提问');
+        retry.type = 'button';
+        retry.disabled = aiBusy() && turn.status !== 'connection_error';
+        retry.addEventListener('click', () => {
+          if (turn.status === 'connection_error' && ai.job?.id) { clearTimeout(ai.jobTimer); pollAiJob(ai.jobRequest); }
+          else if (!aiBusy()) { $('ai-question').value = turn.question || ''; submitAiQuestion(); }
+        });
+        feedback.append(retry);
+        row.append(feedback);
+      }
+      if (turn.role === 'assistant' && turn.status === 'done' && !turn.evidence?.length) row.append(element('p', 'ai-turn-note', '本轮未附原消息证据。'));
+      list.append(row);
+    }
+    if (follow) { scroll.scrollTop = scroll.scrollHeight; $('ai-new-answer').hidden = true; }
+    else { scroll.scrollTop = previousTop; if (options.updated) $('ai-new-answer').hidden = false; }
+    renderAiControls();
+  }
+
+  function renderAiThreads() {
+    const list = $('ai-thread-list');
+    list.replaceChildren();
+    for (const thread of ai.threads.slice(0, 8)) {
+      const button = element('button', 'ai-history-item' + (thread.id === ai.threadId ? ' active' : ''), thread.title || '新的对话');
+      button.type = 'button';
+      button.disabled = aiBusy();
+      button.setAttribute('aria-pressed', String(thread.id === ai.threadId));
+      button.addEventListener('click', () => loadAiThread(thread.id));
+      list.append(button);
+    }
+    if (!ai.threads.length) list.append(element('p', 'ai-history-empty', '还没有对话'));
+  }
+
+  async function refreshAiStatus(force = false) {
+    if (!LIVE || !live.connected || (!force && Date.now() - ai.statusAt < 5000)) return;
+    ai.statusAt = Date.now();
+    const request = ++ai.statusRequest;
+    try {
+      const result = await api('/api/ai/status');
+      if (request !== ai.statusRequest) return;
+      if (!result?.knowledge || !Number.isSafeInteger(result.knowledge.message_count) || !Number.isSafeInteger(result.knowledge.conversation_count)) throw apiError('invalid_response');
+      ai.status = result;
+      ai.statusError = false;
+      setAiProvider(result.provider);
+    } catch { if (request === ai.statusRequest) ai.statusError = true; }
+    renderAiKnowledge();
+    renderAiControls();
+  }
+
+  async function refreshAiThreads() {
+    if (!LIVE) { renderAiThreads(); return; }
+    try {
+      const result = await api('/api/ai/threads');
+      if (!Array.isArray(result?.threads)) return;
+      ai.threads = result.threads.filter(row => typeof row.id === 'string' && typeof row.title === 'string');
+      renderAiThreads();
+    } catch { /* Existing answers stay readable when history is unavailable. */ }
+  }
+
+  async function loadAiThread(id) {
+    if (aiBusy()) return;
+    const request = ++ai.threadRequest;
+    ai.threadLoading = true;
+    renderAiControls();
+    try {
+      const result = LIVE ? await api('/api/ai/threads/' + encodeURIComponent(id)) : ai.previewThreads.get(id);
+      if (request !== ai.threadRequest || !result || !Array.isArray(result.messages)) return;
+      ai.threadId = id;
+      const latestUser = [...result.messages].reverse().find(row => row.role === 'user');
+      if (Array.isArray(latestUser?.scope) && latestUser.scope.length) {
+        const candidate = latestUser.scope.length === 1 ? latestUser.scope[0] : 'all';
+        $('ai-scope').value = [...$('ai-scope').options].some(option => option.value === candidate) ? candidate : 'all';
+      }
+      if (['today', '7d', 'all'].includes(latestUser?.time_range)) $('ai-time-range').value = latestUser.time_range;
+      const scopeSignature = $('ai-time-range').value + '|' + aiScope().sort().join(',');
+      if (scopeSignature !== ai.scopeSignature) { ai.consentKey = null; $('ai-cloud-confirm').checked = false; }
+      ai.scopeSignature = scopeSignature;
+      ai.turns = result.messages.filter(row => ['user', 'assistant', 'system'].includes(row.role) && typeof row.content === 'string').map(row => ({ ...row, status: 'done', evidence: cleanAiEvidence(row.evidence) }));
+      navigate('overview');
+      renderAiTurns({ bottom: true });
+      renderAiThreads();
+      aiNotice();
+    } catch (problem) { aiNotice(aiErrorText(problem)); }
+    finally { ai.threadLoading = false; renderAiControls(); renderAiThreads(); }
+  }
+
+  function cleanAiEvidence(rows) {
+    if (!Array.isArray(rows)) return [];
+    return rows.filter(row => row && /^E[1-9][0-9]*$/.test(row.id) && typeof row.conversation_id === 'string' && (Number.isSafeInteger(row.message_id) || (!LIVE && typeof row.message_id === 'string')) && typeof row.conversation_name === 'string' && typeof row.body === 'string');
+  }
+
+  function resetAiScope() {
+    const signature = $('ai-time-range').value + '|' + aiScope().sort().join(',');
+    if (signature === ai.scopeSignature) return;
+    const hadConversation = ai.turns.length > 0;
+    ai.scopeSignature = signature;
+    ai.consentKey = null;
+    $('ai-cloud-confirm').checked = false;
+    ai.threadId = null;
+    ai.turns = [];
+    ai.threadRequest++;
+    renderAiTurns();
+    renderAiThreads();
+    if (hadConversation) aiNotice('范围已更改，下次提问会开始新的对话。原对话仍可在左侧查看。');
+  }
+
+  async function newAiThread() {
+    if (aiBusy()) return;
+    const request = ++ai.threadRequest;
+    ai.threadLoading = true;
+    renderAiControls();
+    try {
+      const result = LIVE ? await aiPost('/api/ai/threads') : { id: 'preview-thread-' + Date.now(), messages: [] };
+      if (typeof result?.id !== 'string') throw apiError('invalid_response');
+      if (request !== ai.threadRequest) return;
+      ai.threadId = result.id;
+      ai.turns = [];
+      aiNotice();
+      renderAiTurns({ bottom: true });
+      await refreshAiThreads();
+      $('ai-question').focus();
+    } catch (problem) { aiNotice(aiErrorText(problem)); }
+    finally { ai.threadLoading = false; renderAiControls(); renderAiThreads(); }
+  }
+
+  async function submitAiQuestion() {
+    const question = $('ai-question').value.trim();
+    if (!question || aiBusy()) return;
+    if (LIVE && !live.connected) { aiNotice('请先恢复与本机服务的连接。'); return; }
+    if (LIVE && ai.status?.busy) { aiNotice('上一项请求仍在结束，请稍后再提问。'); return; }
+    if (LIVE && !ai.provider?.configured) { aiNotice('请先配置模型，再发送这个问题。'); openModelDialog(); return; }
+    if (LIVE && (!ai.status?.knowledge?.ready || ai.status.knowledge.message_count === 0)) { aiNotice('知识库中还没有可供查询的文字。请等待选定会话的新文字采集完成。'); return; }
+    if (!aiScope().length) { aiNotice('请先启用需要关注的会话。'); return; }
+    if (LIVE && !ai.provider.is_local && ai.consentKey !== aiScopeKey()) { aiNotice('请先核对下方模型目标，并勾选允许发送本次范围的相关文字片段。'); $('ai-cloud-confirm').focus(); return; }
+    const user = { role: 'user', content: question, status: 'done' };
+    ai.threadRequest++;
+    const answer = { role: 'assistant', content: '', status: 'working', evidence: [], question, model: LIVE ? aiTarget() : '没有真实模型请求' };
+    ai.turns.push(user, answer);
+    const request = ++ai.jobRequest;
+    ai.job = { id: null, stage: 'submitting', turn: answer, target: LIVE ? aiTarget() : '没有真实模型请求' };
+    aiNotice();
+    renderAiTurns({ bottom: true });
+    renderAiThreads();
+    if (!LIVE) {
+      if ($('ai-question').value.trim() === question) $('ai-question').value = '';
+      ai.job.id = 'preview-job';
+      ai.job.stage = 'retrieving';
+      renderAiControls();
+      ai.jobTimer = setTimeout(() => {
+        if (request !== ai.jobRequest || !ai.job) return;
+        ai.job.stage = 'generating';
+        renderAiControls();
+        ai.jobTimer = setTimeout(() => finishPreviewAi(answer, request), 600);
+      }, 500);
+      return;
+    }
+    try {
+      const result = await aiPost('/api/ai/questions', { question, scope: aiScope(), time_range: $('ai-time-range').value, ...(ai.threadId ? { thread_id: ai.threadId } : {}), target_fingerprint: ai.provider.target_fingerprint, ...(!ai.provider.is_local ? { confirmed_target: ai.consentKey === aiScopeKey() ? ai.provider.target_fingerprint : '' } : {}) });
+      if (request !== ai.jobRequest || !ai.job) return;
+      if (typeof result?.job_id !== 'string' || typeof result.thread_id !== 'string') throw apiError('invalid_response');
+      ai.threadId = result.thread_id;
+      ai.job.id = result.job_id;
+      ai.job.stage = 'retrieving';
+      if ($('ai-question').value.trim() === question) $('ai-question').value = '';
+      renderAiControls();
+      pollAiJob(request);
+    } catch (problem) {
+      if (request !== ai.jobRequest) return;
+      answer.status = 'error';
+      answer.error = aiErrorText(problem);
+      ai.job = null;
+      renderAiTurns({ updated: true });
+    }
+  }
+
+  function finishPreviewAi(answer, request) {
+    if (request !== ai.jobRequest || !ai.job) return;
+    const chat = conversations[0];
+    const first = chat.messages[6];
+    const second = chat.messages[8];
+    answer.content = '这是虚构回答示例，用来确认对话和证据阅读体验，没有连接 AI 模型。\n\n示例中，客户确认了订单数量 [E1]，并提出了交付时间要求 [E2]。你可以点击证据，回到虚构原消息核对。\n\n真实使用时，回答只会依据你选择范围内已经采集的文字。';
+    answer.evidence = [first, second].map((message, index) => ({ id: 'E' + (index + 1), message_id: message.id, conversation_id: chat.id, conversation_name: chat.name, sender: message.sender, body: message.body, sent_at: Math.floor(message.date.getTime() / 1000) }));
+    answer.status = 'done';
+    ai.job = null;
+    if (!ai.threadId) ai.threadId = 'preview-thread-' + Date.now();
+    ai.previewThreads.set(ai.threadId, { id: ai.threadId, messages: ai.turns.map(row => ({ ...row })) });
+    const title = ai.turns.find(row => row.role === 'user')?.content.slice(0, 32) || '虚构对话';
+    ai.threads = [{ id: ai.threadId, title }, ...ai.threads.filter(row => row.id !== ai.threadId)];
+    renderAiTurns({ updated: true });
+    renderAiThreads();
+    announce('虚构回答示例已显示，没有调用模型。');
+  }
+
+  async function pollAiJob(request) {
+    if (request !== ai.jobRequest || !ai.job?.id) return;
+    const job = ai.job;
+    try {
+      const result = await api('/api/ai/jobs/' + encodeURIComponent(job.id));
+      if (request !== ai.jobRequest || ai.job !== job) return;
+      if (!['retrieving', 'generating', 'done', 'error', 'cancelled'].includes(result?.stage)) throw apiError('invalid_response');
+      const turn = job.turn;
+      if (result.response_kind === 'system') { turn.role = 'system'; turn.model = null; }
+      const changed = typeof result.answer === 'string' && turn.content !== result.answer;
+      if (typeof result.answer === 'string') turn.content = result.answer;
+      if (Array.isArray(result.evidence)) turn.evidence = cleanAiEvidence(result.evidence);
+      if (result.coverage && typeof result.coverage === 'object') turn.coverage = result.coverage;
+      job.stage = result.stage;
+      turn.error = null;
+      turn.status = ['done', 'error', 'cancelled'].includes(result.stage) ? result.stage : 'working';
+      if (result.stage === 'error') turn.error = aiErrorText(result.error);
+      if (result.stage === 'done' && !turn.content) { turn.role = 'system'; turn.content = '本轮没有生成回答。所选范围内可能没有足够的原消息证据，请调整范围后再试。'; }
+      if (['done', 'error', 'cancelled'].includes(result.stage)) {
+        ai.job = null;
+        refreshAiThreads();
+        refreshAiStatus(true);
+      }
+      renderAiTurns({ updated: changed || result.stage === 'done' });
+      renderAiThreads();
+      if (ai.job) ai.jobTimer = setTimeout(() => pollAiJob(request), 700);
+    } catch (problem) {
+      if (request !== ai.jobRequest || ai.job !== job) return;
+      job.stage = 'connection_error';
+      job.turn.status = 'connection_error';
+      job.turn.error = problem.status === 401 ? aiErrorText(problem) : '暂时无法读取任务状态。已显示内容保留，重新连接只读取原任务，不会重复提问。';
+      renderAiTurns();
+      if (problem.status !== 401) ai.jobTimer = setTimeout(() => pollAiJob(request), 2500);
+    }
+  }
+
+  async function cancelAiJob() {
+    if (!ai.job?.id) return;
+    const job = ai.job;
+    clearTimeout(ai.jobTimer);
+    if (!LIVE) {
+      ai.jobRequest++;
+      job.turn.status = 'cancelled';
+      ai.job = null;
+      renderAiTurns();
+      renderAiThreads();
+      return;
+    }
+    job.stage = 'cancelling';
+    renderAiControls();
+    try {
+      await aiPost('/api/ai/jobs/' + encodeURIComponent(job.id) + '/cancel');
+      if (ai.job === job) pollAiJob(ai.jobRequest);
+    } catch (problem) {
+      if (ai.job === job) {
+        job.stage = 'connection_error';
+        job.turn.status = 'connection_error';
+        job.turn.error = '取消请求暂未确认。请重新读取任务状态，或恢复本机服务后再取消。';
+        renderAiTurns();
+      }
+    }
+  }
+
+  async function openAiEvidence(evidence) {
+    const request = ++ai.evidenceRequest;
+    const sourceView = currentView;
+    if (!LIVE) {
+      $('conversation-search').value = '';
+      setFilter('all');
+      selectConversation(evidence.conversation_id);
+      highlightEvidence(evidence.message_id);
+      $('citation-context').hidden = false;
+      $('citation-context-label').textContent = '正在查看虚构原消息证据';
+      return;
+    }
+    try {
+      const query = new URLSearchParams({ conversation_id: evidence.conversation_id, message_id: String(evidence.message_id) });
+      const result = await api('/api/ai/evidence?' + query);
+      if (request !== ai.evidenceRequest || currentView !== sourceView) return;
+      const page = decodePage({ ...result, has_more: false }, evidence.conversation_id);
+      if (result.target_id !== evidence.message_id || !page.messages.some(row => row.id === evidence.message_id)) throw apiError('invalid_response');
+      $('conversation-search').value = '';
+      setFilter('all');
+      selectLiveConversation(evidence.conversation_id, { context: { chatId: evidence.conversation_id, targetId: evidence.message_id, messages: page.messages } });
+      $('message-search').value = '';
+      renderMessages();
+      $('citation-context').hidden = false;
+      $('citation-context-label').textContent = '正在查看引用原文附近 · ' + page.messages.length + ' 条';
+      highlightEvidence(evidence.message_id);
+    } catch { toast('原消息暂时无法定位，请在消息页查看当前会话。'); }
+  }
+
+  function highlightEvidence(id) {
+    requestAnimationFrame(() => {
+      const row = [...$('message-list').querySelectorAll('[data-message-id]')].find(node => node.dataset.messageId === String(id));
+      if (!row) return;
+      row.classList.add('is-evidence-target');
+      row.setAttribute('tabindex', '-1');
+      row.scrollIntoView({ block: 'center', behavior: 'instant' });
+      row.focus({ preventScroll: true });
+    });
+  }
+
+  const modelPresets = { 'minimax-cn': 'https://api.minimax.cn/v1', 'minimax-global': 'https://api.minimax.io/v1' };
+  function modelFeedback(text = '', failure = false) { $('model-feedback').hidden = !text; $('model-feedback').textContent = text; $('model-feedback').classList.toggle('is-error', failure); }
+  function modelDirty() { return $('model-base-url').value.trim() !== (ai.provider?.base_url || '') || $('model-name').value.trim() !== (ai.provider?.model || '') || Boolean($('model-api-key').value) || $('model-delete-key').checked; }
+  function renderModelControls() {
+    const busy = ai.modelBusy || Boolean(ai.testJob);
+    for (const id of ['model-preset', 'model-base-url', 'model-name', 'model-delete-key']) $(id).disabled = busy;
+    $('model-api-key').disabled = busy || $('model-delete-key').checked;
+    $('model-save').disabled = busy || Boolean(ai.job);
+    $('model-save').classList.toggle('is-loading', ai.modelBusy);
+    $('model-test').disabled = busy || Boolean(ai.job) || !ai.provider?.configured || modelDirty();
+    $('model-cancel-test').hidden = !ai.testJob;
+    const draft = { base_url: $('model-base-url').value.trim(), model: $('model-name').value.trim() };
+    $('model-target-preview').textContent = aiTarget(draft);
+    renderAiControls();
+  }
+
+  async function openModelDialog() {
+    if (ai.modelBusy || $('model-dialog').open) return;
+    setDrawer(false, false);
+    $('model-api-key').value = '';
+    $('model-delete-key').checked = false;
+    $('model-base-url').value = ai.provider?.base_url || modelPresets['minimax-cn'];
+    $('model-name').value = ai.provider?.model || 'MiniMax-M3.1-Flash';
+    ai.modelBusy = LIVE && live.connected;
+    renderModelControls();
+    $('model-dialog').showModal();
+    modelFeedback(ai.modelBusy ? '正在读取本机配置…' : '');
+    let readFailed = false;
+    if (LIVE && live.connected) {
+      try { const result = await api('/api/ai/config'); setAiProvider(result.provider || result); }
+      catch (problem) { readFailed = true; modelFeedback(aiErrorText(problem), true); }
+    }
+    const provider = ai.provider;
+    $('model-base-url').value = provider?.base_url || modelPresets['minimax-cn'];
+    $('model-name').value = provider?.model || 'MiniMax-M3.1-Flash';
+    $('model-preset').value = Object.entries(modelPresets).find(([, url]) => url === $('model-base-url').value)?.[0] || 'custom';
+    $('model-delete-key-row').hidden = !provider?.has_key;
+    $('model-key-help').textContent = provider?.has_key ? '已保存本机密钥。留空会保留原密钥，输入新值会替换。' : '请在本机输入密钥，不要发送到聊天里。';
+    if (!LIVE) modelFeedback('虚构预览不会保存真实配置，也不会连接模型。');
+    else if (!readFailed) modelFeedback();
+    ai.modelBusy = false;
+    renderModelControls();
+  }
+
+  async function saveModel(event) {
+    event.preventDefault();
+    if (aiBusy()) return;
+    if (!LIVE) { $('model-api-key').value = ''; modelFeedback('这是虚构预览。没有保存配置或调用模型。'); renderModelControls(); return; }
+    ai.modelBusy = true;
+    modelFeedback('正在保存到本机…');
+    renderModelControls();
+    try {
+      const deleting = $('model-delete-key').checked;
+      const key = $('model-api-key').value;
+      const result = await aiPost('/api/ai/config', { base_url: $('model-base-url').value.trim(), model: $('model-name').value.trim(), key_action: deleting ? 'delete' : key ? 'replace' : 'keep', ...(key && !deleting ? { api_key: key } : {}) });
+      setAiProvider(result.provider || result);
+      $('model-base-url').value = ai.provider.base_url;
+      $('model-name').value = ai.provider.model;
+      $('model-api-key').value = '';
+      $('model-delete-key').checked = false;
+      $('model-delete-key-row').hidden = !ai.provider.has_key;
+      $('model-key-help').textContent = ai.provider.has_key ? '本机密钥已保存，输入框已清空。留空会保留原密钥。' : '当前没有已保存的密钥。';
+      modelFeedback('已保存到本机。尚未测试连接，也没有发送聊天。');
+      refreshAiStatus(true);
+    } catch (problem) { modelFeedback(aiErrorText(problem), true); }
+    finally { $('model-api-key').value = ''; ai.modelBusy = false; renderModelControls(); }
+  }
+
+  async function testModel() {
+    if (aiBusy() || modelDirty() || !ai.provider?.configured) return;
+    if (!LIVE) { modelFeedback('虚构预览不会连接模型。'); return; }
+    ai.modelBusy = true;
+    modelFeedback('正在请求测试 ' + aiTarget() + '，不发送聊天内容。');
+    renderModelControls();
+    try {
+      const result = await aiPost('/api/ai/test', { target_fingerprint: ai.provider.target_fingerprint });
+      if (typeof result?.job_id !== 'string') throw apiError('invalid_response');
+      ai.testJob = { id: result.job_id, target: aiTarget() };
+      pollModelTest();
+    } catch (problem) { modelFeedback(aiErrorText(problem), true); }
+    finally { ai.modelBusy = false; renderModelControls(); }
+  }
+
+  async function pollModelTest() {
+    const job = ai.testJob;
+    if (!job) return;
+    try {
+      const result = await api('/api/ai/jobs/' + encodeURIComponent(job.id));
+      if (ai.testJob !== job) return;
+      if (result.stage === 'done') { modelFeedback('连接测试通过：' + job.target + '。没有发送聊天内容。'); ai.testJob = null; }
+      else if (result.stage === 'error') { modelFeedback(aiErrorText(result.error), true); ai.testJob = null; }
+      else if (result.stage === 'cancelled') { modelFeedback('已取消连接测试。'); ai.testJob = null; }
+      else { modelFeedback('正在测试 ' + job.target + '…'); ai.testTimer = setTimeout(pollModelTest, 700); }
+    } catch (problem) { if (ai.testJob === job) { modelFeedback(aiErrorText(problem), true); ai.testJob = null; } }
+    renderModelControls();
+  }
+
+  async function cancelModelTest() {
+    const job = ai.testJob;
+    if (!job) return;
+    clearTimeout(ai.testTimer);
+    try { await aiPost('/api/ai/jobs/' + encodeURIComponent(job.id) + '/cancel'); }
+    catch { modelFeedback('取消请求暂未确认，请检查本机服务。', true); }
+    if (ai.testJob === job) pollModelTest();
+  }
+
+  function initializeAi() {
+    ai.initialized = true;
+    $('ai-form').addEventListener('submit', event => { event.preventDefault(); submitAiQuestion(); });
+    $('ai-question').addEventListener('keydown', event => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); submitAiQuestion(); } });
+    $('ai-scope').addEventListener('change', resetAiScope);
+    $('ai-time-range').addEventListener('change', resetAiScope);
+    $('ai-cloud-confirm').addEventListener('change', () => { ai.consentKey = $('ai-cloud-confirm').checked ? aiScopeKey() : null; });
+    $('ai-new-thread').addEventListener('click', newAiThread);
+    $('ai-cancel').addEventListener('click', cancelAiJob);
+    $('ai-model-target').addEventListener('click', openModelDialog);
+    $('ai-new-answer').addEventListener('click', () => { $('ai-chat-scroll').scrollTop = $('ai-chat-scroll').scrollHeight; $('ai-new-answer').hidden = true; });
+    $('ai-chat-scroll').addEventListener('scroll', () => { if (aiNearBottom()) $('ai-new-answer').hidden = true; }, { passive: true });
+    const prompts = { today: '今天有哪些重点？', followup: '最近有哪些客户需要跟进？', agreement: '最近有哪些约定？', risk: '最近有没有需要注意的风险？' };
+    document.querySelectorAll('[data-ai-prompt]').forEach(button => button.addEventListener('click', () => {
+      if (aiBusy()) return;
+      if (button.dataset.aiPrompt === 'today' && $('ai-time-range').value !== 'today') { $('ai-time-range').value = 'today'; resetAiScope(); }
+      $('ai-question').value = prompts[button.dataset.aiPrompt];
+      $('ai-question').focus();
+    }));
+    $('ai-knowledge-toggle').addEventListener('click', () => $('knowledge-dialog').showModal());
+    $('close-knowledge').addEventListener('click', () => $('knowledge-dialog').close());
+    $('knowledge-open-messages').addEventListener('click', () => { $('knowledge-dialog').close(); navigate('messages'); });
+    $('close-model').addEventListener('click', () => $('model-dialog').close());
+    $('model-form').addEventListener('submit', saveModel);
+    $('model-test').addEventListener('click', testModel);
+    $('model-cancel-test').addEventListener('click', cancelModelTest);
+    $('model-preset').addEventListener('change', () => { const preset = modelPresets[$('model-preset').value]; if (preset) { $('model-base-url').value = preset; $('model-name').value = 'MiniMax-M3.1-Flash'; } modelFeedback(); renderModelControls(); });
+    for (const id of ['model-base-url', 'model-name', 'model-api-key', 'model-delete-key']) $(id).addEventListener('input', () => { if ($('model-delete-key').checked) $('model-api-key').value = ''; modelFeedback(); renderModelControls(); });
+    for (const id of ['model-dialog', 'knowledge-dialog']) {
+      $(id).addEventListener('click', event => { if (event.target === $(id)) $(id).close(); });
+      $(id).addEventListener('close', () => {
+        if (id === 'model-dialog') { $('model-api-key').value = ''; if (ai.testJob) cancelModelTest(); }
+        if (window.innerWidth <= 640) $('nav-toggle').focus({ preventScroll: true });
+      });
+    }
+    $('citation-back-ai').addEventListener('click', () => navigate('overview'));
+    $('citation-latest').addEventListener('click', () => { live.evidence = null; $('citation-context').hidden = true; if (LIVE) jumpLiveLatest(); else { renderMessages({ bottom: true }); } });
+    renderAiScopes();
+    renderAiKnowledge();
+    renderAiTurns();
+    renderAiThreads();
+  }
+
   $('conversation-search').addEventListener('input', renderConversations);
   $('message-search').addEventListener('input', () => {
-    if (LIVE) requestLiveSearch();
+    if (LIVE) { live.evidence = null; $('citation-context').hidden = true; requestLiveSearch(); }
     else renderMessages({ restore: 0 });
   });
   function setFilter(value) {
@@ -999,30 +1581,6 @@
   document.querySelectorAll('[data-nav]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.nav)));
   document.querySelectorAll('[data-open-view]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.openView)));
   $('brand-home').addEventListener('click', event => { event.preventDefault(); navigate('overview'); });
-  $('overview-form').addEventListener('submit', event => {
-    event.preventDefault();
-    if (LIVE) { openLiveOverviewQuery(); return; }
-    const query = $('overview-search').value.trim();
-    const chat = conversations.find(row => row.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
-    setFilter('all');
-    $('conversation-search').value = '';
-    if (chat && query) {
-      selectConversation(chat.id);
-      $('message-search').value = '';
-    } else {
-      navigate('messages');
-      $('workbench').classList.add('mobile-thread-open');
-      $('message-search').value = query;
-      if (query) {
-        const match = conversations.find(row => row.messages.some(message => (message.body + message.sender).toLocaleLowerCase().includes(query.toLocaleLowerCase())));
-        if (match) activeId = match.id;
-      }
-      renderHeader();
-      renderConversations();
-      renderMessages({ restore: 0 });
-    }
-    previewState('normal');
-  });
   $('simulate-message').addEventListener('click', simulateMessage);
   ['toggle-collection', 'collection-toggle'].forEach(id => $(id).addEventListener('click', toggleCollection));
   ['connection-demo', 'collection-connection'].forEach(id => $(id).addEventListener('click', toggleConnection));
@@ -1070,10 +1628,10 @@
   }));
   settings.addEventListener('click', event => { if (event.target === settings) settings.close(); });
   document.addEventListener('keydown', event => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'k' && !dialog.open && !settings.open) {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'k' && !dialog.open && !settings.open && !$('model-dialog').open && !$('knowledge-dialog').open) {
       event.preventDefault(); navigate('messages'); $('workbench').classList.remove('mobile-thread-open'); $('conversation-search').focus();
     }
-    if (event.key === 'Escape' && !dialog.open && !settings.open) {
+    if (event.key === 'Escape' && !dialog.open && !settings.open && !$('model-dialog').open && !$('knowledge-dialog').open) {
       if (document.body.classList.contains('nav-open')) setDrawer(false);
       else setDetails(false);
     }
@@ -1097,6 +1655,7 @@
     $('demo-elapsed').textContent = String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
   }, 1000);
   $('search-shortcut').textContent = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K';
+  initializeAi();
   if (LIVE) initializeLive();
   else reset();
   navigate('overview');

@@ -22,6 +22,7 @@ SOURCES = (
     'THIRD-PARTY-SELECTED-NOTICES.txt',
 )
 WEB_FILES = ('index.html', 'app.js', 'styles.css', 'assets/chatlens-mark.svg')
+AI_SOURCES = ('ai_knowledge.py', 'ai_provider.py', 'ai_service.py', 'ai_web_server.py')
 
 
 def _public_bytes(path):
@@ -35,6 +36,8 @@ def build(root, output):
     if output.exists() or output.is_symlink():
         raise FileExistsError('output_already_exists')
     files = {name: _public_bytes(root / 'scripts/windows-proof' / name) for name in SOURCES}
+    for name in AI_SOURCES:
+        files[name] = _public_bytes(root / 'scripts' / name)
     for name in WEB_FILES:
         files['web/' + name] = _public_bytes(root / 'apps/web' / name)
     # Release assembly is offline: a missing reviewed input is a build failure.

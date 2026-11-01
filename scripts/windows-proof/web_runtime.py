@@ -17,6 +17,28 @@ from web_data import CollectorWebData
 from web_server import make_server
 
 
+def enable_assistant(server, data):
+    # Source checkout keeps AI modules one directory above these portable
+    # helpers; the Windows archive places them beside this file instead.
+    candidates = Path(__file__).resolve().parent.parent
+    if (candidates / 'ai_service.py').is_file():
+        sys.path.insert(0, str(candidates))
+    from ai_service import AiAssistant
+    from ai_web_server import attach_ai_routes
+    server.assistant = None
+    server.assistant_closing = False
+    def get_service():
+        with server.assistant_lock:
+            if server.assistant_closing:
+                from ai_service import AiError
+                raise AiError('ai_service_stopped', 'AI 服务正在关闭。', 503)
+            if server.assistant is None:
+                server.assistant = AiAssistant(data.data_dir, data.private / 'assistant')
+            return server.assistant
+    server.assistant_lock = threading.RLock()
+    attach_ai_routes(server, get_service)
+
+
 def owned_command(package, data_dir, output, pid, creation_time):
     return [str(package / 'runtime/python.exe'), '-I', '-S', '-B', '-X', 'utf8',
             str(package / 'collector_supervisor.py'), '--data-dir', str(data_dir),
@@ -90,6 +112,8 @@ def run(data_dir, output, *, package, pid=None, creation_time=None, read_only=Fa
     shutdown = threading.Event()
     try:
         server = server_factory(data, package / 'web', port=0)
+        if hasattr(server, 'RequestHandlerClass'):
+            enable_assistant(server, data)
         worker = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': .1}, daemon=True)
         worker.start()
         report['server_started'] = True
@@ -143,6 +167,18 @@ def run(data_dir, output, *, package, pid=None, creation_time=None, read_only=Fa
                 report['status'], report['reason'] = '失败', 'web_collector_stop_failed'
                 report['collector_cleanup_confirmed'] = False
         if server is not None:
+            assistant_lock = getattr(server, 'assistant_lock', None)
+            if assistant_lock is not None:
+                with assistant_lock:
+                    server.assistant_closing = True
+                    assistant = server.assistant
+            else:
+                assistant = None
+            if assistant is not None:
+                assistant.close()
+                report['cloud_calls'] = assistant.cloud_request_attempts
+                report['model_request_attempts'] = assistant.model_request_attempts
+                report['cloud_count_kind'] = 'request_attempts'
             if worker is not None and worker.is_alive():
                 server.shutdown()
             server.server_close()

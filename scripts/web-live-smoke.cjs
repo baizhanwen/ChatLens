@@ -72,17 +72,17 @@ async function main() {
     const noOverflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     const screenshot = name => page.screenshot({ path: path.join(output, name + '.png'), fullPage: true });
     await page.goto(ready.launch_url);
-    await byId('overview-state').getByText('正在采集', { exact: true }).waitFor();
+    await page.waitForFunction(() => document.querySelector('#ribbon-state').textContent === '正在采集');
     await check('authenticated_real_http_bootstrap_and_fragment_removed', async () => {
       assert.equal(new URL(page.url()).hash, '');
       assert.equal(await page.evaluate(() => localStorage.length + sessionStorage.length), 0);
       const cookies = await context.cookies();
       assert(cookies.some(cookie => cookie.name === 'chatlens_session' && cookie.httpOnly && cookie.sameSite === 'Strict'));
       assert.equal(await page.evaluate(() => document.cookie.includes('chatlens_session')), false);
-      assert.equal(await byId('overview-count').innerText(), '126 条');
+      assert.equal(await byId('total-messages').textContent(), '126 条');
       assert.equal(await byId('live-resume-state').innerText(), '已从保存位置继续');
       assert.notEqual(await byId('live-heartbeat').innerText(), '尚未收到');
-      assert((await byId('recent-conversations').innerText()).includes('合成客户·青禾'));
+      assert((await byId('conversation-list').textContent()).includes('合成客户·青禾'));
       assert.equal(await byId('simulate-message').isVisible(), false);
       assert.equal(await byId('reset-preview').isVisible(), false);
     });
