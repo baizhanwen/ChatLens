@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "verified_at_utc": "2026-11-01T15:49:18.485205+00:00",
+  "repository": "https://github.com/baizhanwen/ChatLens",
+  "source_commit": "07d6dc79a604d3c452581039bf3aae4f92acdb31",
+  "tag": "windows-web-20261101-r8",
+  "tag_target_sha": "07d6dc79a604d3c452581039bf3aae4f92acdb31",
+  "remote_main_contains_source_commit": true,
+  "release_url": "https://github.com/baizhanwen/ChatLens/releases/tag/windows-web-20261101-r8",
+  "is_prerelease": true,
+  "is_draft": false,
+  "assets": [
+    {
+      "name": "ChatLens-Windows-Web-20261101-r8-SHA256SUMS.txt",
+      "bytes": 103,
+      "sha256": "cab98491b3b71f687d97821c9a47b96c4f91c5c4f0337608788127762f855552",
+      "github_digest": "sha256:cab98491b3b71f687d97821c9a47b96c4f91c5c4f0337608788127762f855552",
+      "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r8/ChatLens-Windows-Web-20261101-r8-SHA256SUMS.txt",
+      "download_verified": true
+    },
+    {
+      "name": "ChatLens-Windows-Web-20261101-r8-TEST-GUIDE.md",
+      "bytes": 18673,
+      "sha256": "579c2ad2f60daf9d9da42f3a202d34c65d9ffcd530f1afe9abaf8b5b62bac2a1",
+      "github_digest": "sha256:579c2ad2f60daf9d9da42f3a202d34c65d9ffcd530f1afe9abaf8b5b62bac2a1",
+      "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r8/ChatLens-Windows-Web-20261101-r8-TEST-GUIDE.md",
+      "download_verified": true
+    },
+    {
+      "name": "ChatLens-Windows-Web-20261101-r8.zip",
+      "bytes": 15679653,
+      "sha256": "3bf0c63ca7e539a0c15e7f3b72cf9f94ce0bb5f32162fa1a9029d4dde6433b49",
+      "github_digest": "sha256:3bf0c63ca7e539a0c15e7f3b72cf9f94ce0bb5f32162fa1a9029d4dde6433b49",
+      "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r8/ChatLens-Windows-Web-20261101-r8.zip",
+      "download_verified": true
+    }
+  ],
+  "old_release_assets_overwritten": false,
+  "private_chat_or_configs_published": false,
+  "existing_license_state_preserved": true,
+  "r8_windows_native_fresh_initialization_and_legacy_discovery_status": "未验证",
+  "second_windows_machine_status": "待外部条件"
+}
