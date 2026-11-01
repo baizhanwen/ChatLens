@@ -1,0 +1,393 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "user_returned_real_windows_continuous_collector_two_run_stop_recovery",
+  "test_date_local": "2026-11-01",
+  "timezone": "Asia/Shanghai",
+  "status": "通过",
+  "verified_scope": "two_selected_conversations_six_controlled_new_texts_one_normal_stop_and_resume",
+  "target_client_version": "4.1.15.56",
+  "python_version": "3.14.10",
+  "expected_package": {
+    "name": "ChatLens-Windows-Collector-20261101.zip",
+    "sha256": "075aebd5b88d4f3db821084daafd6184eef9bea6cf38c3d23bb4f1727fde9f6d",
+    "identity_boundary": "Archive rechecked locally; returned reports do not contain a remote package digest."
+  },
+  "runs": [
+    {
+      "phase": "initial_live",
+      "service": {
+        "schema_version": 1,
+        "stage": "continuous_collection",
+        "started_at_utc": "2026-11-01T03:25:40.050840+00:00",
+        "finished_at_utc": "2026-11-01T03:28:51.151354+00:00",
+        "status": "通过",
+        "reason": "collector_stopped_with_committed_checkpoint",
+        "scope": "two_previously_selected_conversations_new_text_only",
+        "target_client_version": "4.1.15.56",
+        "python_version": "3.14.10",
+        "resumed_from_checkpoint": false,
+        "restored_messages": 0,
+        "new_messages_this_run": 4,
+        "duplicate_events_skipped_this_run": 0,
+        "total_messages": 4,
+        "paused_polls": 0,
+        "busy_retries": 0,
+        "checkpoint_saved": true,
+        "normal_stop_requested": true,
+        "messages_sent_by_tool": 0,
+        "cloud_calls": 0,
+        "source_database_records_modified": false,
+        "source_process_modified": false,
+        "source_shm_may_receive_normal_sqlite_lock_metadata": true,
+        "strict_end_to_end_latency_measured": false,
+        "private_acl_verified": true,
+        "controlled_summary_before": {
+          "status": "未验证",
+          "reason": "controlled_selected_text_incomplete",
+          "all_expected_tokens_observed": false,
+          "observed_events": 0,
+          "unique_source_messages": 0,
+          "conversations": [
+            {
+              "alias": "private_test",
+              "tokens": [
+                {
+                  "token_index": 1,
+                  "matched_count": 0,
+                  "verified": false,
+                  "source_sent_at": null,
+                  "observed_at": null
+                },
+                {
+                  "token_index": 2,
+                  "matched_count": 0,
+                  "verified": false,
+                  "source_sent_at": null,
+                  "observed_at": null
+                },
+                {
+                  "token_index": 3,
+                  "matched_count": 0,
+                  "verified": false,
+                  "source_sent_at": null,
+                  "observed_at": null
+                }
+              ]
+            },
+            {
+              "alias": "group_test",
+              "tokens": [
+                {
+                  "token_index": 1,
+                  "matched_count": 0,
+                  "verified": false,
+                  "source_sent_at": null,
+                  "observed_at": null
+                },
+                {
+                  "token_index": 2,
+                  "matched_count": 0,
+                  "verified": false,
+                  "source_sent_at": null,
+                  "observed_at": null
+                },
+                {
+                  "token_index": 3,
+                  "matched_count": 0,
+                  "verified": false,
+                  "source_sent_at": null,
+                  "observed_at": null
+                }
+              ]
+            }
+          ]
+        },
+        "controlled_summary_after": {
+          "status": "未验证",
+          "reason": "controlled_selected_text_incomplete",
+          "all_expected_tokens_observed": false,
+          "observed_events": 4,
+          "unique_source_messages": 4,
+          "conversations": [
+            {
+              "alias": "private_test",
+              "tokens": [
+                {
+                  "token_index": 1,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503660,
+                  "observed_at": "2026-11-01T03:27:41.052738+00:00"
+                },
+                {
+                  "token_index": 2,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503695,
+                  "observed_at": "2026-11-01T03:28:15.618333+00:00"
+                },
+                {
+                  "token_index": 3,
+                  "matched_count": 0,
+                  "verified": false,
+                  "source_sent_at": null,
+                  "observed_at": null
+                }
+              ]
+            },
+            {
+              "alias": "group_test",
+              "tokens": [
+                {
+                  "token_index": 1,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503681,
+                  "observed_at": "2026-11-01T03:28:01.410464+00:00"
+                },
+                {
+                  "token_index": 2,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503709,
+                  "observed_at": "2026-11-01T03:28:29.824278+00:00"
+                },
+                {
+                  "token_index": 3,
+                  "matched_count": 0,
+                  "verified": false,
+                  "source_sent_at": null,
+                  "observed_at": null
+                }
+              ]
+            }
+          ]
+        },
+        "baseline_completed_at": "2026-11-01T03:25:40.200228+00:00",
+        "last_commit_at_utc": "2026-11-01T03:28:29.827624+00:00"
+      },
+      "supervisor": {
+        "recorded_at_utc": "2026-11-01T03:28:51.255846+00:00",
+        "status": "通过",
+        "reason": "collector_normal_stop",
+        "child_started": true,
+        "child_exit_code": 0,
+        "child_cleanup_confirmed": true,
+        "normal_stop_requested": true,
+        "timed_out": false,
+        "elapsed_seconds": 191.306,
+        "total_running_time_limit": null,
+        "heartbeat_timeout_seconds": 90
+      }
+    },
+    {
+      "phase": "resumed_catch_up",
+      "service": {
+        "schema_version": 1,
+        "stage": "continuous_collection",
+        "started_at_utc": "2026-11-01T03:29:43.067646+00:00",
+        "finished_at_utc": "2026-11-01T03:29:57.363730+00:00",
+        "status": "通过",
+        "reason": "collector_stopped_with_committed_checkpoint",
+        "scope": "two_previously_selected_conversations_new_text_only",
+        "target_client_version": "4.1.15.56",
+        "python_version": "3.14.10",
+        "resumed_from_checkpoint": true,
+        "restored_messages": 4,
+        "new_messages_this_run": 2,
+        "duplicate_events_skipped_this_run": 0,
+        "total_messages": 6,
+        "paused_polls": 0,
+        "busy_retries": 0,
+        "checkpoint_saved": true,
+        "normal_stop_requested": true,
+        "messages_sent_by_tool": 0,
+        "cloud_calls": 0,
+        "source_database_records_modified": false,
+        "source_process_modified": false,
+        "source_shm_may_receive_normal_sqlite_lock_metadata": true,
+        "strict_end_to_end_latency_measured": false,
+        "private_acl_verified": true,
+        "controlled_summary_before": {
+          "status": "未验证",
+          "reason": "controlled_selected_text_incomplete",
+          "all_expected_tokens_observed": false,
+          "observed_events": 4,
+          "unique_source_messages": 4,
+          "conversations": [
+            {
+              "alias": "private_test",
+              "tokens": [
+                {
+                  "token_index": 1,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503660,
+                  "observed_at": "2026-11-01T03:27:41.052738+00:00"
+                },
+                {
+                  "token_index": 2,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503695,
+                  "observed_at": "2026-11-01T03:28:15.618333+00:00"
+                },
+                {
+                  "token_index": 3,
+                  "matched_count": 0,
+                  "verified": false,
+                  "source_sent_at": null,
+                  "observed_at": null
+                }
+              ]
+            },
+            {
+              "alias": "group_test",
+              "tokens": [
+                {
+                  "token_index": 1,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503681,
+                  "observed_at": "2026-11-01T03:28:01.410464+00:00"
+                },
+                {
+                  "token_index": 2,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503709,
+                  "observed_at": "2026-11-01T03:28:29.824278+00:00"
+                },
+                {
+                  "token_index": 3,
+                  "matched_count": 0,
+                  "verified": false,
+                  "source_sent_at": null,
+                  "observed_at": null
+                }
+              ]
+            }
+          ]
+        },
+        "controlled_summary_after": {
+          "status": "通过",
+          "reason": "controlled_selected_text_verified",
+          "all_expected_tokens_observed": true,
+          "observed_events": 6,
+          "unique_source_messages": 6,
+          "conversations": [
+            {
+              "alias": "private_test",
+              "tokens": [
+                {
+                  "token_index": 1,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503660,
+                  "observed_at": "2026-11-01T03:27:41.052738+00:00"
+                },
+                {
+                  "token_index": 2,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503695,
+                  "observed_at": "2026-11-01T03:28:15.618333+00:00"
+                },
+                {
+                  "token_index": 3,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503766,
+                  "observed_at": "2026-11-01T03:29:43.147826+00:00"
+                }
+              ]
+            },
+            {
+              "alias": "group_test",
+              "tokens": [
+                {
+                  "token_index": 1,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503681,
+                  "observed_at": "2026-11-01T03:28:01.410464+00:00"
+                },
+                {
+                  "token_index": 2,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503709,
+                  "observed_at": "2026-11-01T03:28:29.824278+00:00"
+                },
+                {
+                  "token_index": 3,
+                  "matched_count": 1,
+                  "verified": true,
+                  "source_sent_at": 1793503777,
+                  "observed_at": "2026-11-01T03:29:43.148109+00:00"
+                }
+              ]
+            }
+          ]
+        },
+        "baseline_completed_at": "2026-11-01T03:25:40.200228+00:00",
+        "last_commit_at_utc": "2026-11-01T03:29:43.150483+00:00"
+      },
+      "supervisor": {
+        "recorded_at_utc": "2026-11-01T03:29:57.461785+00:00",
+        "status": "通过",
+        "reason": "collector_normal_stop",
+        "child_started": true,
+        "child_exit_code": 0,
+        "child_cleanup_confirmed": true,
+        "normal_stop_requested": true,
+        "timed_out": false,
+        "elapsed_seconds": 14.487,
+        "total_running_time_limit": null,
+        "heartbeat_timeout_seconds": 90
+      }
+    }
+  ],
+  "cross_run_checks": {
+    "first_run_new_messages": 4,
+    "restored_messages_on_restart": 4,
+    "second_run_new_messages": 2,
+    "final_total_messages": 6,
+    "all_six_controlled_tokens_verified_once": true,
+    "old_four_controlled_rows_and_observed_times_unchanged": true,
+    "first_after_equals_second_before": true,
+    "baseline_unchanged": true,
+    "reported_duplicate_events": 0,
+    "both_normal_stops_and_checkpoint_saves": true,
+    "both_owned_children_cleaned": true,
+    "both_private_acl_verified": true,
+    "both_source_times_within_confirmed_stopped_window": true,
+    "new_two_observed_after_restart": true
+  },
+  "stopped_window": {
+    "after_first_supervisor_finished_at_utc": "2026-11-01T03:28:51.255846+00:00",
+    "before_resumed_service_started_at_utc": "2026-11-01T03:29:43.067646+00:00",
+    "offline_messages": [
+      {
+        "alias": "private_test",
+        "token_index": 3,
+        "source_sent_at": 1793503766,
+        "observed_at": "2026-11-01T03:29:43.147826+00:00"
+      },
+      {
+        "alias": "group_test",
+        "token_index": 3,
+        "source_sent_at": 1793503777,
+        "observed_at": "2026-11-01T03:29:43.148109+00:00"
+      }
+    ]
+  },
+  "business_recovery_status": "通过",
+  "strict_end_to_end_latency_status": "未验证",
+  "real_crash_recovery_status": "未验证",
+  "long_running_stability_status": "未验证",
+  "minimized_and_lock_screen_status": "未验证",
+  "concurrent_instance_refusal_status": "未验证",
+  "new_macos_collector_client_status": "未验证",
+  "evidence_boundary": "Observed Windows WeChat 4.1.15.56 two-conversation six-message normal-stop/restart proof only. Continuous reads were gated by running/background/unlocked state in code; reports contain no continuous native-state trace. No extension to real process crashes, hard timeouts, lock-screen, minimization, long duration, other versions, expanded shard sets, model or notifications."
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "scope": "four_returned_windows_reports_cross_run_consistency_and_redaction",
+  "checks": [
+    "timestamps_determine_chronology_not_filename_suffix",
+    "initial_four_and_restore_four_plus_two",
+    "six_tokens_each_once_exact_body_and_expected_sender_by_alias",
+    "old_observed_at_and_full_summary_preserved",
+    "same_original_baseline",
+    "offline_source_seconds_inside_confirmed_stop_to_restart_window",
+    "new_observed_times_after_restart",
+    "both_graceful_stop_zero_exit_checkpoint_saved",
+    "no_timeout_busy_retry_or_pause",
+    "public_summary_whitelist_only",
+    "four_raw_reports_private_byte_exact_mode_0600"
+  ],
+  "business_recovery_status": "通过",
+  "strict_end_to_end_latency_status": "未验证",
+  "long_running_real_stability_status": "未验证",
+  "tests_rerun": "not_required_report_and_documentation_only; existing implementation unchanged"
+}
