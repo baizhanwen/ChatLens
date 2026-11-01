@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f5f6f2">
+  <meta name="description" content="利明智耀 ChatLens · 关注值得关注的沟通。当前为仅含虚构数据的前端界面预览。">
+  <title>ChatLens 消息工作台 · 利明智耀</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/chatlens-mark.svg">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <svg class="icon-library" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-messages" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 8.7 3.9a8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z"/><path d="M8 10h8M8 14h5"/></symbol>
+    <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 4v16m-6-6 6 6 6-6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.1"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-group" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M21 20v-2a6 6 0 0 0-3-5.2"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="m10 13 4-4m-6 7-1 1a4.2 4.2 0 0 1-6-6l4-4a4.2 4.2 0 0 1 6 0m2 4 1-1a4.2 4.2 0 0 1 6 6l-4 4a4.2 4.2 0 0 1-6 0" transform="translate(1 -1)"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  </svg>
+  <div class="app-shell">
+    <nav class="nav-rail" aria-label="工作台导航">
+      <a class="rail-brand" href="#" aria-label="利明智耀 ChatLens 首页"><img src="./assets/chatlens-mark.svg" alt="利明智耀品牌标识"></a>
+      <div class="rail-links">
+        <button class="rail-button active" id="messages-nav" aria-label="消息工作台" aria-current="page"><svg><use href="#i-messages"></use></svg><span>消息</span></button>
+        <button class="rail-button" id="status-nav" aria-label="查看采集状态"><svg><use href="#i-pulse"></use></svg><span>状态</span></button>
+      </div>
+      <button class="rail-button rail-help" id="preview-help" aria-label="前端预览说明"><svg><use href="#i-info"></use></svg><span>说明</span></button>
+      <div class="rail-monogram" aria-hidden="true">LM</div>
+    </nav>
+    <div class="workspace">
+      <header class="topbar">
+        <div class="brand-wordmark"><img class="mobile-brand-logo" src="./assets/chatlens-mark.svg" alt="利明智耀品牌标识"><strong>利明智耀</strong><span class="brand-divider"></span><span class="product-name">ChatLens<span class="product-dot">.</span></span></div>
+        <div class="workspace-path"><span>工作台</span><span>/</span><strong>消息</strong></div>
+        <div class="preview-label"><span></span>前端预览 · 虚构数据</div>
+      </header>
+      <div class="workbench" id="workbench">
+        <aside class="conversation-sidebar" aria-label="关注的会话">
+          <div class="sidebar-heading"><div><span class="eyebrow">YOUR FOCUS</span><h1>关注的会话<span id="conversation-total">3</span></h1></div><span class="selected-scope">已选范围</span></div>
+          <label class="search-field sidebar-search"><svg><use href="#i-search"></use></svg><input id="conversation-search" data-testid="conversation-search" type="search" placeholder="搜索会话" autocomplete="off" aria-label="搜索会话"><kbd>⌘ K</kbd></label>
+          <div class="conversation-filters" aria-label="会话类型筛选"><button class="filter-button active" data-filter="all" aria-pressed="true">全部</button><button class="filter-button" data-filter="private" aria-pressed="false">私聊</button><button class="filter-button" data-filter="group" aria-pressed="false">群聊</button></div>
+          <div class="conversation-list" id="conversation-list" data-testid="conversation-list"></div>
+          <div class="sidebar-note"><svg><use href="#i-shield"></use></svg><p>只关注你选择的沟通<span>当前内容全部为虚构示例</span></p></div>
+          <div class="sidebar-footer"><span class="small-mark">CHAT · CLARITY · FOCUS</span><span>利明智耀出品</span></div>
+        </aside>
+        <main class="message-pane">
+          <header class="thread-header">
+            <button class="mobile-back icon-button" id="mobile-back" aria-label="返回会话列表"><svg><use href="#i-chevron"></use></svg></button>
+            <div class="thread-avatar" id="thread-avatar" aria-hidden="true"></div>
+            <div class="thread-heading"><div><h2 id="thread-title"></h2><span class="thread-type" id="thread-type"></span></div><p id="thread-subtitle"></p></div>
+            <button class="details-button" id="toggle-details" aria-expanded="true" aria-controls="status-panel"><svg><use href="#i-pulse"></use></svg><span>采集详情</span></button>
+          </header>
+          <div class="collection-ribbon" id="collection-ribbon"><div><span class="status-dot"></span><strong id="ribbon-state">演示运行中</strong><span class="ribbon-divider"></span><span id="ribbon-description">正在演示新消息接收</span></div><span class="ribbon-preview">未连接真实微信</span></div>
+          <div class="message-toolbar"><div><span class="section-dot"></span><strong>消息记录</strong><span id="message-count"></span></div><label class="search-field message-search"><svg><use href="#i-search"></use></svg><input type="search" id="message-search" data-testid="message-search" placeholder="搜索当前会话" aria-label="搜索当前会话消息" autocomplete="off"></label></div>
+          <div class="message-scroll" id="message-scroll" data-testid="message-scroll" tabindex="0" aria-label="当前会话的虚构消息记录"><div id="message-list" class="message-list"></div></div>
+          <button class="new-messages-button" id="new-messages" data-testid="new-messages" hidden><svg><use href="#i-arrow-down"></use></svg><span></span></button>
+          <footer class="message-footer"><span><span class="footer-dot"></span>这是消息阅读区，未提供代发功能</span><button id="simulate-message" data-testid="simulate-message"><svg><use href="#i-plus"></use></svg><span>模拟一条新消息</span></button></footer>
+        </main>
+        <aside class="status-panel" id="status-panel" data-testid="status-panel" aria-label="采集状态预览">
+          <div class="status-panel-title"><h2>采集概览</h2><button class="icon-button close-details" id="close-details" aria-label="收起采集详情"><svg><use href="#i-close"></use></svg></button></div>
+          <div class="status-overview"><div class="status-orbit" id="status-orbit"><svg><use href="#i-pulse"></use></svg><span></span></div><h3 id="status-title">演示运行中</h3><p id="status-description">点击模拟按钮，体验消息到达后的变化。</p><span class="demo-tag">状态演示</span></div>
+          <div class="status-metrics"><div><span>演示消息</span><strong id="total-messages">0<small> 条</small></strong></div><div><span>关注会话</span><strong>3<small> 个</small></strong></div></div>
+          <dl class="status-facts"><div><dt>最近演示更新</dt><dd id="last-update">—</dd></div><div><dt>演示接收状态</dt><dd id="fact-state"><span class="inline-dot"></span>运行中</dd></div><div><dt>真实采集服务</dt><dd class="muted">尚未接入</dd></div></dl>
+          <button class="pause-button" id="toggle-collection" data-testid="toggle-collection"><svg><use href="#i-pause"></use></svg><span>暂停演示接收</span></button>
+          <div class="status-section"><span class="eyebrow">PREVIEW CONTROLS</span><h3>看看不同状态</h3><p>这些操作只改变本页演示。</p><button class="connection-demo" id="connection-demo" data-testid="connection-demo"><svg><use href="#i-link"></use></svg><span>演示连接中断</span><svg><use href="#i-chevron"></use></svg></button><button class="reset-preview" id="reset-preview">重置虚构数据</button></div>
+          <div class="privacy-note"><svg><use href="#i-shield"></use></svg><p>数据只在当前页面内存中<span>刷新即可还原。本页没有读取微信、保存聊天或调用模型。</span></p></div>
+          <div class="status-panel-bottom">让沟通，照见下一步。<span>LI MING ZHI YAO</span></div>
+        </aside>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <div class="sr-only" id="announcer" aria-live="polite" aria-atomic="true"></div>
+  <dialog id="preview-dialog" aria-labelledby="preview-dialog-title"><button class="dialog-close icon-button" id="close-preview" aria-label="关闭说明"><svg><use href="#i-close"></use></svg></button><img src="./assets/chatlens-mark.svg" alt="" class="dialog-logo"><span class="eyebrow">利明智耀 · CHATLENS</span><h2 id="preview-dialog-title">先把阅读体验做好。</h2><p>这是前端界面预览，所有联系人、群聊和消息均为虚构。你可以切换会话、搜索消息，或模拟新消息、暂停和连接中断。</p><p>本页没有连接真实微信或采集服务，也不会外发数据。界面确认后，再接入已经验证的本地采集能力。</p><button class="dialog-confirm" id="confirm-preview">开始体验</button></dialog>
+</body>
+</html>

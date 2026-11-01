@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "scope": "frontend_only_synthetic_browser_qa",
+  "recorded_at_utc": "2026-11-01T03:45:37.013Z",
+  "entry_protocol": "file:",
+  "browser": "Chromium",
+  "browser_version": "156.0.8078.4",
+  "viewports": [
+    "1440x1000",
+    "390x844"
+  ],
+  "passed_checks": [
+    "visible_brand_and_synthetic_preview_boundary",
+    "desktop_has_three_focus_conversations_and_no_horizontal_overflow",
+    "conversation_switch_changes_thread",
+    "conversation_search_and_empty_result",
+    "message_search_and_empty_result",
+    "new_message_during_search_has_explicit_way_back_to_latest",
+    "new_messages_preserve_reader_scroll_then_scroll_to_latest",
+    "paused_demo_blocks_simulation_and_keyboard_resume_works",
+    "connection_interruption_and_restore_are_demo_only",
+    "preview_dialog_can_open_and_close_with_escape",
+    "mobile_conversation_view_and_brand_fit",
+    "mobile_thread_status_and_back_navigation",
+    "no_backend_external_requests_or_browser_errors"
+  ],
+  "passed_check_count": 13,
+  "page_errors": 0,
+  "console_errors": 0,
+  "external_requests": 0,
+  "api_requests": 0,
+  "total_static_requests": 8,
+  "source_files_sha256": {
+    "apps/web/index.html": "000328d8f3fe911774e2536fb6fe567cf499a589eefbba5af59b08c2c11a4389",
+    "apps/web/app.js": "86b595688a9861efa4b65ad98790863aff84747b11221ffdc8b49c876c45f65a",
+    "apps/web/styles.css": "4c3e334c516ebf906f1764431297e46960ca4627a3b7a93e058dd15074a5d276",
+    "apps/web/assets/chatlens-mark.svg": "7f95d4f40f8eb99ce16e763d98c362114f2253dc747dfcc5a5793a6d6a0b4856"
+  },
+  "real_wechat_connected": false,
+  "backend_implemented": false,
+  "real_data_read": false,
+  "boundary": "Interactive frontend preview using explicitly synthetic in-memory data; no backend, real chat, collector integration or mobile-device validation."
+}
