@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "scope": "static_frontend_unified_design_delivery_only",
+  "package_name": "ChatLens-Web-Preview-20261101-r2.zip",
+  "bytes": 27656,
+  "sha256": "9723d61cc59bee9c7ff27c475ca99342373a10f432cce9fde3886f800ec6a882",
+  "file_count": 7,
+  "checks": [
+    "crc",
+    "exact_frontend_and_design_guide_inventory",
+    "current_four_ui_sources_match_final_browser_qa",
+    "all_payload_bytes_and_manifest_hashes",
+    "readme_link_adapted_to_included_design_guide",
+    "no_private_data_database_backend_or_runtime",
+    "original_preview_zip_preserved"
+  ],
+  "browser_checks_passed": 24,
+  "backend_implemented": false,
+  "real_data_read": false,
+  "user_design_approval": "待用户确认"
+}

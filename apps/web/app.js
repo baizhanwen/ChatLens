@@ -11,6 +11,13 @@
   let collectionState = 'running';
   let lastUpdate = new Date();
   let toastTimer;
+  let currentView = 'overview';
+  let previewMode = 'normal';
+  let previewTimer;
+  let wasMobile = window.innerWidth <= 640;
+  let demoStartedAt = Date.now();
+  let logRows = [];
+  const preferences = { density: 'spacious', autoScroll: true };
   const pending = new Map();
   const scrollPositions = new Map();
 
@@ -200,9 +207,11 @@
 
   function selectConversation(id) {
     if ($('message-scroll').clientHeight > 0) scrollPositions.set(activeId, $('message-scroll').scrollTop);
+    navigate('messages');
     const changed = activeId !== id;
     activeId = id;
     activeChat().unread = 0;
+    renderStatus();
     if (changed) $('message-search').value = '';
     pending.set(id, 0);
     $('workbench').classList.add('mobile-thread-open');
@@ -242,7 +251,7 @@
       return;
     }
     const chat = activeChat();
-    const nearBottom = atBottom();
+    const nearBottom = atBottom() && preferences.autoScroll;
     const body = newTexts[chat.id][sequence % newTexts[chat.id].length];
     const latestTime = chat.messages[chat.messages.length - 1].date.getTime();
     const message = { id: 'preview-new-' + sequence++, sender: chat.type === 'group' ? '许设计' : (chat.id === 'lin' ? '林女士' : '周先生'), body, date: new Date(Math.max(Date.now(), latestTime + 60000)), own: false };
@@ -253,49 +262,13 @@
     renderMessages({ bottom: nearBottom && !$('message-search').value.trim(), newId: message.id });
     renderNewMessageButton();
     renderStatus();
+    addLog('received');
     announce('模拟收到一条新消息，来自' + chat.name + '。');
     if (nearBottom) toast('已添加一条虚构新消息。');
   }
 
   function setButtonIcon(button, name, text) {
     button.replaceChildren(icon(name), element('span', '', text));
-  }
-
-  function renderStatus() {
-    const states = {
-      running: { title: '演示运行中', ribbon: '正在演示新消息接收', description: '点击模拟按钮，体验消息到达后的变化。', fact: '运行中' },
-      paused: { title: '演示已暂停', ribbon: '恢复后可继续模拟接收', description: '已展示的虚构消息保留在本页，恢复后继续体验。', fact: '已暂停' },
-      disconnected: { title: '演示连接中断', ribbon: '点击重新连接恢复演示', description: '这里只演示断开状态，没有真实采集服务连接。', fact: '连接中断' }
-    };
-    const state = states[collectionState];
-    $('ribbon-state').textContent = state.title;
-    $('ribbon-description').textContent = state.ribbon;
-    $('collection-ribbon').className = 'collection-ribbon ' + collectionState;
-    $('status-orbit').className = 'status-orbit ' + collectionState;
-    $('status-title').textContent = state.title;
-    $('status-description').textContent = state.description;
-    $('fact-state').replaceChildren(element('span', 'inline-dot'), document.createTextNode(state.fact));
-    $('last-update').textContent = timeText(lastUpdate) + '（演示）';
-    const total = conversations.reduce((sum, chat) => sum + chat.messages.length, 0);
-    $('total-messages').replaceChildren(document.createTextNode(String(total)), element('small', '', ' 条'));
-    $('simulate-message').disabled = collectionState !== 'running';
-    $('toggle-collection').disabled = collectionState === 'disconnected';
-    setButtonIcon($('toggle-collection'), collectionState === 'paused' ? 'play' : 'pause', collectionState === 'paused' ? '恢复演示接收' : '暂停演示接收');
-    setButtonIcon($('connection-demo'), 'link', collectionState === 'disconnected' ? '演示重新连接' : '演示连接中断');
-    $('connection-demo').append(icon('chevron'));
-  }
-
-  function setDetails(open) {
-    const workbench = $('workbench');
-    if (window.innerWidth <= 1060) {
-      workbench.classList.toggle('details-open', open);
-      workbench.classList.remove('details-hidden');
-    } else {
-      workbench.classList.toggle('details-hidden', !open);
-      workbench.classList.remove('details-open');
-    }
-    $('toggle-details').setAttribute('aria-expanded', String(open));
-    $('status-nav').classList.toggle('active', open);
   }
 
   function reset() {
@@ -309,6 +282,9 @@
     $('conversation-search').value = '';
     $('message-search').value = '';
     lastUpdate = new Date();
+    demoStartedAt = Date.now();
+    logRows = [];
+    addLog('started');
     document.querySelectorAll('.filter-button').forEach((button) => {
       button.classList.toggle('active', button.dataset.filter === 'all');
       button.setAttribute('aria-pressed', String(button.dataset.filter === 'all'));
@@ -320,63 +296,284 @@
     renderNewMessageButton();
   }
 
-  $('conversation-search').addEventListener('input', renderConversations);
-  $('message-search').addEventListener('input', () => { renderMessages({ restore: 0 }); });
-  document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => {
-    typeFilter = button.dataset.filter;
-    document.querySelectorAll('.filter-button').forEach((item) => {
-      item.classList.toggle('active', item === button);
-      item.setAttribute('aria-pressed', String(item === button));
+  function renderStatus() {
+    const states = {
+      running: { title: '演示运行中', short: '运行中', stage: '演示接收中', color: 'running', description: '正在展示虚构消息的接收流程，没有连接真实采集服务。' },
+      paused: { title: '演示已暂停', short: '已暂停', stage: '等待恢复演示', color: 'waiting', description: '虚构消息保留在本页，点击恢复后可以继续模拟来信。' },
+      disconnected: { title: '演示连接中断', short: '连接中断', stage: '演示连接已中断', color: 'failure', description: '这里只演示连接中断，没有真实后台任务失败。重新连接后可继续体验。' }
+    };
+    const state = states[collectionState];
+    const total = conversations.reduce((sum, chat) => sum + chat.messages.length, 0);
+    $('ribbon-state').textContent = state.title;
+    $('ribbon-description').textContent = state.short;
+    $('ribbon-tag').className = 'tag tag-' + state.color;
+    $('status-title').textContent = state.title;
+    $('status-title').className = 'tag tag-' + state.color;
+    $('status-description').textContent = state.description;
+    $('fact-state').textContent = state.short;
+    $('last-update').textContent = timeText(lastUpdate) + '（演示）';
+    $('total-messages').textContent = total + ' 条';
+    $('overview-count').replaceChildren(document.createTextNode(String(total)), element('small', '', ' 条'));
+    $('overview-state').textContent = state.short;
+    $('overview-state').style.color = 'var(--' + state.color + '-text)';
+    $('collection-total').replaceChildren(document.createTextNode(String(total)), element('small', '', ' 条'));
+    $('collection-stage-title').textContent = state.stage;
+    $('collection-stage-description').textContent = state.description;
+    $('collection-stage-tag').className = 'tag tag-' + state.color;
+    $('collection-stage-tag').textContent = state.title;
+    $('nav-state-dot').style.background = 'var(--' + state.color + '-text)';
+    $('nav-unread').textContent = String(conversations.reduce((sum, chat) => sum + chat.unread, 0));
+    $('simulate-message').disabled = collectionState !== 'running';
+    for (const id of ['toggle-collection', 'collection-toggle']) {
+      $(id).disabled = collectionState === 'disconnected';
+      setButtonIcon($(id), collectionState === 'paused' ? 'play' : 'pause', collectionState === 'paused' ? '恢复演示接收' : '暂停演示接收');
+    }
+    for (const id of ['connection-demo', 'collection-connection']) {
+      setButtonIcon($(id), 'link', collectionState === 'disconnected' ? '演示重新连接' : '演示连接中断');
+    }
+    renderRecent();
+  }
+
+  function renderRecent() {
+    const list = $('recent-conversations');
+    list.replaceChildren();
+    const sorted = [...conversations].sort((a, b) => b.messages.at(-1).date - a.messages.at(-1).date);
+    for (const chat of sorted) {
+      const last = chat.messages.at(-1);
+      const row = element('button', 'recent-row');
+      row.type = 'button';
+      row.setAttribute('aria-label', '打开' + chat.name);
+      const copy = element('span', 'recent-copy');
+      copy.append(element('strong', '', chat.name), element('span', '', last.body.replace(/\n/g, ' ')));
+      row.append(element('span', 'avatar ' + chat.color, chat.short), copy, element('time', '', timeText(last.date)), icon('chevron'));
+      row.addEventListener('click', () => selectConversation(chat.id));
+      list.append(row);
+    }
+  }
+
+  function addLog(kind) {
+    const entries = {
+      started: ['前端预览已就绪', '已载入 3 个虚构会话。真实采集服务尚未接入。'],
+      received: ['新增一条虚构消息', '消息已添加至当前页面，未读取或保存真实聊天。'],
+      paused: ['已暂停演示接收', '页面已有内容保留，可随时恢复演示。'],
+      resumed: ['已恢复演示接收', '现在可以继续模拟新消息。'],
+      disconnected: ['演示连接中断', '仅展示错误状态，不代表真实后台发生故障。'],
+      reconnected: ['演示连接已恢复', '本地演示状态已恢复，真实服务仍未接入。']
+    };
+    logRows.unshift({ ...{ title: entries[kind][0], description: entries[kind][1] }, date: new Date() });
+    logRows = logRows.slice(0, 8);
+    const list = $('activity-log');
+    list.replaceChildren();
+    for (const row of logRows) {
+      const item = element('li');
+      const copy = element('div');
+      copy.append(element('strong', '', row.title), element('p', '', row.description));
+      item.append(element('span', 'status-dot'), copy, element('time', '', timeText(row.date)));
+      list.append(item);
+    }
+    $('log-count').textContent = logRows.length + ' 条';
+  }
+
+  function navigate(view) {
+    if (!['overview', 'messages', 'collection'].includes(view)) return;
+    const changed = currentView !== view;
+    if (changed && currentView === 'messages' && $('message-scroll').clientHeight > 0) {
+      scrollPositions.set(activeId, $('message-scroll').scrollTop);
+    }
+    currentView = view;
+    document.querySelectorAll('[data-view]').forEach(section => { section.hidden = section.dataset.view !== view; });
+    document.querySelectorAll('[data-nav]').forEach(button => {
+      const active = button.dataset.nav === view;
+      button.classList.toggle('active', active);
+      if (active) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
     });
-    renderConversations();
-  }));
-  $('simulate-message').addEventListener('click', simulateMessage);
-  $('toggle-collection').addEventListener('click', () => {
+    $('breadcrumb-current').textContent = { overview: '沟通总览', messages: '会话消息', collection: '采集状态' }[view];
+    setDrawer(false, false);
+    if (view === 'messages' && changed) {
+      renderMessages({ bottom: !scrollPositions.has(activeId), restore: scrollPositions.get(activeId) });
+      renderNewMessageButton();
+    }
+    if (changed) window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+
+  function setDetails(open) {
+    const workbench = $('workbench');
+    workbench.classList.toggle('details-open', open);
+    workbench.classList.toggle('details-hidden', !open && window.innerWidth > 1250);
+    $('toggle-details').setAttribute('aria-expanded', String(open));
+    if (open && window.innerWidth <= 1250) requestAnimationFrame(() => $('status-panel').scrollIntoView({ block: 'nearest', behavior: 'instant' }));
+  }
+
+  function setDrawer(open, restoreFocus = true) {
+    const mobile = window.innerWidth <= 640;
+    open = open && mobile;
+    document.body.classList.toggle('nav-open', open);
+    $('sidebar-backdrop').hidden = !open;
+    $('nav-toggle').setAttribute('aria-expanded', String(open));
+    $('workspace').inert = open;
+    $('sidebar').inert = mobile && !open;
+    if (open) $('close-nav').focus();
+    else if (restoreFocus && mobile) $('nav-toggle').focus();
+  }
+
+  function previewState(mode) {
+    clearTimeout(previewTimer);
+    previewMode = mode;
+    $('preview-state').value = mode;
+    $('workbench').hidden = mode !== 'normal';
+    $('view-state').hidden = mode === 'normal';
+    $('view-state').className = 'card state-placeholder is-' + mode;
+    const retry = $('retry-preview');
+    retry.hidden = !['error', 'loading'].includes(mode);
+    retry.disabled = mode === 'loading';
+    retry.classList.toggle('is-loading', mode === 'loading');
+    retry.setAttribute('aria-busy', String(mode === 'loading'));
+    retry.textContent = mode === 'loading' ? '\u8f7d\u5165\u6f14\u793a\u4e2d' : '\u91cd\u65b0\u5c1d\u8bd5\u6f14\u793a';
+    if (mode === 'normal') {
+      renderMessages({ bottom: true });
+      return;
+    }
+    const states = {
+      loading: ['refresh', '正在载入虚构消息', '这是本地加载效果演示，当前没有后台请求或可计算进度。'],
+      empty: ['messages', '还没有可展示的消息', '这是空白状态预览。你可以返回内容，继续查看虚构会话。'],
+      error: ['info', '演示：暂时无法显示消息', '这是读取失败的视觉示例。点击重试仅会重新载入本页虚构数据。']
+    };
+    const row = states[mode];
+    $('view-state-icon').replaceChildren(icon(row[0]));
+    $('view-state-title').textContent = row[1];
+    $('view-state-description').textContent = row[2];
+    if (mode === 'loading') previewTimer = setTimeout(() => {
+      if (previewMode === 'loading') previewState('normal');
+    }, 800);
+  }
+
+  function toggleCollection() {
+    if (collectionState === 'disconnected') return;
     collectionState = collectionState === 'running' ? 'paused' : 'running';
+    addLog(collectionState === 'paused' ? 'paused' : 'resumed');
     renderStatus();
     toast(collectionState === 'paused' ? '已暂停本页演示接收。' : '已恢复本页演示接收。');
-  });
-  $('connection-demo').addEventListener('click', () => {
+  }
+
+  function toggleConnection() {
     collectionState = collectionState === 'disconnected' ? 'running' : 'disconnected';
+    addLog(collectionState === 'disconnected' ? 'disconnected' : 'reconnected');
     renderStatus();
-    toast(collectionState === 'disconnected' ? '正在演示连接中断，真实服务尚未接入。' : '演示连接已恢复，可以继续添加虚构消息。');
-  });
-  $('new-messages').addEventListener('click', () => {
-    if ($('message-search').value) {
+    toast(collectionState === 'disconnected' ? '正在演示连接中断，真实服务尚未接入。' : '演示连接已恢复。');
+  }
+
+  $('conversation-search').addEventListener('input', renderConversations);
+  $('message-search').addEventListener('input', () => renderMessages({ restore: 0 }));
+  function setFilter(value) {
+    typeFilter = value;
+    document.querySelectorAll('.filter-button').forEach(item => {
+      item.classList.toggle('active', item.dataset.filter === value);
+      item.setAttribute('aria-pressed', String(item.dataset.filter === value));
+    });
+    renderConversations();
+  }
+  document.querySelectorAll('.filter-button').forEach(button => button.addEventListener('click', () => setFilter(button.dataset.filter)));
+  document.querySelectorAll('[data-nav]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.nav)));
+  document.querySelectorAll('[data-open-view]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.openView)));
+  $('brand-home').addEventListener('click', event => { event.preventDefault(); navigate('overview'); });
+  $('overview-form').addEventListener('submit', event => {
+    event.preventDefault();
+    const query = $('overview-search').value.trim();
+    const chat = conversations.find(row => row.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+    setFilter('all');
+    $('conversation-search').value = '';
+    if (chat && query) {
+      selectConversation(chat.id);
       $('message-search').value = '';
-      renderMessages({ bottom: true });
+    } else {
+      navigate('messages');
+      $('workbench').classList.add('mobile-thread-open');
+      $('message-search').value = query;
+      if (query) {
+        const match = conversations.find(row => row.messages.some(message => (message.body + message.sender).toLocaleLowerCase().includes(query.toLocaleLowerCase())));
+        if (match) activeId = match.id;
+      }
+      renderHeader();
+      renderConversations();
+      renderMessages({ restore: 0 });
     }
+    previewState('normal');
+  });
+  $('simulate-message').addEventListener('click', simulateMessage);
+  ['toggle-collection', 'collection-toggle'].forEach(id => $(id).addEventListener('click', toggleCollection));
+  ['connection-demo', 'collection-connection'].forEach(id => $(id).addEventListener('click', toggleConnection));
+  $('new-messages').addEventListener('click', () => {
+    if ($('message-search').value) { $('message-search').value = ''; renderMessages({ bottom: true }); }
     scrollToBottom();
   });
   $('message-scroll').addEventListener('scroll', () => {
-    if (atBottom() && !$('message-search').value.trim()) {
-      pending.set(activeId, 0);
-      renderNewMessageButton();
-    }
+    if (atBottom() && !$('message-search').value.trim()) { pending.set(activeId, 0); renderNewMessageButton(); }
   }, { passive: true });
   $('toggle-details').addEventListener('click', () => setDetails($('toggle-details').getAttribute('aria-expanded') !== 'true'));
-  $('status-nav').addEventListener('click', () => { setDetails(true); $('status-panel').scrollTop = 0; });
   $('close-details').addEventListener('click', () => { setDetails(false); $('toggle-details').focus(); });
-  $('messages-nav').addEventListener('click', () => { $('workbench').classList.remove('mobile-thread-open'); setDetails(false); $('conversation-search').focus(); });
   $('mobile-back').addEventListener('click', () => { $('workbench').classList.remove('mobile-thread-open'); setDetails(false); });
-  $('reset-preview').addEventListener('click', () => { reset(); toast('已还原全部虚构示例；未更改任何真实数据。'); });
+  $('preview-state').addEventListener('change', event => previewState(event.target.value));
+  $('retry-preview').addEventListener('click', () => previewState('loading'));
+  $('restore-content').addEventListener('click', () => previewState('normal'));
+  $('reset-preview').addEventListener('click', () => { reset(); previewState('normal'); toast('已还原虚构示例，未更改真实数据。'); });
+  $('nav-toggle').addEventListener('click', () => setDrawer(true));
+  $('close-nav').addEventListener('click', () => setDrawer(false));
+  $('sidebar-backdrop').addEventListener('click', () => setDrawer(false));
   const dialog = $('preview-dialog');
-  $('preview-help').addEventListener('click', () => dialog.showModal());
+  $('preview-help').addEventListener('click', () => { setDrawer(false, false); dialog.showModal(); });
   $('close-preview').addEventListener('click', () => dialog.close());
   $('confirm-preview').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
-  document.addEventListener('keydown', (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'k') {
-      event.preventDefault();
-      $('workbench').classList.remove('mobile-thread-open');
-      $('conversation-search').focus();
+  dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+  const settings = $('settings-dialog');
+  $('settings-button').addEventListener('click', () => {
+    setDrawer(false, false);
+    $('pref-density').value = preferences.density;
+    $('pref-autoscroll').checked = preferences.autoScroll;
+    settings.showModal();
+  });
+  $('cancel-settings').addEventListener('click', () => settings.close());
+  $('settings-form').addEventListener('submit', event => {
+    event.preventDefault();
+    preferences.density = $('pref-density').value;
+    preferences.autoScroll = $('pref-autoscroll').checked;
+    document.body.classList.toggle('compact', preferences.density === 'compact');
+    settings.close();
+    toast('显示偏好已应用到本页，刷新后还原。');
+  });
+  [dialog, settings].forEach(modal => modal.addEventListener('close', () => {
+    if (window.innerWidth <= 640) $('nav-toggle').focus({ preventScroll: true });
+  }));
+  settings.addEventListener('click', event => { if (event.target === settings) settings.close(); });
+  document.addEventListener('keydown', event => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'k' && !dialog.open && !settings.open) {
+      event.preventDefault(); navigate('messages'); $('workbench').classList.remove('mobile-thread-open'); $('conversation-search').focus();
     }
-    if (event.key === 'Escape' && !dialog.open) setDetails(false);
+    if (event.key === 'Escape' && !dialog.open && !settings.open) {
+      if (document.body.classList.contains('nav-open')) setDrawer(false);
+      else setDetails(false);
+    }
+    if (event.key === 'Tab' && document.body.classList.contains('nav-open')) {
+      const focusable = [...$('sidebar').querySelectorAll('a,button')].filter(node => node.offsetParent !== null);
+      const first = focusable[0], last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
   });
   window.addEventListener('resize', () => {
-    const visible = window.innerWidth > 1060 ? !$('workbench').classList.contains('details-hidden') : $('workbench').classList.contains('details-open');
+    const mobile = window.innerWidth <= 640;
+    if (mobile !== wasMobile) setDrawer(false, false);
+    wasMobile = mobile;
+    const visible = window.innerWidth > 1250 ? !$('workbench').classList.contains('details-hidden') : $('workbench').classList.contains('details-open');
     $('toggle-details').setAttribute('aria-expanded', String(visible));
   });
+  setInterval(() => {
+    const seconds = Math.floor((Date.now() - demoStartedAt) / 1000);
+    $('demo-elapsed').textContent = String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
+  }, 1000);
+  $('search-shortcut').textContent = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ K' : 'Ctrl K';
   reset();
-  if (window.innerWidth <= 1060) setDetails(false);
+  navigate('overview');
+  setDrawer(false, false);
+  if (window.innerWidth <= 1250) setDetails(false);
 })();
