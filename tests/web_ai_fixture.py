@@ -99,28 +99,36 @@ def main():
                 'recorded_at_utc': now(), 'started_at_utc': started, 'resumed_from_checkpoint': True})
             os.replace(pending, private / 'web-status.json')
 
-        def commit(alias, body):
+        def commit(alias, body, *, sender='synthetic-sender'):
             nonlocal serial, cursors
             serial += 1
             after = dict(cursors)
             after[alias] += 1
             event = {'source_key': hashlib.sha256(('synthetic-ai-' + str(serial)).encode()).hexdigest(),
                 'alias': alias, 'source_local_id': after[alias],
-                'sent_at': int(datetime.now(timezone.utc).timestamp()), 'sender_id': 'synthetic-sender',
+                'sent_at': int(datetime.now(timezone.utc).timestamp()), 'sender_id': sender,
                 'body': body, 'observed_at': now()}
             result = store.commit(cursors, after, [event], epochs)
             cursors = after
             status()
             return result['total_messages']
 
-        write_private_json_new(private / 'catalog.json', {'schema_version': 1, 'conversations': [
+        write_private_json_new(private / 'catalog.json', {'schema_version': 1,
+            'binding_digest': store.binding_digest,
+            'identity': {'schema_version': 1, 'state': 'verified',
+                'self_sender_id': 'synthetic-verified-self', 'method': 'private_peer_account_match',
+                'binding_digest': store.binding_digest, 'proof': {
+                    'account_candidate_matched': True, 'contact_candidate_matched': True,
+                    'private_non_peer_unique': True, 'private_peer_id': 'synthetic-sender'}},
+            'conversations': [
             {'id': 'private_test', 'name': '合成客户·知秋', 'kind': 'private', 'sender_names': {'synthetic-sender': '合成客户'}},
             {'id': 'group_test', 'name': '合成订单测试群', 'kind': 'group', 'sender_names': {'synthetic-sender': '合成群成员'}}]})
         commit('private_test', '合成报价：客户询价 100 套，希望下周确认。<img src=x onerror=alert(1)> 仅为文字🙂')
         for index in range(2, 126):
-            commit('private_test', '合成普通文字 ' + str(index))
+            commit('private_test', '合成普通文字 ' + str(index),
+                   sender='' if index == 124 else 'synthetic-verified-self' if index == 125 else 'synthetic-sender')
         commit('group_test', '合成群内约定：交付时间待确认，付款前请先核对报价。')
-        synthetic = {'mode': 'ok', 'calls': 0, 'test_calls': 0, 'question_calls': 0}
+        synthetic = {'mode': 'ok', 'calls': 0, 'test_calls': 0, 'question_calls': 0, 'raw_identity_leaks': 0}
 
         class ProviderHandler(BaseHTTPRequestHandler):
             def log_message(self, *_):
@@ -129,6 +137,9 @@ def main():
             def do_POST(self):
                 raw = self.rfile.read(int(self.headers.get('Content-Length', 0)))
                 request = json.loads(raw)
+                if any(identifier in json.dumps(request) for identifier in
+                       ('synthetic-verified-self', 'synthetic-sender', 'private_peer_id')):
+                    synthetic['raw_identity_leaks'] += 1
                 synthetic['calls'] += 1
                 content = request.get('messages', [{}])[-1].get('content', '')
                 is_test = content == 'This is a connection test. Reply only OK.'

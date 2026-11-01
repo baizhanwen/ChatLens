@@ -16,7 +16,7 @@ SOURCES = (
     'Start-Web.ps1', 'Start-ChatLens.cmd', 'README-WEB.txt',
     'web_runtime.py', 'web_server.py', 'web_data.py', 'collector_web_meta.py',
     'collector_service.py', 'collector_supervisor.py', 'collector_private.py',
-    'continuous_reader.py', 'continuous_store.py', 'windows_selected_engine.py',
+    'continuous_reader.py', 'continuous_store.py', 'conversation_scope.py', 'wechat_identity.py', 'windows_selected_engine.py',
     'windows_selected_native.py', 'windows_selected_supervisor.py',
     'windows_keyproof_core.py', 'windows_keyproof_platform.py',
     'THIRD-PARTY-SELECTED-NOTICES.txt',

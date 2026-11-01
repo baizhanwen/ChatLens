@@ -1,0 +1,16 @@
+{
+  "status": "通过",
+  "scope": "read_only_current_mac_browser",
+  "incoming_rows": 3,
+  "outgoing_rows": 1,
+  "unknown_rows": 0,
+  "scope_management_entry_visible": true,
+  "existing_selection_preserved": true,
+  "readable_picker_rows": 3,
+  "checked_rows": 2,
+  "mutations_performed": 0,
+  "external_browser_requests": 0,
+  "browser_runtime_errors": 0,
+  "real_chat_screenshots_saved": false,
+  "real_model_called": false
+}

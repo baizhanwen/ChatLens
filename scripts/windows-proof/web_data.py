@@ -1,7 +1,7 @@
 """Read-only view of the already authorized local collector store.
 
 No source WeChat database, decryption key or writer lock is opened here.
-Only committed rows belonging to the two fixed selected aliases leave this
+Only committed rows belonging to the current bound selected aliases leave this
 boundary. Names come from a private, producer-written catalog, never guesses.
 """
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 import ctypes as C
+import json
 import os
 from pathlib import Path
 import sqlite3
@@ -17,9 +18,11 @@ import time
 
 from collector_private import ensure_private_dir, read_private_json, validate_local_path
 from continuous_store import APPLICATION_ID, VERSION
+from conversation_scope import LEGACY_ALIASES, MAX_CONVERSATIONS, valid_alias
+from wechat_identity import message_direction, trusted_self_identity
 
 
-ALIASES = ('private_test', 'group_test')
+ALIASES = LEGACY_ALIASES  # Historical import compatibility, never active scope authority.
 KINDS = {'private_test': 'private', 'group_test': 'group'}
 MAX_PAGE = 100
 MAX_QUERY_BYTES = 1024
@@ -222,21 +225,35 @@ class CollectorWebData:
                     time.sleep(0.005)
         raise WebDataError('web_metadata_unavailable') from None
 
-    def _catalog(self, binding_digest, source):
+    def _catalog(self, binding_digest, source, *, connection=None):
         if source is None:
+            # Missing optional legacy labels must never reinterpret a dynamic
+            # scope as the historical pair of conversations.
+            if connection is None:
+                with self._open(allow_uninitialized=True) as (snapshot, _):
+                    return self._catalog(binding_digest, source, connection=snapshot)
+            cursors = json.loads(connection.execute('SELECT cursors FROM checkpoint WHERE id=1').fetchone()[0])
+            aliases = {alias for values in cursors.values() if isinstance(values, dict) for alias in values}
+            dynamic = connection.execute('SELECT 1 FROM messages WHERE alias GLOB ? LIMIT 1',
+                                         ('chat_' + '[0-9a-f]' * 20,)).fetchone()
+            if dynamic or any(alias not in ALIASES and valid_alias(alias) for alias in aliases):
+                raise WebDataError('web_catalog_scope_unavailable')
             return {alias: {'name': '所选私聊' if alias == 'private_test' else '所选群聊',
-                            'kind': KINDS[alias], 'sender_names': {}} for alias in ALIASES}
+                            'kind': KINDS[alias], 'sender_names': {},
+                            'self_sender_id': None, 'identity_verified': False} for alias in ALIASES}
         try:
             if (not isinstance(source, dict) or type(source.get('schema_version')) is not int
                     or source['schema_version'] != 1 or not isinstance(source.get('conversations'), list)
-                    or len(source['conversations']) != 2):
+                    or not 1 <= len(source['conversations']) <= MAX_CONVERSATIONS):
                 raise ValueError
             if source.get('binding_digest') is not None and source['binding_digest'] != binding_digest:
                 raise WebDataError('web_catalog_binding_mismatch')
+            self_sender_id = trusted_self_identity(source, binding_digest)
             result = {}
             for row in source['conversations']:
                 alias, name = row['id'], row['name']
-                if alias not in ALIASES or alias in result or row['kind'] != KINDS[alias]:
+                if (not valid_alias(alias) or alias in result or row['kind'] not in ('private', 'group')
+                        or alias in KINDS and row['kind'] != KINDS[alias]):
                     raise ValueError
                 if not isinstance(name, str) or not name.strip() or len(name) > 256 or '\0' in name:
                     raise ValueError
@@ -245,10 +262,12 @@ class CollectorWebData:
                         or any(not isinstance(k, str) or len(k) > 256 or not isinstance(v, str)
                                or not v.strip() or len(v) > 256 or '\0' in v for k, v in names.items())):
                     raise ValueError
-                result[alias] = {'name': name, 'kind': row['kind'], 'sender_names': names}
-            if set(result) != set(ALIASES):
-                raise ValueError
-            return result
+                result[alias] = {'name': name, 'kind': row['kind'], 'sender_names': names,
+                                 'self_sender_id': self_sender_id, 'identity_verified': self_sender_id is not None}
+            if set(result) != set(LEGACY_ALIASES) and source.get('binding_digest') != binding_digest:
+                raise WebDataError('web_catalog_binding_required')
+            priority = {alias: index for index, alias in enumerate(LEGACY_ALIASES)}
+            return dict(sorted(result.items(), key=lambda row: (priority.get(row[0], len(priority)), row[0])))
         except WebDataError:
             raise
         except (KeyError, TypeError, ValueError):
@@ -259,9 +278,9 @@ class CollectorWebData:
         # the SQLite snapshot, so they never extend the writer's lock wait.
         source = self._metadata('catalog.json')
         with self._open() as (connection, state):
-            catalog = self._catalog(state['binding_digest'], source)
+            catalog = self._catalog(state['binding_digest'], source, connection=connection)
             rows = []
-            for alias in ALIASES:
+            for alias in catalog:
                 count, latest = connection.execute('SELECT COUNT(*),MAX(rowid) FROM messages WHERE alias=?', (alias,)).fetchone()
                 last = connection.execute('SELECT observed_at,substr(body,1,200) AS preview FROM messages WHERE rowid=? AND alias=?',
                                           (latest, alias)).fetchone() if latest is not None else None
@@ -270,8 +289,8 @@ class CollectorWebData:
                              'latest_preview': last['preview'] if last else ''})
             return {'conversations': rows}
 
-    def messages(self, conversation, *, before=None, after=None, limit=100, q=''):
-        if conversation not in ALIASES:
+    def messages(self, conversation=None, *, before=None, after=None, limit=100, q=''):
+        if conversation is not None and not valid_alias(conversation):
             raise WebDataError('web_conversation_not_selected', 400)
         if type(limit) is not int or not 1 <= limit <= MAX_PAGE:
             raise WebDataError('web_message_limit_invalid', 400)
@@ -288,7 +307,11 @@ class CollectorWebData:
             raise WebDataError('web_message_query_invalid', 400)
         source_catalog = self._metadata('catalog.json')
         with self._open() as (connection, state):
-            catalog = self._catalog(state['binding_digest'], source_catalog)
+            catalog = self._catalog(state['binding_digest'], source_catalog, connection=connection)
+            if conversation is None:
+                conversation = next(iter(catalog))
+            if conversation not in catalog:
+                raise WebDataError('web_conversation_not_selected', 400)
             where, params = ['alias=?'], [conversation]
             if before is not None:
                 where.append('rowid<?'); params.append(before)
@@ -314,11 +337,15 @@ class CollectorWebData:
                     has_more = True
                     break
                 body_bytes += size
+                direction = message_direction(source_catalog, state['binding_digest'], row['sender_id'])
                 label = catalog[conversation]['sender_names'].get(row['sender_id'])
+                if direction == 'outgoing':
+                    label = '我'
                 result.append({'id': row['rowid'], 'conversation_id': conversation, 'conversation': conversation,
                                'body': body, 'sender': label if label else '未知发送人', 'sender_known': bool(label),
                                'sent_at': row['sent_at'] if type(row['sent_at']) is int else None,
-                               'observed_at': _public_time(row['observed_at']), 'own': False})
+                               'observed_at': _public_time(row['observed_at']), 'own': direction == 'outgoing',
+                               'direction': direction})
             if not ascending:
                 result.reverse()
             return {'messages': result, 'has_more': has_more,
@@ -331,8 +358,12 @@ class CollectorWebData:
             current = datetime.fromtimestamp(current, timezone.utc)
         if current.tzinfo is None:
             raise WebDataError('web_clock_invalid')
+        source_catalog = self._metadata('catalog.json')
         with self._open(allow_uninitialized=True) as (connection, checkpoint):
-            total = connection.execute('SELECT COUNT(*) FROM messages WHERE alias IN (?,?)', ALIASES).fetchone()[0]
+            catalog = self._catalog(checkpoint['binding_digest'], source_catalog, connection=connection)
+            aliases = tuple(catalog)
+            total = connection.execute('SELECT COUNT(*) FROM messages WHERE alias IN (%s)' %
+                                       ','.join('?' for _ in aliases), aliases).fetchone()[0]
             last_commit = _public_time(checkpoint['last_commit_at'])
             binding = checkpoint['binding_digest']
         source = self._metadata('web-status.json')

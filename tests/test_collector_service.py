@@ -298,11 +298,13 @@ class CollectorServiceSessionTests(unittest.TestCase):
                 return {'initialized': True, 'last_commit_at': '2026-01-01T00:00:00+00:00'}
             def close(self):
                 events.append('store_closed')
-            def sender_ids_by_alias(self):
+            def sender_ids_by_alias(self, *, include_unknown=False):
                 return {'private_test': [PEER], 'group_test': [PEER]}
 
         class DummyMetadata:
             failed = False
+            def ensure_catalog(self, config):
+                events.append('catalog_scope_ready')
             def __init__(self, *args):
                 events.append('metadata_created')
             def refresh_catalog(self, *args):

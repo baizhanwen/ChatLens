@@ -1,0 +1,41 @@
+{
+  "result": "passed",
+  "source": "synthetic_commits_into_actual_collector_store",
+  "transport": "actual_authenticated_loopback_http",
+  "race_check": "actual_db_search_response_delayed_800ms",
+  "viewports": [
+    "1440x1000",
+    "988x776",
+    "390x844"
+  ],
+  "settings_surface": "dedicated_page",
+  "real_wechat_validation": "not_performed",
+  "source_sha256": {
+    "apps/web/app.js": "5547c746b0348f914d7a973fca4f92b79ac01c464c35a3a47aebfeddea945f83",
+    "apps/web/index.html": "af99a9bce22c16afeb6198f45ffba775fc314ec7cd312ff0156ba2246ab91f91",
+    "apps/web/styles.css": "3e0c1a51adadcf0fb653c80240af7fe8e6d34eef31f5780e4d5406a09fb48f92",
+    "scripts/windows-proof/web_data.py": "7b6917859fa3bb5d9f5f8517011ef2376808692b3e64c52feb7aeb2edf8aaee1",
+    "scripts/windows-proof/wechat_identity.py": "af4399b1a0f06f9417f5de9c244b364cd7ad16eb2417cd591199bb3a9406fcbf",
+    "scripts/windows-proof/web_server.py": "eee83d0db863f8370e14e32a4fc76dc15b89ca67e7a4ac38c66623e3b2e3253a",
+    "tests/web_live_fixture.py": "ef13e72f2214b0861701c9cd0d6796dbf81347f49c045c14ff2c01219091c00f",
+    "scripts/web-live-smoke.cjs": "e3c544e45eba214035d144fa244be748af5380d7827ae9e1c355c72f904e4c42"
+  },
+  "checks": [
+    "authenticated_real_http_bootstrap_and_fragment_removed",
+    "dedicated_settings_navigation_and_display_preferences_keep_live_data",
+    "988px_ai_and_settings_fit_without_horizontal_overflow",
+    "selected_conversations_real_latest100_and_older_pagination",
+    "server_search_pagination_separate_from_incremental_cursor",
+    "source_commit_polling_xss_literal_unknown_sender_and_no_duplicate",
+    "reading_position_preserved_and_new_message_button",
+    "conversation_switch_search_responses_cannot_replace_other_thread",
+    "actual_service_stop_keeps_rows_then_reconnect_catches_up",
+    "actual_collector_status_does_not_claim_collecting_when_stopped",
+    "390px_drawer_list_thread_detail_and_status_no_overflow",
+    "real_http_without_authorization_shows_error_and_never_fiction"
+  ],
+  "api_request_count": 44,
+  "external_requests": 0,
+  "browser_runtime_errors": 0,
+  "fixture_stderr_bytes": 0
+}

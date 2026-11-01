@@ -15,6 +15,7 @@ if str(SCRIPTS) not in sys.path:
 from ai_knowledge import KnowledgeIndex, KnowledgeError, MAX_CANDIDATES, validate_citations
 from collector_private import write_private_json_new
 from continuous_store import CollectorStore
+from wechat_identity import establish_identity
 
 NOW = datetime(2026, 11, 5, 10, 0, tzinfo=timezone(timedelta(hours=8)))
 TODAY = {'start': NOW.replace(hour=0).isoformat(), 'end': (NOW.replace(hour=0) + timedelta(days=1)).isoformat()}
@@ -49,7 +50,13 @@ class KnowledgeIndexTests(unittest.TestCase):
                'sent_at': int(NOW.timestamp()) + self.serial if sent_at == 'default' else sent_at,
                'sender_id': 'synthetic_raw_sender_id', 'body': body,
                'observed_at': observed_at or NOW.astimezone(timezone.utc).isoformat()}
-        self.store.commit({}, {}, [row], {})
+        if alias == 'unselected_alias':
+            # Deliberately corrupted external row: production commits now
+            # reject cross-scope data, while readers must still exclude it.
+            self.store._connection.execute('INSERT INTO messages (source_key,alias,source_local_id,sent_at,sender_id,body,observed_at) VALUES (?,?,?,?,?,?,?)',
+                tuple(row[key] for key in ('source_key', 'alias', 'source_local_id', 'sent_at', 'sender_id', 'body', 'observed_at')))
+        else:
+            self.store.commit({}, {}, [row], {})
         return self.serial
 
     def test_chinese_without_spaces_matches_and_adds_only_same_chat_neighbor_context(self):
@@ -67,6 +74,39 @@ class KnowledgeIndexTests(unittest.TestCase):
         self.assertEqual(result['coverage']['available_count'], 4)
         self.assertNotIn('SYNTHETIC_EXCLUDED_BODY', json.dumps(result, ensure_ascii=False))
         self.assertEqual(result['groups'][0]['conversation_id'], 'private_test')
+
+    def test_direction_filter_and_citation_context_share_verified_account_identity(self):
+        received = self.add('合同收到。')
+        sent = self.add('合同发出。')
+        self.add('合同身份未知。')
+        self.add('合同非法身份。')
+        own_id = 'synthetic-self-id'
+        self.store._connection.execute('UPDATE messages SET sender_id=? WHERE rowid=?', (own_id, sent))
+        self.store._connection.execute('UPDATE messages SET sender_id=NULL WHERE rowid=3')
+        self.store._connection.execute('UPDATE messages SET sender_id=? WHERE rowid=4', ('not a valid sender',))
+        path = self.private / 'catalog.json'
+        document = json.loads(path.read_text())
+        document['binding_digest'] = self.store.binding_digest
+        document['identity'] = establish_identity(self.store.binding_digest, [own_id], [own_id],
+            [{'alias': 'private_test', 'chat_id': 'synthetic_raw_sender_id'}],
+            {'private_test': ['synthetic_raw_sender_id', own_id]})
+        path.unlink(); write_private_json_new(path, document)
+        incoming = self.index.snapshot('合同', direction='incoming')
+        self.assertEqual([row['message_id'] for row in incoming['evidence']], [received])
+        self.assertEqual(incoming['evidence'][0]['direction'], 'incoming')
+        outgoing = self.index.snapshot('合同', direction='outgoing')
+        self.assertEqual([row['message_id'] for row in outgoing['evidence']], [sent])
+        self.assertTrue(outgoing['evidence'][0]['own'])
+        self.assertEqual(outgoing['provider_context']['messages'][0]['direction'], 'outgoing')
+        self.assertNotIn(own_id, json.dumps(outgoing['provider_context']))
+        context = self.index.lookup_message_context('private_test', sent)
+        target = next(row for row in context['messages'] if row['anchor'])
+        self.assertTrue(target['own'])
+        document['identity']['proof']['private_non_peer_unique'] = False
+        path.unlink(); write_private_json_new(path, document)
+        with self.assertRaises(KnowledgeError) as caught:
+            self.index.snapshot('合同', direction='incoming')
+        self.assertEqual(caught.exception.code, 'knowledge_direction_identity_unavailable')
 
     def test_display_name_is_local_relevance_hint_when_body_never_repeats_customer_name(self):
         target = self.add('这笔订单周五送达。')

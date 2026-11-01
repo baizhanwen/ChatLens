@@ -264,8 +264,9 @@ def main():
             metadata = WebMetadata(args.data_dir / 'private', store.binding_digest, report['started_at_utc'])
             heartbeat.metadata = metadata
             heartbeat.emit('starting', report['total_messages'])
+            metadata.ensure_catalog(scope['config'])
             try:
-                metadata.refresh_catalog(driver, root, keys, scope['config'], store.sender_ids_by_alias())
+                metadata.refresh_catalog(driver, root, keys, scope['config'], store.sender_ids_by_alias(include_unknown=True))
             except Exception:
                 metadata.failed = True
         signal.signal(signal.SIGINT, signal.SIG_IGN)  # Parent sends our local stop request.
@@ -282,7 +283,8 @@ def main():
             def on_commit():
                 if metadata is not None:
                     try:
-                        metadata.refresh_catalog(driver, root, keys, scope['config'], store.sender_ids_by_alias())
+                        metadata.ensure_catalog(scope['config'])
+                        metadata.refresh_catalog(driver, root, keys, scope['config'], store.sender_ids_by_alias(include_unknown=True))
                     except Exception:
                         metadata.failed = True
             collect_loop(reader, store, native, lambda: (args.output / 'stop.request').exists(), heartbeat, report,

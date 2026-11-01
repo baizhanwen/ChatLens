@@ -16,7 +16,8 @@ MODULES = Path(__file__).resolve().parents[1] / 'scripts/windows-proof'
 if str(MODULES) not in sys.path:
     sys.path.insert(0, str(MODULES))
 import continuous_reader as reader_module
-from continuous_store import CollectorStore, DB_NAME
+from continuous_store import CollectorStore, DB_NAME, StoreError
+from conversation_scope import alias_for
 
 try:
     import sqlcipher3.dbapi2 as cipher
@@ -467,6 +468,86 @@ class ContinuousReaderTests(unittest.TestCase):
         self.assertEqual(saved[0][-1], OTHER + ':\nSYNTHETIC_DIFFERENT_PREFIX')
         self.assertEqual(saved[1][-2], None)
         self.assertEqual(saved[2][-1], PEER + ':\nSYNTHETIC_PRIVATE_PREFIX')
+
+    def multi_scope(self):
+        chats = (PEER, 'synthetic_reader_peer_b', GROUP, 'synthetic_reader_group_b@chatroom')
+        for connection in self.writers.values():
+            for chat in chats:
+                if chat not in (PEER, GROUP):
+                    self.create_table(connection, chat)
+            connection.commit()
+        for chat in chats:
+            if chat not in (PEER, GROUP):
+                self.insert(chat, 1, OLD)
+        self.writer.commit()
+        self.config = {'conversations': [{'alias': alias_for(chat), 'chat_id': chat, 'table': table(chat)} for chat in chats]}
+        self.binding = {'account': 'synthetic-account-only', 'config': self.config}
+        return chats
+
+    def test_many_private_and_group_conversations_keep_independent_cursors_and_restart_recovery(self):
+        chats = self.multi_scope()
+        reader, storage = self.reader()
+        baseline = reader.baseline_completed_at
+        expected = {}
+        for index, chat in enumerate(chats):
+            body = 'SYNTHETIC_SELECTED_MULTI_%d' % index
+            expected[alias_for(chat)] = body
+            self.insert(chat, 2, (PEER + ':\n' if chat.endswith('@chatroom') else '') + body)
+        self.insert(OTHER, 2, UNSELECTED)
+        self.writer.commit()
+        self.assertEqual(reader.poll()['new_messages'], 4)
+        self.assertEqual({row[0]: row[-1] for row in self.saved()}, expected)
+        self.assertTrue(all(set(value) == set(expected) for value in storage.snapshot()['cursors'].values()))
+        reader.close(); storage.close()
+        for chat in (chats[1], chats[3]):
+            self.insert(chat, 3, 'SYNTHETIC_PAUSED_MULTI')
+        self.writer.commit()
+        restored, storage = self.reader()
+        self.assertTrue(restored.resumed)
+        self.assertEqual(restored.baseline_completed_at, baseline)
+        self.assertEqual(restored.poll()['new_messages'], 2)
+        self.assertEqual(restored.poll()['new_messages'], 0)
+        self.assertEqual(storage.stats()['total_messages'], 6)
+        self.assertEqual(self.driver.old_reads, [])
+        self.assertEqual(self.driver.forbidden_reads, [])
+
+    def test_large_message_above_per_conversation_share_does_not_starve_later_scopes(self):
+        chats = self.multi_scope()
+        with patch.object(reader_module, 'MAX_BATCH_BODY_BYTES', 4096):
+            reader, storage = self.reader()
+            self.assertLess(reader._pair_body_budget, 2500)
+            for chat in chats:
+                self.insert(chat, 2, 'S' * 2500)
+            self.writer.commit()
+            self.assertEqual([reader.poll()['new_messages'] for _ in range(5)], [1, 1, 1, 1, 0])
+        self.assertEqual(storage.stats()['total_messages'], 4)
+        cursors = storage.snapshot()['cursors']['message/message_0.db']
+        for chat in chats:
+            self.assertEqual(cursors[alias_for(chat)]['local_id'], 2)
+
+    def test_batch_message_limit_uses_actual_pairs_without_losing_other_shard_messages(self):
+        chats = self.multi_scope()
+        with patch.object(reader_module, 'MAX_BATCH_MESSAGES', 4):
+            reader, storage = self.reader()
+            self.assertEqual(reader._pair_page_size, 1)
+            for shard in (0, 1):
+                for chat in chats:
+                    self.insert(chat, 2, 'SYNTHETIC_MULTI_PAIR_%d' % shard, shard=shard)
+                self.writers['message/message_%d.db' % shard].commit()
+            counts = [reader.poll()['new_messages'] for _ in range(3)]
+            self.assertEqual(counts, [4, 4, 0])
+            self.assertEqual(storage.stats()['total_messages'], 8)
+
+    def test_changed_selected_conversations_cannot_reuse_the_original_checkpoint(self):
+        chats = self.multi_scope()
+        reader, storage = self.reader()
+        snapshot = storage.snapshot()
+        reader.close(); storage.close()
+        changed = {'account': 'synthetic-account-only', 'config': {'conversations': self.config['conversations'][:-1]}}
+        with self.assertRaisesRegex(StoreError, 'collector_state_binding_mismatch'):
+            CollectorStore(self.state, changed)
+        resumed = self.storage()
+        self.assertEqual(resumed.snapshot(), snapshot)
 
 
 if __name__ == '__main__':

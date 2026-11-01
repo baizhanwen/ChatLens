@@ -13,12 +13,13 @@ import time
 from ai_knowledge import KnowledgeIndex, validate_citations
 from ai_query import plan_query, QueryPlanError
 from ai_statistics import LocalStatistics
+from wechat_identity import trusted_self_identity
+from conversation_scope import MAX_CONVERSATIONS, valid_alias
 import ai_provider
 from collector_private import ensure_private_dir, read_private_json, write_private_json_new, MAX_NEW_JSON_BYTES
 from web_data import CollectorWebData
 
 IDENTIFIER = re.compile(r'[a-f0-9]{32}\Z')
-ALIASES = ('private_test', 'group_test')
 TERMINAL = {'done', 'error', 'cancelled'}
 LOCAL_TIMEZONE = timezone(timedelta(hours=8), 'Asia/Shanghai')
 MAX_ANSWER_BYTES = 65536
@@ -139,10 +140,20 @@ class AiAssistant:
     def _public_plan(self, plan):
         catalog = self.knowledge.catalog()
         selected = plan.get('scope', [])
-        scope_label = '、'.join(catalog[alias]['name'] for alias in selected if alias in catalog)
+        entries = [catalog[alias] for alias in selected if alias in catalog]
+        if len(entries) > 3:
+            private = sum(row['kind'] == 'private' for row in entries)
+            group = sum(row['kind'] == 'group' for row in entries)
+            scope_label = f'{len(entries)} 个已选会话（{private} 个私聊 · {group} 个群聊）'
+        else:
+            scope_label = '、'.join(row['name'][:48] + ('…' if len(row['name']) > 48 else '') for row in entries)
         operations = {'messages': '消息条数', 'senders': '消息发送者', 'conversations': '会话分布',
                       'ranking': '活跃排行', 'latest': '最近消息', 'trend': '消息趋势'}
         operation = operations.get(plan.get('metric'), '聊天分析')
+        if plan.get('group_by') == 'direction':
+            operation = '收到与发出分开统计'
+        elif plan.get('direction') in {'incoming', 'outgoing'}:
+            operation = ('收到的' if plan['direction'] == 'incoming' else '发出的') + operation
         time_label = ('页面所选时间' if plan.get('route') == 'clarify' else plan.get('time_label')) or '所选时间'
         bounds = plan.get('time_range') or {}
         start, end = bounds.get('start'), bounds.get('end')
@@ -182,14 +193,17 @@ class AiAssistant:
         self._bound()
         conversations = self.data.conversations()['conversations']
         state = self.data.status()
-        with self.data._open() as (connection, _):
+        metadata = self.data._metadata('catalog.json')
+        with self.data._open() as (connection, snapshot_state):
             baseline = connection.execute('SELECT baseline_completed_at FROM checkpoint WHERE id=1').fetchone()[0]
+            verified_identity = trusted_self_identity(metadata, snapshot_state['binding_digest']) is not None
         with self.lock:
             busy = any(job['worker'].is_alive() for job in self.jobs.values() if job.get('worker'))
         return {'provider': self.provider.public_config(self.directory),
                 'knowledge': {'ready': True, 'conversation_count': len(conversations),
                     'message_count': sum(row['count'] for row in conversations),
-                    'last_saved_at': state.get('last_update'), 'baseline_at': baseline},
+                    'last_saved_at': state.get('last_update'), 'baseline_at': baseline,
+                    'direction_identity': {'state': 'verified' if verified_identity else 'unknown', 'verified': verified_identity}},
                 'busy': busy}
 
     def config(self):
@@ -252,7 +266,8 @@ class AiAssistant:
             question.encode('utf-8')
         except UnicodeError:
             raise AiError('ai_question_invalid', '问题中包含无法读取的文字。') from None
-        if (not isinstance(scope, list) or not scope or any(alias not in ALIASES for alias in scope)
+        if (not isinstance(scope, list) or not 1 <= len(scope) <= MAX_CONVERSATIONS
+                or any(not valid_alias(alias) for alias in scope)
                 or len(set(scope)) != len(scope)):
             raise AiError('ai_scope_invalid', '请选择知识库中的有效会话。')
         time_bounds(choice)
@@ -304,6 +319,8 @@ class AiAssistant:
         if not job['thread_id']:
             return
         with self.lock:
+            if self.closed:
+                raise AiError('ai_service_stopped', 'AI 服务已停止。', 503)
             thread = self._thread(job['thread_id'])
             message.update(created_at=now(), scope=job['scope'], time_range=job['time_range'])
             if job.get('_plan'):
@@ -379,7 +396,7 @@ class AiAssistant:
             fallback = bool(re.search(r'[\u3400-\u9fff]', retrieval_query) or len(retrieval_query.split()) > 1)
             snapshot = self.knowledge.snapshot(retrieval_query, scope=plan['scope'],
                                                time_range=plan['time_range'], fallback_recent=fallback,
-                                               filters=plan.get('filters'))
+                                               filters=plan.get('filters'), direction=plan.get('direction', 'all'))
             local_answer = local['answer'] if local else None
             if local:
                 # Statistics are computed over every matching stored row. The
@@ -474,6 +491,7 @@ class AiAssistant:
                         'ai_history_limit': '当前对话记录已较长，本轮未调用模型。请开始新对话继续。',
                         'ai_answer_too_large': '本轮回答过长或格式异常，请缩小问题范围后重试。',
                         'ai_statistics_failed': '本机统计暂未完成，请缩小时间或会话范围后重试；原消息仍可查看。',
+                        'knowledge_direction_identity_unavailable': '本人发送身份暂时无法可靠核对，本轮未发送聊天内容。请等待本机身份核对后重试。',
                         'ai_provider_timeout': '模型响应超时，请稍后重试。',
                         'ai_provider_authentication_failed': '模型服务未接受当前 API Key，请在模型设置中检查。',
                         'ai_provider_rate_limited': '模型服务暂时限流，请稍后重试。',
@@ -517,7 +535,7 @@ class AiAssistant:
         for row in result['messages']:
             row['id'] = row['message_id']
             row['conversation'] = row['conversation_id']
-            row['own'] = False
+            row['own'] = row.get('direction') == 'outgoing' if row.get('direction') != 'unknown' else None
         return result
 
     def close(self):

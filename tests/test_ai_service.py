@@ -16,6 +16,7 @@ import ai_provider
 import ai_service as service
 from collector_private import read_private_json, write_private_json_new
 from continuous_store import CollectorStore
+from wechat_identity import establish_identity
 
 SYNTHETIC_KEY = 'SYNTHETIC_NOT_A_REAL_MODEL_API_KEY'
 
@@ -61,7 +62,14 @@ class AiAssistantTests(unittest.TestCase):
             directory.mkdir(mode=0o700)
         self.store = CollectorStore(self.store_dir, {'account': 'SYNTHETIC_SERVICE_ACCOUNT', 'selected': ['private_test', 'group_test']})
         self.store.initialize({}, {})
-        write_private_json_new(self.private / 'catalog.json', {'schema_version': 1, 'conversations': [
+        # Explicit synthetic proof fixture; producer corroboration is tested in
+        # the identity module, while these tests exercise its consumer contract.
+        binding = self.store.binding_digest
+        identity = establish_identity(binding, ['synthetic_self_sender'], ['synthetic_self_sender'],
+            [{'alias': 'private_test', 'chat_id': 'synthetic_raw_sender_id'}],
+            {'private_test': ['synthetic_raw_sender_id', 'synthetic_self_sender']})
+        write_private_json_new(self.private / 'catalog.json', {'schema_version': 1, 'binding_digest': binding,
+            'identity': identity, 'conversations': [
             {'id': 'private_test', 'name': '合成私聊甲', 'kind': 'private', 'sender_names': {'synthetic_raw_sender_id': '合成客户'}},
             {'id': 'group_test', 'name': '合成项目群', 'kind': 'group', 'sender_names': {'synthetic_raw_sender_id': '合成成员'}}]})
         self.provider = FakeProvider()
@@ -82,9 +90,14 @@ class AiAssistantTests(unittest.TestCase):
     def add(self, body, alias='private_test'):
         self.serial += 1
         observed = datetime.now(timezone.utc)
-        self.store.commit({}, {}, [{'source_key': hashlib.sha256(('synthetic-ai-service-%d' % self.serial).encode()).hexdigest(),
+        row = {'source_key': hashlib.sha256(('synthetic-ai-service-%d' % self.serial).encode()).hexdigest(),
             'alias': alias, 'source_local_id': self.serial, 'sent_at': int(observed.timestamp()),
-            'sender_id': 'synthetic_raw_sender_id', 'body': body, 'observed_at': observed.isoformat()}], {})
+            'sender_id': 'synthetic_raw_sender_id', 'body': body, 'observed_at': observed.isoformat()}
+        if alias == 'unselected_alias':
+            self.store._connection.execute('INSERT INTO messages (source_key,alias,source_local_id,sent_at,sender_id,body,observed_at) VALUES (?,?,?,?,?,?,?)',
+                tuple(row[key] for key in ('source_key', 'alias', 'source_local_id', 'sent_at', 'sender_id', 'body', 'observed_at')))
+        else:
+            self.store.commit({}, {}, [row], {})
 
     def question(self, question='今天有哪些重点', scope=None, time_range='all', thread_id=None, **extra):
         target = self.assistant.config()['target_fingerprint']

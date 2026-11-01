@@ -14,10 +14,11 @@ import time
 
 from ai_knowledge import EVENT_TIME, VALID_SENT, KnowledgeError, MAX_CONTEXT_CHARS, MAX_EVIDENCE
 from web_data import WebDataError
+from wechat_identity import trusted_self_identity, valid_sender
 
 LOCAL_TIMEZONE = timezone(timedelta(hours=8), 'Asia/Shanghai')
 METRICS = {'messages', 'senders', 'conversations', 'ranking', 'latest', 'trend'}
-GROUPS = {'sender', 'conversation', 'day'}
+GROUPS = {'sender', 'conversation', 'day', 'direction'}
 EVIDENCE_COLUMNS = ('rowid,alias,sender_id,sent_at,observed_at,typeof(body) AS body_type,'
                     'length(body) AS body_chars,substr(body,1,500) AS body')
 
@@ -43,6 +44,7 @@ class LocalStatistics:
         if (plan.get('route') not in {'local_stats', 'mixed'} or metric not in METRICS
                 or (group not in GROUPS and not (group is None and metric in {'messages', 'latest'}))
                 or direction not in {'all', 'incoming', 'outgoing'} or order not in {'asc', 'desc'}
+                or group == 'direction' and metric != 'messages'
                 or type(limit) is not int or not 1 <= limit <= 50):
             raise KnowledgeError('statistics_plan_invalid', 400)
         scope = self.index._scope(plan.get('scope'))
@@ -59,25 +61,12 @@ class LocalStatistics:
         return metric, group, direction, limit, scope, normalized, seconds, senders, body, order
 
     @staticmethod
-    def _self_ids(source, scope):
-        # Optional trusted producer metadata; a display name such as “我” is
-        # deliberately never an identity proof. Current catalogs omit this.
-        found = []
-        if isinstance(source, dict):
-            found.append(source.get('self_sender_id'))
-            for row in source.get('conversations', []):
-                if isinstance(row, dict) and row.get('id') in scope:
-                    found.append(row.get('self_sender_id'))
-        values = {value for value in found if isinstance(value, str) and value and len(value) <= 256 and '\0' not in value}
-        return sorted(values)
-
-    @staticmethod
     def _totals(connection, where, parameters):
         return dict(connection.execute(
             'SELECT COUNT(*) AS message_count,'
-            "COUNT(DISTINCT CASE WHEN COALESCE(sender_id,'')<>'' THEN sender_id END) AS sender_count,"
+            "COUNT(DISTINCT CASE WHEN chatlens_sender_valid(sender_id)=1 THEN sender_id END) AS sender_count,"
             'COUNT(DISTINCT alias) AS conversation_count,'
-            "COALESCE(SUM(CASE WHEN COALESCE(sender_id,'')='' THEN 1 ELSE 0 END),0) AS unknown_sender_messages,"
+            "COALESCE(SUM(CASE WHEN chatlens_sender_valid(sender_id)=0 THEN 1 ELSE 0 END),0) AS unknown_sender_messages,"
             'COALESCE(SUM(CASE WHEN ' + EVENT_TIME + ' IS NULL THEN 1 ELSE 0 END),0) AS unknown_timestamp_messages,'
             'COALESCE(SUM(CASE WHEN NOT (' + VALID_SENT + ') AND julianday(observed_at) IS NOT NULL THEN 1 ELSE 0 END),0) AS timestamp_fallback_messages,'
             "COALESCE(SUM(CASE WHEN typeof(body)<>'text' THEN 1 ELSE 0 END),0) AS invalid_body_count "
@@ -95,8 +84,9 @@ class LocalStatistics:
         try:
             with self.data._open() as (connection, state):
                 self.index._check_binding(state)
+                connection.create_function('chatlens_sender_valid', 1, valid_sender, deterministic=True)
                 connection.set_progress_handler(lambda: int(cancelled() or time.monotonic() - started > 1.5), 10000)
-                catalog = self.data._catalog(state['binding_digest'], source)
+                catalog = self.index._catalog(state, source, connection=connection)
                 known_ids = {key for alias in scope for key in catalog[alias]['sender_names']}
                 if any(sender not in known_ids for sender in senders):
                     raise KnowledgeError('statistics_sender_scope_invalid', 400)
@@ -113,16 +103,17 @@ class LocalStatistics:
                     parameters.extend(senders)
                     untimed_where += sender_filter
                     untimed_parameters.extend(senders)
-                self_ids = self._self_ids(source, scope)
+                self_id = trusted_self_identity(source, state['binding_digest'])
+                self_ids = [self_id] if self_id is not None else []
                 unclassified_direction = 0
                 applied_direction = direction
                 warnings = []
-                if direction != 'all' and not self_ids:
-                    applied_direction = 'all'
+                if (direction != 'all' or group == 'direction') and not self_ids:
+                    applied_direction = 'unknown'
                     warnings.append('self_identity_unavailable')
                 elif direction == 'incoming':
-                    unclassified_direction = connection.execute('SELECT COUNT(*) FROM messages WHERE ' + where + " AND COALESCE(sender_id,'')=''", parameters).fetchone()[0]
-                    incoming_filter = " AND COALESCE(sender_id,'')<>'' AND sender_id NOT IN (%s)" % ','.join('?' for _ in self_ids)
+                    unclassified_direction = connection.execute('SELECT COUNT(*) FROM messages WHERE ' + where + ' AND chatlens_sender_valid(sender_id)=0', parameters).fetchone()[0]
+                    incoming_filter = ' AND chatlens_sender_valid(sender_id)=1 AND sender_id NOT IN (%s)' % ','.join('?' for _ in self_ids)
                     where += incoming_filter
                     parameters.extend(self_ids)
                     untimed_where += incoming_filter
@@ -138,20 +129,45 @@ class LocalStatistics:
                 totals = self._totals(connection, where, parameters)
                 if totals.pop('invalid_body_count') or base['invalid_body_count']:
                     raise KnowledgeError('statistics_message_invalid')
-                identity_missing = direction == 'outgoing' and not self_ids
-                output_rows, representatives, total_groups = [], [], 0
-                if not identity_missing and metric == 'latest':
+                identity_missing = (direction != 'all' or group == 'direction') and not self_ids
+                direction_counts = {'incoming_count': None, 'outgoing_count': None,
+                                    'unknown_direction_count': totals['message_count']}
+                if self_id is not None:
+                    counts = connection.execute("SELECT COALESCE(SUM(CASE WHEN chatlens_sender_valid(sender_id)=1 AND sender_id<>? THEN 1 ELSE 0 END),0),"
+                        "COALESCE(SUM(CASE WHEN sender_id=? THEN 1 ELSE 0 END),0),"
+                        "COALESCE(SUM(CASE WHEN chatlens_sender_valid(sender_id)=0 THEN 1 ELSE 0 END),0) FROM messages WHERE " + where,
+                        [self_id, self_id] + parameters).fetchone()
+                    direction_counts = dict(zip(('incoming_count', 'outgoing_count', 'unknown_direction_count'), counts))
+                output_rows, representatives, representative_positions, total_groups = [], [], [], 0
+                if not identity_missing and group == 'direction':
+                    definitions = [('incoming', '收到', ' AND chatlens_sender_valid(sender_id)=1 AND sender_id<>?', [self_id]),
+                                   ('outgoing', '发出', ' AND sender_id=?', [self_id]),
+                                   ('unknown', '方向未知', ' AND chatlens_sender_valid(sender_id)=0', [])]
+                    for bucket, label, clause, extra in definitions:
+                        count = direction_counts[bucket + '_count' if bucket != 'unknown' else 'unknown_direction_count']
+                        if bucket == 'unknown' and not count:
+                            continue
+                        index = len(output_rows)
+                        output_rows.append({'direction': bucket, 'name': label, 'message_count': count})
+                        if count:
+                            raw = connection.execute('SELECT ' + EVIDENCE_COLUMNS + ' FROM messages WHERE ' + where + clause
+                                + ' ORDER BY rowid DESC LIMIT 1', parameters + extra).fetchone()
+                            representatives.append(raw)
+                            representative_positions.append(index)
+                    total_groups = len(output_rows)
+                elif not identity_missing and metric == 'latest':
                     rows = connection.execute('SELECT ' + EVIDENCE_COLUMNS + ' FROM messages WHERE ' + where
                                               + ' ORDER BY ' + EVENT_TIME + ' DESC,rowid DESC LIMIT ?', parameters + [limit]).fetchall()
                     total_groups = totals['message_count']
                     for row in rows:
-                        sender = catalog[row['alias']]['sender_names'].get(row['sender_id']) or '未知发送人'
+                        sender = '我' if self_id is not None and row['sender_id'] == self_id else catalog[row['alias']]['sender_names'].get(row['sender_id']) or '未知发送人'
                         output_rows.append({'sender': _display(sender), 'conversation': _display(catalog[row['alias']]['name']),
                                             'time': self._time(row), 'excerpt': _display(row['body'], 120)})
                         representatives.append(row)
+                        representative_positions.append(len(output_rows) - 1)
                 elif not identity_missing and (metric != 'messages' or group is not None):
                     group = 'sender' if metric == 'senders' else 'conversation' if metric == 'conversations' else 'day' if metric == 'trend' else group
-                    expression = {'sender': "NULLIF(sender_id,'')", 'conversation': 'alias',
+                    expression = {'sender': 'CASE WHEN chatlens_sender_valid(sender_id)=1 THEN sender_id END', 'conversation': 'alias',
                                   'day': "date(" + EVENT_TIME + ",'unixepoch','+8 hours')"}[group]
                     total_groups = connection.execute('SELECT COUNT(*) FROM (SELECT 1 FROM messages WHERE ' + where + ' GROUP BY ' + expression + ')', parameters).fetchone()[0]
                     order = 'group_key DESC' if metric == 'trend' else 'message_count ' + sort_order.upper() + ',representative DESC'
@@ -165,6 +181,8 @@ class LocalStatistics:
                         key = row['group_key']
                         if group == 'sender':
                             label = next((catalog[alias]['sender_names'][key] for alias in scope if key in catalog[alias]['sender_names']), None)
+                            if self_id is not None and key == self_id:
+                                label = '我'
                             label = label or ('身份未知的消息' if key is None else '未知姓名的发送人 %d' % position)
                         elif group == 'conversation':
                             label = catalog[key]['name']
@@ -173,10 +191,12 @@ class LocalStatistics:
                         output_rows.append({'name': _display(label), 'message_count': row['message_count'],
                                             'unknown_identity': group == 'sender' and key is None})
                         representatives.append(raw)
+                        representative_positions.append(len(output_rows) - 1)
                 elif not identity_missing and totals['message_count']:
                     raw = connection.execute('SELECT ' + EVIDENCE_COLUMNS + ' FROM messages WHERE ' + where
                                              + ' ORDER BY rowid DESC LIMIT 1', parameters).fetchone()
                     representatives.append(raw)
+                    representative_positions.append(None)
                 self.index._check_binding(state)
                 if cancelled():
                     raise KnowledgeError('ai_request_cancelled', 409)
@@ -204,8 +224,9 @@ class LocalStatistics:
                 evidence.append(item)
                 seen.add(row['rowid'])
                 label = item['id']
-            if position < len(output_rows):
-                output_rows[position]['citation'] = label
+            output_position = representative_positions[position]
+            if output_position is not None:
+                output_rows[output_position]['citation'] = label
         if totals['unknown_sender_messages']:
             warnings.append('unknown_sender_identity')
         if totals['timestamp_fallback_messages']:
@@ -216,7 +237,7 @@ class LocalStatistics:
             warnings.append('unclassified_direction_messages_excluded')
         if total_groups > len(output_rows):
             warnings.append('display_limit')
-        statistics = {'metric': metric, 'group_by': group, 'order': sort_order, **totals, 'total_groups': total_groups,
+        statistics = {'metric': metric, 'group_by': group, 'order': sort_order, **totals, **direction_counts, 'total_groups': total_groups,
                       'displayed_groups': len(output_rows), 'display_truncated': total_groups > len(output_rows),
                       'rows': output_rows, 'aggregate_complete': not identity_missing,
                       'direction_requested': direction, 'direction_applied': applied_direction,
@@ -228,6 +249,8 @@ class LocalStatistics:
                       'data_boundary': '仅当前选定会话中启用采集后已保存的文字，不代表完整微信历史。'}
         if identity_missing:
             statistics['message_count'] = None
+            statistics['sender_count'] = None
+            statistics['conversation_count'] = None
         coverage = {'mode': 'statistics', 'available_count': base['message_count'],
                     'matched_count': 0 if identity_missing else totals['message_count'],
                     'included_count': len(evidence), 'included_match_count': len(evidence), 'context_count': 0,
@@ -254,20 +277,23 @@ class LocalStatistics:
     @staticmethod
     def _answer(statistics, evidence, *, needs_identity):
         if needs_identity:
-            return ('当前已采数据没有可靠的本人发送身份，暂时无法准确统计“我发出的消息”。'
-                    '可以查询全部已采消息、指定联系人或会话；不能依据显示名猜测本人身份。')
+            return ('当前账号的本人发送身份尚未可靠确认，暂时无法准确区分收到与发出的消息。'
+                    '请等待本机身份核对完成；不能依据显示名猜测本人身份。')
         count, metric = statistics['message_count'], statistics['metric']
         prefix = statistics['time_label'] + '，在' + '、'.join(statistics['scope_names']) + '中'
         source = ' '.join('[' + item['id'] + ']' for item in evidence[:2])
-        lines = [prefix + '共匹配 %d 条已采文字。%s' % (count, (' ' + source) if source else '')]
-        if statistics['direction_requested'] == 'incoming' and not statistics['identity_verified']:
-            lines.append('以下按已采消息统计，无法排除本人发送的消息；列出的为已采消息发送者。')
+        action = '共收到' if statistics['direction_applied'] == 'incoming' else '共发出' if statistics['direction_applied'] == 'outgoing' else '共匹配'
+        lines = [prefix + action + ' %d 条已采文字。%s' % (count, (' ' + source) if source else '')]
+        if statistics['group_by'] == 'direction':
+            lines.append('收发方向按已核对的本人账号 ID 区分，未知身份单独保留。')
         if metric in {'senders', 'ranking'} and statistics['group_by'] == 'sender':
             lines.append('可识别的发送者共 %d 位；身份未知的 %d 条消息未计入人数。' % (statistics['sender_count'], statistics['unknown_sender_messages']))
         elif metric == 'conversations':
-            lines.append('有文字记录的会话共 %d 个。' % statistics['conversation_count'])
+            lines.append(('发往的会话对象（私聊联系人或群会话）共 %d 个。' if statistics['direction_applied'] == 'outgoing'
+                          else '有文字记录的会话共 %d 个。') % statistics['conversation_count'])
         elif metric == 'messages':
-            lines.append('涉及 %d 个会话、%d 位可识别发送者。' % (statistics['conversation_count'], statistics['sender_count']))
+            lines.append(('涉及 %d 个会话。' % statistics['conversation_count']) if statistics['direction_applied'] == 'outgoing'
+                         else '涉及 %d 个会话、%d 位可识别发送者。' % (statistics['conversation_count'], statistics['sender_count']))
         for row in statistics['rows']:
             citation = (' [' + row['citation'] + ']') if row.get('citation') else ''
             if metric == 'latest':
@@ -284,6 +310,8 @@ class LocalStatistics:
             lines.append('另有 %d 条符合会话与筛选条件的文字没有可用时间，无法判断是否属于本次日期范围，未计入日期统计。' % statistics['unplaced_timestamp_messages'])
         if statistics['unclassified_direction_messages']:
             lines.append('%d 条发送身份未知，未计入已确认来信。' % statistics['unclassified_direction_messages'])
+        if not statistics['identity_verified']:
+            lines.append('本人身份尚未可靠核对，本轮只统计全部已采消息，不推断收发方向。')
         if evidence:
             lines.append('引用为代表性原消息；统计总数来自完整匹配数据，不是证据卡数量。')
         lines.append(statistics['data_boundary'])

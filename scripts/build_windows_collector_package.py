@@ -15,7 +15,7 @@ MANIFEST = 'COLLECTOR-MANIFEST.json'
 SOURCES = (
     'Verify-Collector.ps1', 'Start-Collector.cmd', 'README-COLLECTOR.txt',
     'collector_service.py', 'collector_supervisor.py', 'collector_private.py',
-    'continuous_reader.py', 'continuous_store.py', 'windows_selected_engine.py',
+    'continuous_reader.py', 'continuous_store.py', 'conversation_scope.py', 'wechat_identity.py', 'collector_web_meta.py', 'windows_selected_engine.py',
     'windows_selected_native.py', 'windows_selected_supervisor.py',
     'windows_keyproof_core.py', 'windows_keyproof_platform.py',
     'THIRD-PARTY-SELECTED-NOTICES.txt',

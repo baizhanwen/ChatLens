@@ -7,14 +7,20 @@ question cannot enlarge the conversation or time range chosen in the UI.
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 import re
+import sys
 import unicodedata
+
+MODULES = str(Path(__file__).resolve().parent / 'windows-proof')
+if MODULES not in sys.path:
+    sys.path.insert(0, MODULES)
+from conversation_scope import MAX_CONVERSATIONS, valid_alias
 
 SCHEMA_VERSION = 1
 LOCAL_TIMEZONE = timezone(timedelta(hours=8), 'Asia/Shanghai')
 MAX_QUESTION_CHARS = 2000
 MAX_LIMIT = 50
-ALIASES = ('private_test', 'group_test')
 STATS_METRICS = {'messages', 'senders', 'conversations', 'ranking', 'latest', 'trend'}
 CHINESE_DIGITS = {'零': 0, '〇': 0, '一': 1, '二': 2, '两': 2, '三': 3, '四': 4,
                   '五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
@@ -202,12 +208,12 @@ def _body_filter(text):
 
 
 def _catalog_entries(catalog):
-    if not isinstance(catalog, dict):
+    if not isinstance(catalog, dict) or not 1 <= len(catalog) <= MAX_CONVERSATIONS:
         raise QueryPlanError('query_catalog_invalid')
     for alias, value in catalog.items():
-        if alias not in ALIASES or not isinstance(value, dict) or not isinstance(value.get('name'), str):
+        if not valid_alias(alias) or not isinstance(value, dict) or not isinstance(value.get('name'), str):
             raise QueryPlanError('query_catalog_invalid')
-    return catalog
+    return dict(sorted(catalog.items()))
 
 
 def _entities(text, selected, catalog):
@@ -317,10 +323,11 @@ def _previous(previous):
         return None
     if (previous.get('route') not in ('local_stats', 'mixed', 'analysis')
             or previous.get('metric') not in STATS_METRICS | {None}
-            or previous.get('group_by') not in ('sender', 'conversation', 'day', None)
+            or previous.get('group_by') not in ('sender', 'conversation', 'day', 'direction', None)
             or previous.get('direction') not in ('incoming', 'outgoing', 'all')
             or not isinstance(previous.get('scope'), list)
-            or any(not isinstance(alias, str) or alias not in ALIASES for alias in previous['scope'])):
+            or not 1 <= len(previous['scope']) <= MAX_CONVERSATIONS
+            or any(not valid_alias(alias) for alias in previous['scope'])):
         return None
     if not isinstance(previous.get('retrieval_query', ''), str):
         return None
@@ -350,7 +357,7 @@ def _ellipsis(text, catalog):
     for name in sorted(names, key=len, reverse=True):
         if len(name) >= 2:
             remaining = remaining.replace(name, ' ')
-    remaining = re.sub(r'那么|那|呢|也|还有|再看|看看|看下|一下|只看|仅看|换成|改成|同样|的|看|请|怎么样|怎样|情况|群聊|私聊|私信|单聊|群', ' ', remaining)
+    remaining = re.sub(r'那么|那|呢|也|还有|再看|看看|看下|一下|只看|仅看|换成|改成|同样|的|看|请|怎么样|怎样|情况|群聊|私聊|私信|单聊|群|发出|发送|收到|接收|收发', ' ', remaining)
     return not re.sub(r'[\s?？。.!！,，:：;；]', '', remaining)
 
 
@@ -367,6 +374,9 @@ def _metadata_residue(text, catalog):
     remaining = re.sub(r'(?:前\s*' + NUMBER + r'\s*(?:名|位|个|条)|top\s*' + NUMBER + r')', ' ', remaining)
     remaining = re.sub(r'大前天|前天|昨天|昨日|今天|今日|当天|本周|这周|上个周|上周|这星期|本星期|上星期|本月|这个月|这月|上个月|上月|所有时间|全部时间|不限时间|从开始|启用以来|采集以来|yesterday|today|this\s+week|last\s+week|this\s+month|last\s+month|all\s+time', ' ', remaining)
     remaining = re.sub(r'新(?:消息|信息|来信)', ' ', remaining)
+    # Consume composed quantity operators before overlapping words (一共/共有)
+    # so hash-randomized tie ordering cannot leave a spurious “一” predicate.
+    remaining = re.sub(r'(?:一共|总共|共计|合计)(?:有)?', ' ', remaining)
     for pattern in (COUNT, RANK, LATEST, TREND, SENDER, CONVERSATION, MESSAGE):
         remaining = pattern.sub(' ', remaining)
     # Functional grammar and explicitly interpreted literal operators only.
@@ -381,7 +391,8 @@ def _metadata_residue(text, catalog):
              '关键字', '包含', '含有', '提到', '出现', '带有', '带着', '从多到少', '从少到多', '降序', '升序',
              '最高', '最低', '多', '少', '数', '量', '到', '至', '是什么时候', '是什么', '是多少', '是', '为',
              '给', '对', '向', '从', '里', '内', '中', '上', '和', '与', '跟', '的', '得', '了', '吗', '呢', '都', '我',
-             '那么', '那', '这', '也', '一下', '吧')
+             '那么', '那', '这', '也', '一下', '吧', '收发', '收到', '收件', '发出的', '发出', '发件',
+             '发送的', '接收的', '接收', '分别', '对比', '分开', '和', '及', '各')
     for word in sorted(set(words), key=len, reverse=True):
         remaining = remaining.replace(word, ' ')
     remaining = re.sub(r'\b(?:how|many|who|which|what|when|received|receive|sent|send|from|to|me|my|the|a|an|by|in|on|of|all|are|is|was|were|did|do|does|have|has|had|there|please|list|show|give|with|containing|contains|mentions?|each|per|within|counts?)\b', ' ', remaining)
@@ -432,12 +443,14 @@ def plan_query(question, *, scope, time_range, catalog, previous=None, current=N
         question.encode('utf-8')
     except UnicodeError:
         raise QueryPlanError('query_question_invalid') from None
-    if (not isinstance(scope, (list, tuple)) or not scope
-            or any(not isinstance(alias, str) or alias not in ALIASES for alias in scope)
+    if (not isinstance(scope, (list, tuple)) or not 1 <= len(scope) <= MAX_CONVERSATIONS
+            or any(not valid_alias(alias) for alias in scope)
             or len(set(scope)) != len(scope)):
         raise QueryPlanError('query_scope_invalid')
-    selected = [alias for alias in ALIASES if alias in scope]
     catalog = _catalog_entries(catalog)
+    if any(alias not in catalog for alias in scope):
+        raise QueryPlanError('query_scope_invalid')
+    selected = sorted(scope)
     current = current or datetime.now(timezone.utc)
     if not isinstance(current, datetime) or current.tzinfo is None:
         raise QueryPlanError('query_time_invalid')
@@ -461,13 +474,34 @@ def plan_query(question, *, scope, time_range, catalog, previous=None, current=N
         group_by = 'sender' if len(sender_ids) > 1 else 'conversation'
     if re.search(r'(?:列出|统计|查询|查一下|查看).{0,20}(?:从未|从没|没有|没|未).{0,20}(?:发|联系|说).{0,12}(?:人|客户|群)', text):
         clarification = '当前只有已采消息，没有完整联系人活动全集，暂不能精确列出从未发消息的对象。'
-    direction = 'incoming' if re.search(r'收到|来信|私信|给我|找我|联系我|incoming|received', text) else 'all'
-    if re.search(r'(?<![给向对找])我(?:自己)?(?:今天|昨天|最近|本周|这周|一共|总共|总计|共|总){0,4}(?:发|回复|回了|说了)|(?<![给向对找])我(?:发出|发送|已回复)|我给|outgoing|sent\s+by\s+me', text):
+    direction = 'incoming' if re.search(r'收到|收件|接收|来信|私信|给我|找我|联系我|incoming|received', text) else 'all'
+    self_outgoing = bool(re.search(r'(?<![给向对找])我(?:自己)?(?:今天|昨天|最近|本周|这周|本月|上周|上个月|最后|最新|最早|刚才|刚刚|已经|曾经|一共|总共|总计|共|总){0,6}(?:发|回复|回了|说了)|(?<![给向对找])我(?:发出|发送|已回复)|(?<![给向对找])我(?:自己)?(?:今天|昨天|最近|本周|这周|本月|上周|上个月|最后|最新|最早|刚才|刚刚|已经|曾经){0,6}(?:给|向|对).{0,30}(?:发|发送)|我给|outgoing|sent\s+by\s+me', text))
+    outgoing = self_outgoing or bool(not sender_ids and re.search(r'发出的|发出去|发件', text))
+    split_direction = bool(re.search(r'收发|(?:收到|收件|接收).{0,12}(?:和|与|及|、|，|,|分别|各).{0,12}(?:发出|发送|发件)|(?:发出|发送|发件).{0,12}(?:和|与|及|、|，|,|分别|各).{0,12}(?:收到|收件|接收)', text))
+    if outgoing:
         direction = 'outgoing'
-        if route in ('local_stats', 'mixed'):
-            clarification = '当前已采数据没有可靠的本人发送标记，暂不能精确统计本人发出或回复的条数。'
-    if route in ('local_stats', 'mixed') and re.search(r'我(?:和|与|、)|(?:和|与|、)我', text):
-        clarification = '当前已采数据没有可靠的本人发送标记，暂不能将本人和其他发送人一起做精确分人统计。'
+    if split_direction:
+        direction = 'all'
+        if not ANALYTIC.search(semantic_text) or route == 'mixed':
+            route = 'mixed' if ANALYTIC.search(semantic_text) else 'local_stats'
+            metric, group_by = 'messages', 'direction'
+    if outgoing and not split_direction:
+        if metric != 'latest' and re.search(r'给谁|向谁|发给(?:了)?谁|给哪些|向哪些', text):
+            metric, group_by = 'conversations', 'conversation'
+        if sender_ids:
+            recipients = [alias for alias in effective_scope if catalog[alias].get('kind') == 'private'
+                          and catalog[alias].get('peer_sender_id') in sender_ids]
+            resolved = {catalog[alias].get('peer_sender_id') for alias in recipients}
+            named_conversations = [alias for alias in effective_scope if catalog[alias].get('kind') == 'private'
+                                   and _normalize(catalog[alias]['name']) in text]
+            if resolved == set(sender_ids) and recipients:
+                effective_scope, sender_ids = recipients, []
+            elif named_conversations and len(sender_ids) <= len(named_conversations):
+                # An explicitly named one-to-one conversation is a destination,
+                # not a sender predicate intersected with the current account.
+                effective_scope, sender_ids = named_conversations, []
+            else:
+                clarification = '只能按所选私聊或群会话统计发出消息，无法把群内某位成员推断为收件人。'
     if re.search(r'几条|多少条|多少(?:个|位|人)?|统计|总数|数量', text) and re.search(r'未回复|没回复|没有回复|未读|没读|已读|回复率|响应时间', text):
         clarification = '当前数据不包含可靠的已读或回复状态，无法精确统计；可以改问需要跟进的线索并核对原话。'
     if route == 'local_stats' and re.search(r'未回复|没回复|没有回复|未读|没读|已读|回复率|响应时间', text):
@@ -485,7 +519,9 @@ def plan_query(question, *, scope, time_range, catalog, previous=None, current=N
     elliptical = _ellipsis(text, catalog)
     temporal_followup = requested is not None and elliptical and not ANALYTIC.search(text) and metric is None
     scope_followup = elliptical and bool(re.search(r'^(?:那|那么|只看|仅看|换成|改成|看看|看下|看)', text)) and (effective_scope != selected or sender_ids)
-    if (previous is not None and (temporal_followup or scope_followup) and not ANALYTIC.search(text) and metric is None):
+    explicit_direction = outgoing or split_direction or bool(re.search(r'收到|收件|接收|来信|incoming|received', text))
+    direction_followup = explicit_direction and elliptical and metric is None
+    if (previous is not None and (temporal_followup or scope_followup or direction_followup) and not ANALYTIC.search(text) and metric is None):
         old_metric = previous.get('metric')
         if old_metric in STATS_METRICS or previous.get('route') == 'analysis':
             route, metric, group_by = previous['route'], old_metric, previous.get('group_by')
@@ -503,7 +539,10 @@ def plan_query(question, *, scope, time_range, catalog, previous=None, current=N
                         clarification = '上一轮时间与当前所选范围不一致，请重新明确时间范围。'
                         window = selected_window
                     label = previous.get('time_label')
-            direction = previous.get('direction') if previous.get('direction') in ('incoming', 'outgoing', 'all') else direction
+            if not explicit_direction:
+                direction = previous.get('direction') if previous.get('direction') in ('incoming', 'outgoing', 'all') else direction
+            if direction_followup and group_by == 'direction' and not split_direction:
+                group_by = None
             order = previous.get('order') if previous.get('order') in ('asc', 'desc') else order
             if literal is None:
                 old_filters = previous.get('filters', {})
@@ -541,6 +580,13 @@ def plan_query(question, *, scope, time_range, catalog, previous=None, current=N
                 route, metric, group_by = 'analysis', None, None
     if clarification:
         route = 'clarify'
+    self_ids = {catalog[alias].get('self_sender_id') for alias in effective_scope
+                if catalog[alias].get('identity_verified') is True and catalog[alias].get('self_sender_id')}
+    verified_identity = bool(effective_scope) and len(self_ids) == 1 and all(
+        catalog[alias].get('identity_verified') is True for alias in effective_scope)
+    if (direction != 'all' or group_by == 'direction' or split_direction) and not verified_identity:
+        route = 'clarify'
+        clarification = '当前账号的本人发送身份尚未可靠核对，暂不能准确区分收到与发出的消息，请等待本机身份核对完成。'
     return {'schema_version': SCHEMA_VERSION, 'route': route, 'metric': metric, 'group_by': group_by,
             'direction': direction, 'scope': effective_scope, 'time_range': _bounds(window),
             'time_label': label or selected_label,

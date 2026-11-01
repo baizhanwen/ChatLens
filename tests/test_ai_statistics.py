@@ -16,6 +16,7 @@ from ai_knowledge import KnowledgeError, KnowledgeIndex
 from ai_statistics import LocalStatistics
 from collector_private import write_private_json_new
 from continuous_store import CollectorStore
+from wechat_identity import establish_identity
 
 NOW = datetime(2026, 11, 5, 10, tzinfo=timezone(timedelta(hours=8)))
 TODAY = {'start': NOW.replace(hour=0).isoformat(), 'end': (NOW.replace(hour=0) + timedelta(days=1)).isoformat()}
@@ -55,13 +56,23 @@ class LocalStatisticsTests(unittest.TestCase):
             path.unlink()
         write_private_json_new(path, self.catalog)
 
+    def verify_identity(self):
+        self.catalog['binding_digest'] = self.store.binding_digest
+        self.catalog['identity'] = establish_identity(self.store.binding_digest, [SELF], [SELF],
+            [{'alias': 'private_test', 'chat_id': SENDER}], {'private_test': [SENDER, SELF]})
+        self.write_catalog()
+
     def add(self, body='合成普通文字。', *, alias='private_test', sender=SENDER, sent_at='default', observed_at=None):
         self.serial += 1
         row = {'source_key': hashlib.sha256(('synthetic-statistics-message-%d' % self.serial).encode()).hexdigest(),
                'alias': alias, 'source_local_id': self.serial,
                'sent_at': int(NOW.timestamp()) + self.serial if sent_at == 'default' else sent_at,
                'sender_id': sender, 'body': body, 'observed_at': observed_at or NOW.astimezone(timezone.utc).isoformat()}
-        self.store.commit({}, {}, [row], {})
+        if alias == 'unselected_alias':
+            self.store._connection.execute('INSERT INTO messages (source_key,alias,source_local_id,sent_at,sender_id,body,observed_at) VALUES (?,?,?,?,?,?,?)',
+                tuple(row[key] for key in ('source_key', 'alias', 'source_local_id', 'sent_at', 'sender_id', 'body', 'observed_at')))
+        else:
+            self.store.commit({}, {}, [row], {})
         return self.serial
 
     @staticmethod
@@ -115,18 +126,18 @@ class LocalStatisticsTests(unittest.TestCase):
         self.add(sender=SELF)
         self.add(sender=SENDER)
         incoming = self.statistics.execute(self.plan('senders', direction='incoming'))
-        self.assertEqual(incoming['statistics']['message_count'], 2)
-        self.assertEqual(incoming['statistics']['direction_applied'], 'all')
+        self.assertIsNone(incoming['statistics']['message_count'])
+        self.assertEqual(incoming['statistics']['direction_applied'], 'unknown')
         self.assertFalse(incoming['statistics']['identity_verified'])
-        self.assertIn('无法排除本人', incoming['answer'])
+        self.assertTrue(incoming['needs_clarification'])
+        self.assertIn('暂时无法准确区分', incoming['answer'])
         outgoing = self.statistics.execute(self.plan(direction='outgoing'))
         self.assertTrue(outgoing['needs_clarification'])
         self.assertIsNone(outgoing['statistics']['message_count'])
         self.assertEqual(outgoing['evidence'], [])
 
     def test_trusted_self_identity_excludes_own_and_unclassified_rows_from_incoming(self):
-        self.catalog['self_sender_id'] = SELF
-        self.write_catalog()
+        self.verify_identity()
         self.add(sender=SELF)
         received = self.add(sender=SENDER)
         self.add(sender=None)
@@ -138,6 +149,47 @@ class LocalStatisticsTests(unittest.TestCase):
         outgoing = self.statistics.execute(self.plan(direction='outgoing'))
         self.assertEqual(outgoing['statistics']['message_count'], 1)
         self.assertFalse(outgoing['needs_clarification'])
+
+    def test_split_direction_counts_unknown_separately_and_preserves_reference_mapping(self):
+        self.verify_identity()
+        own = self.add(sender=SELF)
+        received = self.add(sender=SENDER)
+        self.add(sender='invalid sender id')
+        self.add(sender=None)
+        result = self.statistics.execute(self.plan(group_by='direction'))
+        statistics = result['statistics']
+        self.assertEqual((statistics['incoming_count'], statistics['outgoing_count'], statistics['unknown_direction_count']), (1, 1, 2))
+        self.assertEqual(sum(row['message_count'] for row in statistics['rows']), statistics['message_count'])
+        self.assertEqual([row['direction'] for row in statistics['rows']], ['incoming', 'outgoing', 'unknown'])
+        lookup = {item['id']: item for item in result['evidence']}
+        self.assertEqual(lookup[statistics['rows'][0]['citation']]['message_id'], received)
+        self.assertEqual(lookup[statistics['rows'][1]['citation']]['message_id'], own)
+        self.assertTrue(lookup[statistics['rows'][1]['citation']]['own'])
+
+    def test_split_zero_bucket_does_not_take_other_direction_citation(self):
+        self.verify_identity()
+        self.add(sender=SELF)
+        result = self.statistics.execute(self.plan(group_by='direction'))
+        rows = result['statistics']['rows']
+        self.assertEqual(rows[0]['message_count'], 0)
+        self.assertNotIn('citation', rows[0])
+        self.assertEqual(rows[1]['message_count'], 1)
+        self.assertEqual(result['evidence'][0]['direction'], 'outgoing')
+        self.assertEqual(rows[1]['citation'], result['evidence'][0]['id'])
+
+    def test_bare_wrong_binding_or_unverified_self_id_cannot_classify_messages(self):
+        self.add(sender=SELF)
+        self.catalog['self_sender_id'] = SELF
+        self.write_catalog()
+        self.assertTrue(self.statistics.execute(self.plan(direction='incoming'))['needs_clarification'])
+        self.verify_identity()
+        self.catalog['identity']['binding_digest'] = '0' * 64
+        self.write_catalog()
+        self.assertTrue(self.statistics.execute(self.plan(direction='outgoing'))['needs_clarification'])
+        self.verify_identity()
+        self.catalog['identity']['proof']['private_non_peer_unique'] = False
+        self.write_catalog()
+        self.assertTrue(self.statistics.execute(self.plan(group_by='direction'))['needs_clarification'])
 
     def test_scope_and_time_half_open_boundaries_apply_before_aggregation(self):
         start = int(NOW.replace(hour=0).timestamp())

@@ -7,6 +7,7 @@ from ai_service import AiError
 from ai_provider import ProviderError
 from ai_knowledge import KnowledgeError
 from ai_query import QueryPlanError
+from web_data import WebDataError
 
 
 def pairs(rows):
@@ -45,7 +46,24 @@ def attach_ai_routes(server, get_service):
 
         def _ai_operation(self, function):
             try:
-                self._json(200, function(get_service()))
+                owner = self.server.data
+                if callable(getattr(owner, 'public_scope_context', None)):
+                    generations = self.headers.get_all('X-ChatLens-Scope', [])
+                    if len(generations) != 1:
+                        raise WebDataError('scope_changed', 409)
+                    # Pin the runtime generation through service acquisition
+                    # and dispatch. A profile switch cannot retarget a request.
+                    with owner.lock:
+                        service = get_service(expected_generation=generations[0])
+                        result = function(service)
+                else:
+                    result = function(get_service())
+                self._json(200, result)
+            except WebDataError as error:
+                if error.code == 'scope_changed':
+                    self._json(409, {'error': {'code': 'scope_changed', 'message': '关注范围已改变，请重新打开工作台。'}})
+                else:
+                    self._json(503, {'error': {'code': 'ai_knowledge_not_ready', 'message': '正在切换关注范围，请稍后再试。'}})
             except AiError as error:
                 self._json(error.status, {'error': {'code': error.code, 'message': error.message}})
             except ProviderError as error:

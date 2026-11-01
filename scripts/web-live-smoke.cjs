@@ -11,7 +11,7 @@ const root = path.resolve(__dirname, '..');
 const args = process.argv.slice(2);
 const option = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
 const output = path.resolve(option('--output', path.join(root, '.build', 'web-live-smoke-' + Date.now())));
-const sourceNames = ['apps/web/app.js', 'apps/web/index.html', 'apps/web/styles.css', 'scripts/windows-proof/web_data.py', 'scripts/windows-proof/web_server.py', 'tests/web_live_fixture.py', 'scripts/web-live-smoke.cjs'];
+const sourceNames = ['apps/web/app.js', 'apps/web/index.html', 'apps/web/styles.css', 'scripts/windows-proof/web_data.py', 'scripts/windows-proof/wechat_identity.py', 'scripts/windows-proof/web_server.py', 'tests/web_live_fixture.py', 'scripts/web-live-smoke.cjs'];
 const hashes = () => Object.fromEntries(sourceNames.map(name => [name, createHash('sha256').update(fs.readFileSync(path.join(root, name))).digest('hex')]));
 const before = hashes();
 assert(!fs.existsSync(output), 'Choose a new evidence directory.');
@@ -129,6 +129,9 @@ async function main() {
       await bodyContains(text);
       assert.equal(await page.locator('.message-body img,.message-body script').count(), 0);
       assert((await rows().last().innerText()).includes('未知发送人'));
+      assert.equal(await rows().last().getAttribute('data-direction'), 'unknown');
+      assert.equal(await rows().last().locator('.message-direction-label').innerText(), '收发方向未确认');
+      assert.equal(await rows().last().evaluate(node => node.classList.contains('own')), false);
       await page.waitForTimeout(1600);
       const ids = await rows().evaluateAll(nodes => nodes.map(node => node.dataset.messageId));
       assert.equal(new Set(ids).size, ids.length);

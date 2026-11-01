@@ -17,6 +17,7 @@ SPEC = importlib.util.spec_from_file_location('chatlens_continuous_store', MODUL
 store_module = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(store_module)
 CollectorStore, StoreError = store_module.CollectorStore, store_module.StoreError
+from conversation_scope import alias_for
 BINDING = {'selected_scope': ['synthetic_private', 'synthetic_group'], 'account_fingerprint': 'f' * 64}
 EPOCHS = {'message_0': {'salt_sha256': 'a' * 64, 'file_identity': [1, 2], 'key_sha256': 'b' * 64}}
 CURSORS = {'message_0': {'private': {'local_id': 4, 'present': True}, 'group': {'local_id': 2, 'present': True}}}
@@ -330,6 +331,65 @@ except m.StoreError as error:
             connection.execute('CREATE TRIGGER synthetic_trigger AFTER INSERT ON messages BEGIN DELETE FROM messages; END')
         with self.assertRaisesRegex(StoreError, 'collector_state_schema_invalid'):
             CollectorStore(self.directory, BINDING)
+
+    def test_explicit_multi_scope_refuses_outside_event_atomically(self):
+        chats = ['synthetic_multi_peer_a', 'synthetic_multi_peer_b', 'synthetic_multi_group@chatroom']
+        binding = {'account': 'synthetic_account_a', 'config': {'conversations': [
+            {'alias': alias_for(chat), 'chat_id': chat} for chat in chats]}}
+        cursors = {'message_0': {alias_for(chat): {'local_id': 0, 'present': True} for chat in chats}}
+        next_cursors = {'message_0': {alias_for(chat): {'local_id': 1, 'present': True} for chat in chats}}
+        with CollectorStore(self.directory, binding) as storage:
+            storage.initialize(cursors, EPOCHS)
+            accepted = event(1); accepted['alias'] = alias_for(chats[0])
+            rejected = event(2); rejected['alias'] = alias_for('synthetic_outside_scope')
+            with self.assertRaisesRegex(StoreError, 'collector_event_scope_invalid'):
+                storage.commit(cursors, next_cursors, [accepted, rejected], EPOCHS)
+            self.assertEqual(storage.stats()['total_messages'], 0)
+            self.assertEqual(storage.snapshot()['cursors'], cursors)
+            storage.commit(cursors, next_cursors, [accepted], EPOCHS)
+            self.assertEqual(storage.stats()['total_messages'], 1)
+        with self.assertRaisesRegex(StoreError, 'collector_state_binding_mismatch'):
+            CollectorStore(self.directory, {'account': 'synthetic_account_b', 'config': binding['config']})
+        with CollectorStore(self.directory, binding) as storage:
+            self.assertEqual(storage.snapshot()['cursors'], next_cursors)
+
+    def test_explicit_scope_checks_each_shard_cursor_alias_set(self):
+        alias = alias_for('synthetic_multi_peer')
+        binding = {'config': {'conversations': [{'alias': alias, 'chat_id': 'synthetic_multi_peer'}]}}
+        valid = {'message_0': {alias: {'local_id': 0, 'present': True}}}
+        wrong = {'message_0': {'private_test': {'local_id': 0, 'present': True}}}
+        with CollectorStore(self.directory, binding) as storage:
+            for cursors in ({}, wrong):
+                with self.subTest(cursors=cursors), self.assertRaisesRegex(StoreError, 'collector_checkpoint_scope_invalid'):
+                    storage.initialize(cursors, EPOCHS)
+            storage.initialize(valid, EPOCHS)
+            with self.assertRaisesRegex(StoreError, 'collector_checkpoint_scope_invalid'):
+                storage.commit(valid, wrong, [], EPOCHS)
+            self.assertEqual(storage.snapshot()['cursors'], valid)
+
+    def test_malformed_explicit_configuration_cannot_fall_back_to_generic_store(self):
+        for binding in ({'config': None}, {'config': {'conversations': []}}, {'scope': []}, {'scope': ['unselected']}):
+            with self.subTest(binding=binding), self.assertRaisesRegex(StoreError, 'collector_scope_invalid'):
+                CollectorStore(self.directory, binding)
+            self.assertEqual(list(self.directory.iterdir()), [])
+
+    def test_sender_metadata_uses_actual_scope_and_preserves_unknown_on_request(self):
+        chats = ['synthetic_sender_meta_a', 'synthetic_sender_meta_b']
+        aliases = [alias_for(chat) for chat in chats]
+        binding = {'scope': aliases}
+        with CollectorStore(self.directory, binding) as storage:
+            storage.initialize({}, {})
+            rows = []
+            for index, (alias, sender) in enumerate(((aliases[0], 'synthetic_known'), (aliases[0], None),
+                                                    (aliases[1], 'synthetic_other')), 1):
+                row = event(index); row.update(alias=alias, sender_id=sender); rows.append(row)
+            storage.commit({}, {}, rows, {})
+            self.assertEqual(storage.sender_ids_by_alias(), {aliases[0]: ['synthetic_known'], aliases[1]: ['synthetic_other']})
+            self.assertEqual(storage.sender_ids_by_alias(include_unknown=True),
+                             {aliases[0]: ['synthetic_known', None], aliases[1]: ['synthetic_other']})
+            outside = event(4); outside['alias'] = 'private_test'
+            with self.assertRaisesRegex(StoreError, 'collector_event_scope_invalid'):
+                storage.commit({}, {}, [outside], {})
 
 
 if __name__ == '__main__':

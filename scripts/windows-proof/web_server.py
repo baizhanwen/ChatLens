@@ -158,13 +158,20 @@ def make_server(data, static_dir, *, port=0, token=None):
                 self._json(401, {'error': {'code': 'web_session_required'}})
                 return
             try:
+                scope_arguments = {}
+                if callable(getattr(self.server.data, 'public_scope_context', None)):
+                    generations = self.headers.get_all('X-ChatLens-Scope', [])
+                    if len(generations) != 1:
+                        raise WebDataError('scope_changed', 409)
+                    scope_arguments['expected_generation'] = generations[0]
                 query = parse_qs(parsed.query, keep_blank_values=True, strict_parsing=False, max_num_fields=8)
                 if any(len(values) != 1 for values in query.values()):
                     raise WebDataError('web_query_invalid', 400)
                 if parsed.path in ('/api/conversations', '/api/status'):
                     if query:
                         raise WebDataError('web_query_invalid', 400)
-                    result = self.server.data.conversations() if parsed.path.endswith('conversations') else self.server.data.status()
+                    result = (self.server.data.conversations(**scope_arguments) if parsed.path.endswith('conversations')
+                              else self.server.data.status(**scope_arguments))
                 elif parsed.path == '/api/messages':
                     if set(query) - {'conversation', 'before', 'after', 'limit', 'q'}:
                         raise WebDataError('web_query_invalid', 400)
@@ -175,8 +182,9 @@ def make_server(data, static_dir, *, port=0, token=None):
                         if re.fullmatch(r'[0-9]{1,19}', value) is None:
                             raise WebDataError('web_query_invalid', 400)
                         return int(value)
-                    result = self.server.data.messages(query.get('conversation', [''])[0], before=integer('before'),
-                                                       after=integer('after'), limit=integer('limit', 100), q=query.get('q', [''])[0])
+                    result = self.server.data.messages(query.get('conversation', [None])[0], before=integer('before'),
+                                                       after=integer('after'), limit=integer('limit', 100), q=query.get('q', [''])[0],
+                                                       **scope_arguments)
                 else:
                     raise WebDataError('web_route_not_found', 404)
                 self._json(200, result)

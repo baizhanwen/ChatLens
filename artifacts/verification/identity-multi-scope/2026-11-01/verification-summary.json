@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-01",
+  "status": "通过",
+  "features": [
+    "verified incoming/outgoing/unknown directions",
+    "Mac selected 1-50 private/group conversations",
+    "account and selected-scope persistence isolation",
+    "stale request and old AI worker isolation"
+  ],
+  "python": {
+    "status": "通过",
+    "passed_tests": 610,
+    "elapsed_seconds": 25.12,
+    "http_isolation_tests_included": 7,
+    "evidence": "python-unittest.txt"
+  },
+  "browser": {
+    "ai": {
+      "status": "通过",
+      "passed_checks": 33,
+      "report": "ai/browser-qa.json"
+    },
+    "preview": {
+      "status": "通过",
+      "passed_checks": 24,
+      "report": "preview/browser-qa.json"
+    },
+    "live-synthetic": {
+      "status": "通过",
+      "passed_checks": 12,
+      "report": "live-synthetic/browser-qa.json"
+    },
+    "multi-scope": {
+      "status": "通过",
+      "passed_checks": 14,
+      "report": "multi-scope/browser-qa.json"
+    }
+  },
+  "browser_passed_checks": 83,
+  "all_browser_source_hashes_match": true,
+  "current_mac": {
+    "status": "通过",
+    "mode": "read_only_original_scope",
+    "saved_messages": 4,
+    "incoming": 3,
+    "outgoing": 1,
+    "unknown": 0,
+    "incoming_senders": 1,
+    "original_selected_conversations": 2,
+    "listed_readable_conversations": 3,
+    "model_config_and_baseline_retained": true,
+    "new_real_scope_selected": false,
+    "collector_state": "collecting",
+    "reports": [
+      "current-mac-readonly.json",
+      "current-mac-browser-readonly.json"
+    ]
+  },
+  "synthetic_stop_recovery": {
+    "status": "通过",
+    "events": 10000,
+    "first_run": 5000,
+    "caught_up": 5000,
+    "duplicate_replay": 0,
+    "evidence": "synthetic-stop-recovery-10000.json"
+  },
+  "intermediate_diagnostic": {
+    "observed": "two transient 409 ai_knowledge_not_ready responses during earlier synthetic browser runs",
+    "root_cause": "unknown",
+    "final_frozen_repeats": "two green browser runs and separate sixty account-switch checks did not reproduce",
+    "long_duration_stability": "未验证"
+  },
+  "boundaries": {
+    "new_real_outgoing_arrival": "未验证",
+    "new_real_multi_selection_and_recovery": "未验证",
+    "new_windows_multi_ui_package_and_device": "未验证",
+    "actual_phone": "未验证",
+    "real_cloud_model_call_this_change": false,
+    "new_runtime_dependencies": false,
+    "historical_windows_deliverables_changed": false,
+    "other_skill_collect_project_changed": false,
+    "github_published": false,
+    "public_real_names_bodies_keys_tokens_or_screenshots": false
+  },
+  "source_sha256": {
+    "apps/web/README.md": "eca3b92ab1a5acab768b1c0bcb4cbc543ba4e467c68735202e9cbbbfac68ba83",
+    "apps/web/app.js": "5547c746b0348f914d7a973fca4f92b79ac01c464c35a3a47aebfeddea945f83",
+    "apps/web/connect.css": "fe87a5a3bda71bbb90f13f5afa166f797525ab82c12b99125584b7d8c2207f47",
+    "apps/web/connect.html": "66d961ed566ef49b2dd5af2e81c2180940d66e8f48ea7211d0526b12577e6ce1",
+    "apps/web/connect.js": "4819c8008226f3fdd8a39544b936f72b0eebb1fe04dd4939a7c06dfb1bba7266",
+    "apps/web/index.html": "af99a9bce22c16afeb6198f45ffba775fc314ec7cd312ff0156ba2246ab91f91",
+    "apps/web/styles.css": "3e0c1a51adadcf0fb653c80240af7fe8e6d34eef31f5780e4d5406a09fb48f92",
+    "scripts/ai_knowledge.py": "9d024668840614600c478ef4296adf878b24b2be93159666950a28c43d8a3e97",
+    "scripts/ai_query.py": "ad2c2b5b6a5d6ddcbccef27e7dd90181990ba13b84cd580a9713f2d55cee8565",
+    "scripts/ai_service.py": "b9dfb7c7526cd3d0e68b5de7f36de754a10294d551a4b7f747bd7e22eec424bf",
+    "scripts/ai_statistics.py": "d77c2b882644afc80662df04a2519d06ed4c24b270b6f91893b4d1a46d983058",
+    "scripts/ai_web_server.py": "11e88b85b14092a8c1722c6ba4f696e05e5075be501c5d190d014e164255c19d",
+    "scripts/build_windows_collector_package.py": "8acf9f95dfa0f40556b14445edf4cdf9c0a14b7d99ca25150293d3f01a663695",
+    "scripts/build_windows_web_package.py": "9bd7ccfdf6acbb864449c59dc46c7c9be086b7a95cf3fd3602b642e7687d519c",
+    "scripts/macos_collector.py": "e9a34eb1c23dc3b8e48d1db46c98a8965ffe5dd1a4d202c93167cf025ab5ffed",
+    "scripts/macos_web.py": "e85ca36a7617ac2bf0dee7974994ba687f60a4385b2e8fd9508aa0c9c574e06a",
+    "scripts/macos_web_server.py": "7f3cfde5c9e95e02782a41df59cc069ed47bd92c83a64e1cd859bdeb5c121186",
+    "scripts/web-ai-smoke.cjs": "da504189be4ff0f2639c3f742a5f1fbf5e79375f2be9e1ba192b0e938e6d516f",
+    "scripts/web-live-smoke.cjs": "e3c544e45eba214035d144fa244be748af5380d7827ae9e1c355c72f904e4c42",
+    "scripts/web-multi-smoke.cjs": "d4b8550b580ac170b45be6956f3d8881abde0e89b36f615863f1f6fa430b7734",
+    "scripts/windows-proof/collector_service.py": "5671f19fb547db3d924a16362d3a8e0af1e3410c5dc7a0879e57fc8797877711",
+    "scripts/windows-proof/collector_web_meta.py": "ee918d2443bbfe5827429b6659ad9154be2b2c1920611a29c3ee240ade02d4ae",
+    "scripts/windows-proof/continuous_reader.py": "82a2a0e2ab1de364cc9d74c7c2a40c282f1c4426a001a7a30f0aa9c613be5e60",
+    "scripts/windows-proof/continuous_store.py": "e44a06a7f2a4a474f4e0623d891d55e14198f959b66fa2ebe58b501ef99c79be",
+    "scripts/windows-proof/conversation_scope.py": "974b5a8df919e20384f18834f2971a317a8df108bbf53fd3e44a5e5780827443",
+    "scripts/windows-proof/web_data.py": "7b6917859fa3bb5d9f5f8517011ef2376808692b3e64c52feb7aeb2edf8aaee1",
+    "scripts/windows-proof/web_server.py": "eee83d0db863f8370e14e32a4fc76dc15b89ca67e7a4ac38c66623e3b2e3253a",
+    "scripts/windows-proof/wechat_identity.py": "af4399b1a0f06f9417f5de9c244b364cd7ad16eb2417cd591199bb3a9406fcbf",
+    "tests/test_ai_knowledge.py": "52782dc7464a8489a8efeca4c6044e1371dce9c3a59258175548e6d897c8fdf6",
+    "tests/test_ai_lifecycle.py": "7e4b6b99239ef29cddc42a08d65f5f40731fccb285a3b66a071c578f06bbdde1",
+    "tests/test_ai_query.py": "80e93b7ac0f84bed9a5645029a27916f2fd58929dfcdc75de036e16b1868ff10",
+    "tests/test_ai_routing.py": "f1fd24624a59d253146c6d6ba087d4b6a0ae23427601839e0c171a333d559aa6",
+    "tests/test_ai_service.py": "c35fe221925babbce6f88a8fd293b5b5a66991c918b57a6f7e46314762ee097f",
+    "tests/test_ai_statistics.py": "26bb0d1cc55258ea1a6496d7e5daf39fe285b131b86bfe60bbbff457b5b8d9ad",
+    "tests/test_collector_service.py": "6139592d8f320f32d8ecc7255db6550f58de180fe3018dc1537b48712df582b1",
+    "tests/test_continuous_reader.py": "5b8cf8e268c056259e4d1b5a74a61b5935efede6b6b1b63e764b860fcf68b92a",
+    "tests/test_continuous_store.py": "24aad96a32a4eda39f58a2e4e3ce3d4fc30814a2f3b1598197a935a211da5c82",
+    "tests/test_conversation_scope.py": "3587b3a23271cb9b6204951a7a9eeee696c03747998004cf710b1f8c45281046",
+    "tests/test_macos_collector.py": "a4da8d68eb70c9a0fb161c574a44c6f09c8cad943ab16d93d32c2139be0ad2d8",
+    "tests/test_macos_profiles.py": "9260c059684887ac677e0389b4a502b8913428f2c89ea0ec82f2080e3fbc0798",
+    "tests/test_macos_web_manager.py": "abe53cff2f9757cc287ae1168fb0d58628b3ad777b134503631c624603647173",
+    "tests/test_scope_isolation_http.py": "89ef1b007f96eb5e86825b8daf23adeb2d3c1cf4faf5cceb23cb93a216dcfd16",
+    "tests/test_scope_safety_regressions.py": "827d547555e0b62d386e30147f7b025ccef1e3683a79cd81394fb3738ae687ec",
+    "tests/test_web_data.py": "868ecfe78d9060d3bd950bbc1d6b0c24232a10e6d61a61a50ef26d6fd191d977",
+    "tests/test_wechat_identity.py": "e9f642b5789ab3339a329cb5a4fca688f0b689fccc37d31b426ef2437c768161",
+    "tests/web_ai_fixture.py": "76683ab4a989fd3fbacae0c6351416d6979f3b9273e84e03ea9205200b59413d",
+    "tests/web_multi_fixture.py": "9da4ec346f5d8f36523bc34b059a14da2553d675979720d47010cb9680232e47"
+  }
+}

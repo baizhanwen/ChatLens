@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 from queue import SimpleQueue, Empty
+import re
 import secrets
 import signal
 import stat
@@ -29,6 +30,9 @@ from macos_reader_setup import ReaderInitializer
 from macos_web_server import make_macos_server
 from web_data import CollectorWebData, WebDataError
 from windows_selected_engine import _open, ID
+from conversation_scope import alias_for, normalize_conversations, MAX_CONVERSATIONS
+
+PROFILE = re.compile(r'[0-9a-f]{64}\Z')
 
 
 def atomic_private(path, value):
@@ -81,6 +85,206 @@ class MacWebManager:
         self.description = '正在自动识别当前登录的微信。'
         self.queued = False
         self.last_detection = self.last_poll = 0.0
+        self.scope_generation = secrets.token_hex(16)
+        self.active_scope_id = 'legacy'
+        self.active_config = {'conversations': []}
+        self.switching = False
+        self.catalog_loading = False
+        self.catalog_ready = False
+        self.pending_scope_id = None
+        self.pending_display_names = []
+        self.pending_identity_hint = None
+        self.observed_account = None
+        self.active_account_identity = None
+
+    def public_scope_context(self):
+        with self.lock:
+            return {'scope_generation': self.scope_generation,
+                    'scope_id': self.active_scope_id, 'scope_switching': self.switching}
+
+    def _check_generation(self, expected_generation):
+        if expected_generation is not None and expected_generation != self.scope_generation:
+            raise WebDataError('scope_changed', 409)
+
+    def _profile_root(self, identifier):
+        if self.directory is None or identifier != 'legacy' and (not isinstance(identifier, str) or PROFILE.fullmatch(identifier) is None):
+            raise ValueError('macos_profile_invalid')
+        if identifier == 'legacy':
+            return self.directory
+        parent = self.directory / 'profiles'
+        if parent.exists() or parent.is_symlink():
+            ensure_private_dir(parent)
+        path = parent / identifier
+        if path.exists() or path.is_symlink():
+            ensure_private_dir(path)
+        return path
+
+    def _profile_data(self, identifier):
+        return self._profile_root(identifier) / 'collector-data'
+
+    def _assistant_directory(self, identifier=None):
+        return self._profile_root(identifier or self.active_scope_id) / 'assistant'
+
+    @staticmethod
+    def _scope_fingerprint(chats):
+        identifiers = sorted(chat['chat_id'] for chat in chats)
+        return hashlib.sha256(json.dumps(identifiers, ensure_ascii=False, separators=(',', ':')).encode()).hexdigest()
+
+    def _saved_profiles(self):
+        if self.directory is None or self.account is None:
+            return []
+        entries = []
+        legacy = self.directory / 'collector-data/private/scope.json'
+        if legacy.exists() or legacy.is_symlink():
+            try:
+                value = read_private_json(legacy)
+                chats = normalize_conversations(value['config'])
+                if Path(value['db_root']) == self.account.db_root:
+                    entries.append({'id': 'legacy', 'label': '原关注范围', 'count': len(chats),
+                                    'private_count': sum(not row['chat_id'].endswith('@chatroom') for row in chats),
+                                    'group_count': sum(row['chat_id'].endswith('@chatroom') for row in chats),
+                                    'active': self.active_scope_id == 'legacy'})
+            except Exception:
+                pass
+        parent = self.directory / 'profiles'
+        if parent.exists() or parent.is_symlink():
+            ensure_private_dir(parent)
+            paths = list(parent.iterdir())
+            if len(paths) > 100:
+                raise ValueError('macos_profile_limit')
+            for path in sorted(paths):
+                if not PROFILE.fullmatch(path.name):
+                    continue
+                ensure_private_dir(path)
+                try:
+                    value = read_private_json(path / 'profile.json')
+                    if (value.get('schema_version') != 1 or value.get('account_identity') != account_identity(self.account)
+                            or value.get('profile_id') != path.name):
+                        continue
+                    chats = normalize_conversations({'conversations': value['conversations']})
+                    if self._scope_fingerprint(chats) != path.name:
+                        continue
+                    names = value.get('display_names', [])
+                    label = '、'.join(name for name in names[:3] if isinstance(name, str))[:140]
+                    entries.append({'id': path.name, 'label': label or '已保存关注范围', 'count': len(chats),
+                                    'private_count': sum(not row['chat_id'].endswith('@chatroom') for row in chats),
+                                    'group_count': sum(row['chat_id'].endswith('@chatroom') for row in chats),
+                                    'active': self.active_scope_id == path.name})
+                except Exception:
+                    continue
+        return entries
+
+    def _activate_pointer(self):
+        atomic_private(self.directory / 'active-scope.json',
+                       {'schema_version': 1, 'account_identity': account_identity(self.account),
+                        'profile_id': self.active_scope_id})
+
+    def _read_active_pointer(self):
+        pointer = self.directory / 'active-scope.json'
+        if not pointer.exists() and not pointer.is_symlink():
+            return 'legacy'
+        value = read_private_json(pointer)
+        identifier = value.get('profile_id')
+        if (value.get('schema_version') != 1 or value.get('account_identity') != account_identity(self.account)
+                or identifier != 'legacy' and (not isinstance(identifier, str) or PROFILE.fullmatch(identifier) is None)):
+            raise ValueError('macos_active_profile_invalid')
+        return identifier
+
+    def _begin_switch(self):
+        self.scope_generation = secrets.token_hex(16)
+        self.switching = True
+        self.queued, self.stage, self.reason = True, 'starting', None
+        self.description = '正在切换独立关注范围；原消息和采集位置保留。'
+
+    def _stop_active(self):
+        # Hold the manager lock so an HTTP handler cannot obtain the old
+        # assistant/provider between invalidation and shutdown.
+        with self.lock:
+            assistant, collector = self.assistant, self.collector
+            self.assistant = self.collector = self.provider = None
+            self.pending_session = None
+            try:
+                if assistant is not None:
+                    assistant.close()
+            finally:
+                if collector is not None:
+                    collector.close(reason='macos_scope_switch')
+
+    def _copy_model_config(self, source, target):
+        if source == target or not (source / 'provider.json').exists():
+            return
+        ensure_private_dir(source)
+        ensure_private_dir(target.parent, create=True)
+        ensure_private_dir(target, create=True)
+        if not (target / 'provider.json').exists() and not (target / 'provider.json').is_symlink():
+            write_private_json_new(target / 'provider.json', read_private_json(source / 'provider.json'))
+
+    def _capture_identity_hint(self):
+        from wechat_identity import trusted_self_identity
+        provider = self.provider
+        if provider is None or not hasattr(provider, '_metadata'):
+            return None
+        try:
+            catalog = provider._metadata('catalog.json')
+            with provider._open() as (_, snapshot):
+                binding = snapshot['binding_digest']
+            if trusted_self_identity(catalog, binding) is None:
+                return None
+            return {'catalog': catalog, 'binding_digest': binding,
+                    'account_context': account_identity(self.account)}
+        except Exception:
+            return None
+
+    def _prepare_scope(self, identifier, chats=None, display_names=None):
+        current = self.detector(self.probe)
+        if account_identity(current) != self.active_account_identity:
+            self._change_account(current)
+            return
+        if chats is not None:
+            legacy_scope = self.directory / 'collector-data/private/scope.json'
+            if legacy_scope.exists() or legacy_scope.is_symlink():
+                legacy = read_private_json(legacy_scope)
+                legacy_chats = normalize_conversations(legacy['config'])
+                if self._scope_fingerprint(legacy_chats) == self._scope_fingerprint(chats):
+                    identifier = 'legacy'
+                elif identifier == 'legacy':
+                    chats = normalize_conversations({'conversations': [
+                        {'alias': alias_for(row['chat_id']), 'chat_id': row['chat_id']} for row in chats]})
+                    identifier = self._scope_fingerprint(chats)
+        source_assistant = self._assistant_directory()
+        identity_hint = self._capture_identity_hint()
+        self._stop_active()
+        self.account = current
+        target_root = self._profile_root(identifier)
+        if identifier != 'legacy':
+            ensure_private_dir(target_root.parent, create=True)
+            ensure_private_dir(target_root, create=True)
+        self.data_dir = self._profile_data(identifier)
+        if chats is None:
+            session = prepare_session(self.data_dir, db_root=current.db_root)
+        else:
+            selected = self.directory / ('selection-' + secrets.token_hex(8) + '.json')
+            write_private_json_new(selected, {'conversations': chats})
+            session = prepare_session(self.data_dir, db_root=current.db_root,
+                selected_config=selected, key_file=self.key_file, client_version=current.client_version)
+        if identifier != 'legacy' and self._scope_fingerprint(session.config['conversations']) != identifier:
+            raise ValueError('macos_profile_scope_mismatch')
+        if chats is not None and self._scope_fingerprint(session.config['conversations']) != self._scope_fingerprint(chats):
+            raise ValueError('macos_selected_profile_scope_mismatch')
+        self._copy_model_config(source_assistant, target_root / 'assistant')
+        if identifier != 'legacy':
+            manifest = target_root / 'profile.json'
+            if not manifest.exists() and not manifest.is_symlink():
+                canonical = getattr(session, 'config', {'conversations': chats or []})
+                write_private_json_new(manifest, {'schema_version': 1,
+                    'account_identity': account_identity(self.account), 'profile_id': identifier,
+                    'conversations': canonical['conversations'], 'display_names': list(display_names or []),
+                    'created_at': datetime.now(timezone.utc).isoformat()})
+        self.pending_session = session
+        self.pending_scope_id = identifier
+        self.pending_identity_hint = identity_hint
+        self.pending_display_names = list(display_names or [])
+        self.queued = False
 
     def start(self):
         ensure_private_dir(self.workspace)
@@ -91,9 +295,9 @@ class MacWebManager:
             self.stage, self.reason = 'error', 'macos_saved_reader_unavailable'
             self.description = '已有读取配置暂不可用，私人资料已保留。请确认微信登录与本机权限后重试。'
 
-    def _detect_first(self):
+    def _detect_first(self, detected=None):
         try:
-            self.account = self.detector(self.probe)
+            self.account = detected if detected is not None else self.detector(self.probe)
         except Exception as error:
             code = getattr(error, 'code', '')
             messages = {
@@ -106,23 +310,94 @@ class MacWebManager:
                 self.reason = code if code in messages else 'macos_active_account_not_ready'
                 self.description = messages.get(code, '请先登录微信；本页会自动识别当前账号。')
             return
-        self.directory = self.workspace / 'accounts' / account_identity(self.account)[:24]
+        self.last_detection = time.monotonic()
+        self.active_account_identity = account_identity(self.account)
+        self.directory = self.workspace / 'accounts' / self.active_account_identity[:24]
         ensure_private_dir(self.directory, create=True)
-        self.data_dir = self.directory / 'collector-data'
+        self.active_scope_id = self._read_active_pointer()
+        self.data_dir = self._profile_data(self.active_scope_id)
         reader = self.directory / 'reader.json'
-        if self.data_dir.exists():
-            self.pending_session = prepare_session(self.data_dir, db_root=self.account.db_root)
-            self.stage, self.reason = 'starting', None
-            self.description = '正在恢复已选择会话的采集位置，请保持微信登录并切回网页。'
-        elif reader.exists():
+        if reader.exists() or reader.is_symlink():
             value = read_private_json(reader)
             if value.get('account_identity') != account_identity(self.account):
                 raise ValueError('macos_cached_reader_account_mismatch')
             self.key_file = Path(value['key_file'])
+        if self.data_dir.exists():
+            self.pending_session = prepare_session(self.data_dir, db_root=self.account.db_root)
+            self.active_config = getattr(self.pending_session, 'config', {'conversations': []})
+            if (self.active_scope_id != 'legacy'
+                    and self._scope_fingerprint(self.active_config['conversations']) != self.active_scope_id):
+                raise ValueError('macos_active_profile_scope_mismatch')
+            self.pending_scope_id = self.active_scope_id
+            if self.key_file is None:
+                self.key_file = self.data_dir / 'private/keys.json'
+            self.switching = True
+            self.stage, self.reason = 'starting', None
+            self.description = '正在恢复已选择会话的采集位置，请保持微信登录并切回网页。'
+        elif self.active_scope_id != 'legacy':
+            raise ValueError('macos_active_profile_missing')
+        elif self.key_file is not None:
             self._load_contacts()
         else:
             self.reason = None
             self.description = '已识别当前登录账号。首次使用需要在本机初始化读取能力。'
+
+    def _initializer_active(self):
+        return (self.stage == 'needs_initialization' and self.initializer is not None
+                and self.initializer.state not in ('idle', 'ready', 'error'))
+
+    def _change_account(self, current):
+        """Invalidate the old domain before discovering the new account's state."""
+        with self.lock:
+            self.scope_generation = secrets.token_hex(16)
+            self.switching = True
+            initializer, self.initializer = self.initializer, None
+            try:
+                self._stop_active()
+            finally:
+                # Nothing from the old account may be used for the new reader,
+                # picker, assistant, or queued HTTP operation, even if shutdown
+                # reports an error. Saved private files remain in their domain.
+                self.account = self.directory = self.data_dir = self.key_file = None
+                self.active_account_identity = None
+                self.contacts, self.catalog = [], {}
+                self.commands = SimpleQueue()
+                self.active_scope_id = 'legacy'
+                self.active_config = {'conversations': []}
+                self.pending_session = self.pending_scope_id = self.pending_identity_hint = None
+                self.pending_display_names = []
+                self.catalog_loading = self.catalog_ready = self.queued = False
+                self.observed_account = None
+                self.last_poll = 0.0
+                self.native_probe = None
+                self.stage, self.reason = 'needs_initialization', None
+                self.switching = False
+                self.description = '已切换微信账号，正在识别该账号自己的本机读取配置。'
+                if initializer is not None:
+                    initializer.close()
+            self._detect_first(current)
+
+    def _refresh_active_account(self, *, force=False):
+        """Owner-thread safety point; a temporary detection failure is offline."""
+        if self.account is None or self._initializer_active():
+            return False
+        current, self.observed_account = self.observed_account, None
+        if current is None:
+            now = time.monotonic()
+            if not force and now - self.last_detection < 3:
+                return False
+            self.last_detection = now
+            try:
+                current = self.detector(self.probe)
+                identity = account_identity(current)
+            except Exception:
+                return False
+        else:
+            identity = account_identity(current)
+        if identity == self.active_account_identity:
+            return False
+        self._change_account(current)
+        return True
 
     def setup(self):
         with self.lock:
@@ -140,10 +415,16 @@ class MacWebManager:
                                  'elapsed_seconds': int(getattr(init, 'elapsed_seconds', 0))},
                     'initialization': {'state': state, 'action': getattr(init, 'action', 'none'),
                                        'description': self.description},
-                    'scope_limits': {'private': 1, 'group': 1}, 'workspace_path': '/'}
+                    'scope_limits': {'total': MAX_CONVERSATIONS, 'private': MAX_CONVERSATIONS, 'group': MAX_CONVERSATIONS},
+                    'scope_generation': self.scope_generation, 'scope_id': self.active_scope_id,
+                    'scope_switching': self.switching,
+                    'catalog': {'state': 'loading' if self.catalog_loading else 'ready' if self.catalog_ready else 'idle'},
+                    'active_scope': next((row for row in self._saved_profiles() if row['active']), None),
+                    'profiles': self._saved_profiles(), 'workspace_path': '/'}
 
-    def request_initialize(self):
+    def request_initialize(self, expected_generation=None):
         with self.lock:
+            self._check_generation(expected_generation)
             if self.account is None:
                 return self.setup()
             if self.stage in ('ready_to_select', 'starting', 'running'):
@@ -153,16 +434,33 @@ class MacWebManager:
                 self.commands.put(('initialize', None))
             return self.setup()
 
-    def list_conversations(self, q=''):
+    def list_conversations(self, q='', *, expected_generation=None):
         with self.lock:
-            if self.stage != 'ready_to_select':
+            self._check_generation(expected_generation)
+            if self.stage != 'ready_to_select' and not self.catalog_ready:
                 return {'conversations': [], 'has_more': False}
             matches = [row for row in self.contacts if q.casefold() in row['name'].casefold()]
+            if not q:
+                # Current selections must fit in the first picker page even
+                # when the account has thousands of other conversations.
+                matches.sort(key=lambda row: (not row.get('selected', False),
+                                              row['type'], row['name'].casefold()))
             return {'conversations': matches[:200], 'has_more': len(matches) > 200}
 
-    def select(self, private_id, group_id):
+    def request_catalog(self, expected_generation=None):
         with self.lock:
-            if self.stage != 'ready_to_select' or self.queued:
+            self._check_generation(expected_generation)
+            if self.account is None or self.key_file is None or self.switching:
+                raise ValueError('macos_selection_not_ready')
+            if not self.catalog_loading:
+                self.catalog_loading = True
+                self.commands.put(('catalog', None))
+            return self.setup()
+
+    def select(self, private_id, group_id, *, expected_generation=None):
+        with self.lock:
+            self._check_generation(expected_generation)
+            if self.stage not in ('ready_to_select', 'running') or self.queued or self.switching:
                 raise ValueError('macos_selection_not_ready')
             private, group = self.catalog.get(private_id), self.catalog.get(group_id)
             if not private or not group or private['type'] != 'private' or group['type'] != 'group':
@@ -170,6 +468,39 @@ class MacWebManager:
             self.queued, self.stage = True, 'starting'
             self.description = '正在保存所选范围，建立启用后的新消息起点。'
             self.commands.put(('select', (private['chat_id'], group['chat_id'])))
+            self.scope_generation = secrets.token_hex(16)
+            self.switching = True
+            return self.setup()
+
+    def select_many(self, conversation_ids, *, expected_generation=None):
+        with self.lock:
+            self._check_generation(expected_generation)
+            if (self.stage not in ('ready_to_select', 'running', 'error') or self.queued or self.switching
+                    or not self.catalog_ready and self.stage != 'ready_to_select'):
+                raise ValueError('macos_selection_not_ready')
+            if (not isinstance(conversation_ids, list) or not 1 <= len(conversation_ids) <= MAX_CONVERSATIONS
+                    or any(not isinstance(value, str) or value not in self.catalog for value in conversation_ids)
+                    or len(set(conversation_ids)) != len(conversation_ids)):
+                raise ValueError('macos_selection_invalid')
+            rows = [self.catalog[value] for value in conversation_ids]
+            chats = [{'alias': alias_for(row['chat_id']), 'chat_id': row['chat_id']} for row in rows]
+            existing = self._saved_profiles()
+            identifier = self._scope_fingerprint(chats)
+            if len(existing) >= 100 and not any(row['id'] == identifier for row in existing):
+                raise ValueError('macos_profile_limit')
+            names = {row['id']: row['name'] for row in self.contacts}
+            display = [names.get(value, '未命名会话') for value in conversation_ids]
+            self._begin_switch()
+            self.commands.put(('select_many', {'chats': chats, 'display_names': display}))
+            return self.setup()
+
+    def restore_profile(self, identifier, *, expected_generation=None):
+        with self.lock:
+            self._check_generation(expected_generation)
+            if self.queued or self.switching or not any(row['id'] == identifier for row in self._saved_profiles()):
+                raise ValueError('macos_profile_not_ready')
+            self._begin_switch()
+            self.commands.put(('profile', identifier))
             return self.setup()
 
     def _load_contacts(self):
@@ -204,6 +535,10 @@ class MacWebManager:
         finally:
             connection.close()
         contacts, catalog = [], {}
+        with self.lock:
+            previous_identifiers = {value['chat_id']: identifier for identifier, value in self.catalog.items()
+                                    if isinstance(value, dict) and isinstance(value.get('chat_id'), str)}
+        selected = {row['chat_id'] for row in self.active_config.get('conversations', [])}
         for username, remark, nickname in rows:
             if not isinstance(username, str) or ID.fullmatch(username) is None:
                 continue
@@ -211,15 +546,18 @@ class MacWebManager:
                 continue
             name = next((v.strip() for v in (remark, nickname) if isinstance(v, str) and v.strip()), '未命名会话')
             name = ''.join(c for c in name if c >= ' ' and c != '\x7f')[:256]
-            identifier = secrets.token_urlsafe(18)
+            identifier = previous_identifiers.get(username) or secrets.token_urlsafe(18)
             kind = 'group' if username.endswith('@chatroom') else 'private'
-            contacts.append({'id': identifier, 'name': name or '未命名会话', 'type': kind})
+            contacts.append({'id': identifier, 'name': name or '未命名会话', 'type': kind,
+                             'selected': username in selected})
             catalog[identifier] = {'chat_id': username, 'type': kind}
         contacts.sort(key=lambda row: (row['type'], row['name'].casefold()))
         with self.lock:
             self.contacts, self.catalog = contacts, catalog
-            self.stage, self.reason = 'ready_to_select', None
-            self.description = '读取能力已准备好。只会采集你接下来选定的会话新文字。'
+            self.catalog_ready, self.catalog_loading = True, False
+            if self.collector is None and not self.switching:
+                self.stage, self.reason = 'ready_to_select', None
+                self.description = '读取能力已准备好。只会采集你接下来选定的会话新文字。'
 
     def _native(self):
         source = self.native_probe()
@@ -227,8 +565,10 @@ class MacWebManager:
             return source
         try:
             current = self.detector(self.probe)
-            if (account_identity(current) != account_identity(self.account)
-                    or current.pid != self.account.pid or current.started_at != self.account.started_at):
+            if account_identity(current) != self.active_account_identity:
+                self.observed_account = current
+                raise ValueError
+            if current.pid != self.account.pid or current.started_at != self.account.started_at:
                 raise ValueError
         except Exception:
             return {'probe_succeeded': False, 'running': None, 'frontmost': None, 'screen_locked': None}
@@ -238,12 +578,11 @@ class MacWebManager:
         try:
             self._tick()
         except Exception:
-            if self.collector is not None:
-                self.collector.close(reason='macos_setup_operation_failed')
-                self.collector = None
+            self._stop_active()
             with self.lock:
                 self.stage, self.reason = 'error', 'macos_setup_operation_failed'
                 self.queued = False
+                self.switching = False
                 self.description = '本次接入未完成，已有配置和采集位置已保留。请检查微信登录与本机读取权限。'
 
     def _tick(self):
@@ -252,30 +591,41 @@ class MacWebManager:
                 self.last_detection = time.monotonic()
                 self._detect_first()
             return
+        if self._refresh_active_account(force=self.queued or self.pending_session is not None):
+            return
         try:
             command, value = self.commands.get_nowait()
         except Empty:
             command = None
         if command == 'initialize':
             current = self.detector(self.probe)
-            if account_identity(current) != account_identity(self.account):
-                raise ValueError('macos_account_changed')
+            if account_identity(current) != self.active_account_identity:
+                self._change_account(current)
+                return
             self.account = current
             self.initializer = self.initializer_factory(self.account, self.directory, project_root=self.project)
             self.initializer.start()
             self.queued, self.stage, self.reason = False, 'needs_initialization', None
+        elif command == 'catalog':
+            try:
+                current = self.detector(self.probe)
+                if account_identity(current) != self.active_account_identity:
+                    self._change_account(current)
+                    return
+                self._load_contacts()
+            except Exception:
+                self.catalog_loading = self.catalog_ready = False
+                self.reason = 'macos_contact_catalog_unavailable'
+                self.description = '可选会话暂时未能载入，当前关注范围继续保留。请确认微信登录后重试。'
         elif command == 'select':
-            selected = self.directory / ('selection-' + secrets.token_hex(8) + '.json')
-            write_private_json_new(selected, {'conversations': [
+            self._prepare_scope('legacy', [
                 {'alias': 'private_test', 'chat_id': value[0]},
-                {'alias': 'group_test', 'chat_id': value[1]}]})
-            current = self.detector(self.probe)
-            if account_identity(current) != account_identity(self.account):
-                raise ValueError('macos_account_changed')
-            self.account = current
-            self.pending_session = prepare_session(self.data_dir, db_root=current.db_root,
-                selected_config=selected, key_file=self.key_file, client_version=current.client_version)
-            self.queued = False
+                {'alias': 'group_test', 'chat_id': value[1]}])
+        elif command == 'select_many':
+            chats = normalize_conversations({'conversations': value['chats']})
+            self._prepare_scope(self._scope_fingerprint(chats), chats, value['display_names'])
+        elif command == 'profile':
+            self._prepare_scope(value)
         if self.initializer is not None and self.stage == 'needs_initialization':
             self.initializer.step()
             action = self.initializer.action
@@ -297,8 +647,9 @@ class MacWebManager:
                 except Exception:
                     self.description = '请完成原版微信登录，再切回网页。准备好后会自动开始。'
                     return
-                if account_identity(current) != account_identity(self.account):
-                    raise ValueError
+                if account_identity(current) != self.active_account_identity:
+                    self._change_account(current)
+                    return
                 probe = MacNativeProbe(self.probe, expected_version=self.pending_session.client_version)
                 sample = probe()
                 if not (sample.get('probe_succeeded') and sample.get('running') is True
@@ -306,33 +657,47 @@ class MacWebManager:
                     self.description = '请完成原版微信登录，再切回网页。准备好后会自动开始。'
                     return
                 self.account, self.native_probe = current, probe
-                self.collector = MacCollector(self.pending_session, self._native)
+                options = {'identity_hint': self.pending_identity_hint} if self.pending_identity_hint else {}
+                self.collector = MacCollector(self.pending_session, self._native, **options)
             except Exception as error:
                 if getattr(error, 'code', '') in ('continuous_native_state_not_ready', 'continuous_native_state_unavailable'):
                     return
                 raise
+            self.active_config = getattr(self.pending_session, 'config', self.active_config)
+            self.active_scope_id = self.pending_scope_id or self.active_scope_id
+            self.pending_scope_id = self.pending_identity_hint = None
             self.pending_session = None
             self.provider = CollectorWebData(self.data_dir)
+            self._activate_pointer()
+            self.switching = False
+            self.catalog_ready = False
             self.stage, self.reason = 'running', None
             self.description = '正在采集你选择的会话新文字。'
         if self.collector is not None and time.monotonic() - self.last_poll >= 1:
             self.collector.poll()
             self.last_poll = time.monotonic()
+            if self.observed_account is not None:
+                self._refresh_active_account()
 
-    def _data(self):
+    def _data(self, expected_generation=None):
         with self.lock:
-            if self.provider is None:
+            self._check_generation(expected_generation)
+            if self.provider is None or self.switching:
                 raise WebDataError('web_store_unavailable')
             return self.provider
 
-    def conversations(self):
-        return self._data().conversations()
+    def conversations(self, *, expected_generation=None):
+        with self.lock:
+            return self._data(expected_generation).conversations() | self.public_scope_context()
 
     def messages(self, *args, **kwargs):
-        return self._data().messages(*args, **kwargs)
+        expected = kwargs.pop('expected_generation', None)
+        with self.lock:
+            return self._data(expected).messages(*args, **kwargs) | self.public_scope_context()
 
-    def status(self):
-        return self._data().status()
+    def status(self, *, expected_generation=None):
+        with self.lock:
+            return self._data(expected_generation).status() | self.public_scope_context()
 
     def close(self):
         with self.lock:
@@ -345,15 +710,17 @@ class MacWebManager:
         if self.collector is not None:
             self.collector.close()
 
-    def ai_service(self):
+    def ai_service(self, expected_generation=None):
         from ai_service import AiAssistant, AiError
         with self.lock:
+            if expected_generation is not None and expected_generation != self.scope_generation:
+                raise AiError('scope_changed', '关注范围已经改变，请重新打开工作台。', 409)
             if self.closed:
                 raise AiError('ai_service_stopped', 'AI 服务正在关闭。', 503)
-            if self.provider is None or self.directory is None:
+            if self.provider is None or self.directory is None or self.switching:
                 raise AiError('ai_knowledge_not_ready', '请先完成微信接入并选择会话。', 409)
             if self.assistant is None:
-                self.assistant = AiAssistant(self.provider.data_dir, self.directory / 'assistant')
+                self.assistant = AiAssistant(self.provider.data_dir, self._assistant_directory())
             return self.assistant
 
 

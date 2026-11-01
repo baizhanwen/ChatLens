@@ -135,11 +135,18 @@ class MacWebManagerTests(unittest.TestCase):
             connection.close()
             return result
         try:
-            status, headers, _ = request('GET', '/api/session', headers={'Authorization': 'Bearer ' + server.token})
+            status, headers, session = request('GET', '/api/session', headers={'Authorization': 'Bearer ' + server.token})
             self.assertEqual(status, 200)
             cookie = headers['Set-Cookie'].split(';', 1)[0]
+            scope_generation = session.get('scope_generation')
             def authenticated(method, route, value=None):
-                return request(method, route, value, headers={'Cookie': cookie})
+                nonlocal scope_generation
+                headers = {'Cookie': cookie}
+                if scope_generation:
+                    headers['X-ChatLens-Scope'] = scope_generation
+                result = request(method, route, value, headers=headers)
+                scope_generation = result[2].get('scope_generation', scope_generation)
+                return result
             yield authenticated
         finally:
             server.shutdown(); worker.join(timeout=2); server.server_close()
@@ -342,7 +349,7 @@ class MacWebManagerTests(unittest.TestCase):
             self.assertEqual(selected, {'conversations': [
                 {'alias': 'private_test', 'chat_id': PRIVATE_CHAT},
                 {'alias': 'group_test', 'chat_id': GROUP_CHAT}]})
-            session = SimpleNamespace(client_version=options['client_version'])
+            session = SimpleNamespace(client_version=options['client_version'], config=selected)
             sessions.append(session)
             return session
         def create(session, native):
@@ -378,7 +385,9 @@ class MacWebManagerTests(unittest.TestCase):
         with mock.patch.object(web, 'prepare_session', forbidden), mock.patch.object(web, 'MacCollector', forbidden):
             self.manager.tick()
         forbidden.assert_not_called()
-        self.assertEqual(self.manager.stage, 'error')
+        self.assertEqual(self.manager.stage, 'needs_initialization')
+        self.assertEqual(self.manager.account, self.second)
+        self.assertIsNone(self.manager.key_file)
         self.assert_public(self.manager.setup())
 
     def test_contacts_are_metadata_only_and_public_rows_use_opaque_identifiers(self):

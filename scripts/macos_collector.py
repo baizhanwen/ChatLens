@@ -35,6 +35,7 @@ from continuous_reader import ContinuousReader
 from continuous_store import CollectorStore
 from prepare_wechat_read_test import key_validates_page
 from windows_selected_engine import ALIASES, ID
+from conversation_scope import normalize_conversations
 
 MESSAGE_RELATIVE = re.compile(r'message/message_([0-7])\.db\Z')
 HEX_KEY = re.compile(r'[0-9a-fA-F]{64}\Z')
@@ -64,25 +65,7 @@ def _safe_code(error):
 
 def _config(source):
     try:
-        rows = source['conversations']
-        if not isinstance(rows, list) or len(rows) != 2:
-            raise ValueError
-        result = []
-        for alias in ALIASES:
-            found = [row for row in rows if isinstance(row, dict) and row.get('alias') == alias]
-            if len(found) != 1:
-                raise ValueError
-            chat_id = found[0]['chat_id']
-            if (not isinstance(chat_id, str) or ID.fullmatch(chat_id) is None
-                    or (alias == 'group_test') != chat_id.endswith('@chatroom')):
-                raise ValueError
-            table = 'Msg_' + hashlib.md5(chat_id.encode()).hexdigest()
-            if found[0].get('table', table) != table:
-                raise ValueError
-            result.append({'alias': alias, 'chat_id': chat_id, 'table': table})
-        if result[0]['chat_id'] == result[1]['chat_id']:
-            raise ValueError
-        return {'conversations': result}
+        return {'conversations': normalize_conversations(source)}
     except (KeyError, TypeError, ValueError):
         raise MacCollectorError('macos_selected_scope_invalid') from None
 
@@ -283,7 +266,7 @@ class MacNativeProbe:
 
 
 class MacCollector:
-    def __init__(self, session, native_state_callable, driver=None):
+    def __init__(self, session, native_state_callable, driver=None, *, identity_hint=None):
         self.session, self.native = session, native_state_callable
         self.store = self.reader = self.metadata = None
         self.resumed = False
@@ -302,7 +285,8 @@ class MacCollector:
             self.driver = driver
             self._preflight()
             self.store = CollectorStore(session.data_dir / 'private' / 'store', session.binding)
-            self.metadata = WebMetadata(session.data_dir / 'private', self.store.binding_digest, _now())
+            self.metadata = WebMetadata(session.data_dir / 'private', self.store.binding_digest, _now(),
+                                        identity_hint=identity_hint)
             self._heartbeat('starting')
             self.reader = ContinuousReader(driver, session.root, session.keys, session.config, self.store,
                                            self.native, shards=session.shards)
@@ -321,9 +305,11 @@ class MacCollector:
             raise MacCollectorError('macos_session_account_identity_changed')
 
     def _catalog(self):
+        # The allowed scope is required; display-name enrichment is optional.
+        self.metadata.ensure_catalog(self.session.config)
         try:
             self.metadata.refresh_catalog(self.driver, self.session.root, self.session.keys, self.session.config,
-                                          self.store.sender_ids_by_alias())
+                                          self.store.sender_ids_by_alias(include_unknown=True))
         except Exception:
             self.metadata.failed = True  # Optional labels never stop durable message commits.
 

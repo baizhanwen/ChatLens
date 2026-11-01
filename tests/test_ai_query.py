@@ -14,8 +14,10 @@ TZ = timezone(timedelta(hours=8))
 NOW = datetime(2026, 11, 5, 12, 30, tzinfo=TZ)
 SCOPE = ['private_test', 'group_test']
 CATALOG = {
-    'private_test': {'name': '青禾客户', 'kind': 'private', 'sender_names': {'sender-a': '张三', 'sender-b': '李四'}},
-    'group_test': {'name': '星桥项目群', 'kind': 'group', 'sender_names': {'sender-a': '张三', 'sender-c': '王五'}},
+    'private_test': {'name': '青禾客户', 'kind': 'private', 'sender_names': {'sender-a': '张三', 'sender-b': '李四'},
+                     'identity_verified': True, 'self_sender_id': 'synthetic-self', 'peer_sender_id': 'sender-a'},
+    'group_test': {'name': '星桥项目群', 'kind': 'group', 'sender_names': {'sender-a': '张三', 'sender-c': '王五'},
+                   'identity_verified': True, 'self_sender_id': 'synthetic-self'},
 }
 
 
@@ -57,6 +59,8 @@ class QueryPlannerTests(unittest.TestCase):
             ('再统计一下今天有多少条消息', 'messages', None),
             ('再统计今天共有多少条消息', 'messages', None),
             ('麻烦重新统计今天有几条消息', 'messages', None),
+            ('今天一共有多少条消息', 'messages', None),
+            ('今天总共有多少条消息', 'messages', None),
             ('客户今天发了多少消息', 'messages', None),
             ('客户的消息有多少', 'messages', None),
         ]
@@ -235,13 +239,42 @@ class QueryPlannerTests(unittest.TestCase):
                 result = self.plan(question)
                 self.assertEqual(result['route'], 'local_stats')
                 self.assertEqual(result['direction'], 'incoming')
-        for question in ['我今天一共发了几条消息', '我发出多少条消息', '我给张三发了多少条消息', '今天有多少条未读消息', '几个人我还没回复']:
+        for question in ['我今天一共发了几条消息', '我发出多少条消息', '我给张三发了多少条消息']:
+            with self.subTest(question=question):
+                result = self.plan(question)
+                self.assertEqual(result['route'], 'local_stats')
+                self.assertEqual(result['direction'], 'outgoing')
+        for question in ['今天有多少条未读消息', '几个人我还没回复']:
             with self.subTest(question=question):
                 result = self.plan(question)
                 self.assertEqual(result['route'], 'clarify')
                 self.assertFalse(result['requires_model'])
                 self.assertTrue(result['clarification'])
         self.assertEqual(self.plan('有哪些客户可能需要跟进回复')['route'], 'analysis')
+
+    def test_split_recipient_queries_and_direction_followups_use_explicit_identity(self):
+        for question in ['今天收到和发出的消息分别多少条', '收发消息分开统计', '今天收发各几条']:
+            with self.subTest(question=question):
+                result = self.plan(question)
+                self.assertEqual((result['route'], result['metric'], result['group_by'], result['direction']),
+                                 ('local_stats', 'messages', 'direction', 'all'))
+        result = self.plan('我今天给谁发了消息')
+        self.assertEqual((result['metric'], result['group_by'], result['direction']), ('conversations', 'conversation', 'outgoing'))
+        result = self.plan('我今天最后给谁发了消息')
+        self.assertEqual((result['metric'], result['direction']), ('latest', 'outgoing'))
+        result = self.plan('我给张三发了多少条消息')
+        self.assertEqual(result['scope'], ['private_test'])
+        self.assertEqual(result['filters']['sender_ids'], [])
+        previous = self.plan('今天收到多少条消息')
+        followup = self.plan('那发出的呢', previous=previous)
+        self.assertEqual((followup['metric'], followup['direction'], followup['route']), ('messages', 'outgoing', 'local_stats'))
+        unknown = {alias: {key: value for key, value in entry.items() if key not in {'identity_verified', 'self_sender_id'}}
+                   for alias, entry in CATALOG.items()}
+        for question in ['今天谁给我发消息', '我发了几条消息', '今天收发各几条', '总结我收到的消息']:
+            with self.subTest(question=question):
+                result = self.plan(question, catalog=unknown)
+                self.assertEqual(result['route'], 'clarify')
+                self.assertFalse(result['requires_model'])
 
     def test_elliptical_followups_inherit_typed_intent_but_never_a_new_substantive_topic(self):
         previous = self.plan('今天青禾客户收到多少条消息')

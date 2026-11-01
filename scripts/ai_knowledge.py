@@ -19,7 +19,9 @@ import unicodedata
 MODULES = Path(__file__).resolve().parent / 'windows-proof'
 if str(MODULES) not in sys.path:
     sys.path.insert(0, str(MODULES))
-from web_data import ALIASES, CollectorWebData, WebDataError, _iso, _public_time
+from web_data import CollectorWebData, WebDataError, _iso, _public_time
+from wechat_identity import trusted_self_identity, message_direction, valid_sender
+from conversation_scope import MAX_CONVERSATIONS, valid_alias
 
 MAX_EVIDENCE = 30
 MAX_CONTEXT_CHARS = 12000
@@ -128,18 +130,30 @@ class KnowledgeIndex:
     def catalog(self):
         """Selected display names for the local planner; never provider context."""
         metadata = self.data._metadata('catalog.json')
-        with self.data._open() as (_, state):
+        with self.data._open() as (connection, state):
             self._check_binding(state)
-            return self.data._catalog(state['binding_digest'], metadata)
+            return self._catalog(state, metadata, connection=connection)
+
+    def _catalog(self, state, metadata, *, connection=None):
+        catalog = self.data._catalog(state['binding_digest'], metadata, connection=connection)
+        identifier = trusted_self_identity(metadata, state['binding_digest'])
+        for alias, entry in catalog.items():
+            entry.update(self_sender_id=identifier, identity_verified=identifier is not None,
+                         _identity_source=metadata, _binding_digest=state['binding_digest'])
+            if (identifier is not None and entry.get('kind') == 'private'
+                    and metadata['identity']['proof'].get('private_alias') == alias):
+                entry['peer_sender_id'] = metadata['identity']['proof']['private_peer_id']
+        return catalog
 
     def _scope(self, scope):
+        active = self.catalog()
         if scope is None:
-            return tuple(ALIASES)
-        if (not isinstance(scope, (list, tuple)) or not 1 <= len(scope) <= 2
-                or any(not isinstance(alias, str) or alias not in ALIASES for alias in scope)
+            return tuple(sorted(active))
+        if (not isinstance(scope, (list, tuple)) or not 1 <= len(scope) <= MAX_CONVERSATIONS
+                or any(not valid_alias(alias) or alias not in active for alias in scope)
                 or len(set(scope)) != len(scope)):
             raise KnowledgeError('knowledge_scope_invalid', 400)
-        return tuple(alias for alias in ALIASES if alias in scope)
+        return tuple(sorted(scope))
 
     def _range(self, supplied):
         if supplied is None:
@@ -180,13 +194,18 @@ class KnowledgeIndex:
         if row['body'] is None:
             return None
         sender = catalog[row['alias']]['sender_names'].get(row['sender_id']) or '未知发送人'
+        entry = catalog[row['alias']]
+        direction = message_direction(entry.get('_identity_source'), entry.get('_binding_digest'), row['sender_id'])
+        own = direction == 'outgoing' if direction != 'unknown' else None
+        if own:
+            sender = '我'
         valid_sent = type(row['sent_at']) is int and 0 <= row['sent_at'] <= 253402300799
         observed = _public_time(row['observed_at'])
         return {'message_id': row['rowid'], 'conversation_id': row['alias'],
                 'conversation_name': catalog[row['alias']]['name'], 'type': catalog[row['alias']]['kind'],
                 'sender': sender, 'sent_at': row['sent_at'] if valid_sent else None,
                 'observed_at': observed, 'time_source': 'sent_at' if valid_sent else 'observed_at' if observed else 'unknown',
-                'body': row['body'], 'is_context': context}
+                'body': row['body'], 'is_context': context, 'direction': direction, 'own': own}
 
     def _provider(self, item, citation):
         sent = None
@@ -197,14 +216,14 @@ class KnowledgeIndex:
             pass
         return {'citation': citation, 'conversation': item['conversation_name'], 'type': item['type'],
                 'sender': item['sender'], 'sent_at': sent, 'observed_at': item['observed_at'],
-                'time_source': item['time_source'], 'text': item['body']}
+                'time_source': item['time_source'], 'text': item['body'], 'direction': item.get('direction', 'unknown')}
 
     def _context(self, evidence):
         return {'kind': 'untrusted_chat_evidence', 'trust_note': TRUST_NOTE,
                 'messages': [self._provider(row, row['id']) for row in evidence]}
 
     def snapshot(self, query, scope=None, time_range=None, *, limit=MAX_EVIDENCE, char_budget=MAX_CONTEXT_CHARS,
-                 fallback_recent=False, filters=None):
+                 fallback_recent=False, filters=None, direction='all'):
         try:
             valid = isinstance(query, str) and bool(query.strip()) and '\0' not in query and len(query) <= 6000 and len(query.encode('utf-8')) <= 24000
         except UnicodeError:
@@ -214,6 +233,8 @@ class KnowledgeIndex:
         if type(limit) is not int or not 1 <= limit <= MAX_EVIDENCE or type(char_budget) is not int or not 256 <= char_budget <= MAX_CONTEXT_CHARS:
             raise KnowledgeError('knowledge_budget_invalid', 400)
         aliases, (normalized_range, seconds) = self._scope(scope), self._range(time_range)
+        if direction not in {'all', 'incoming', 'outgoing'}:
+            raise KnowledgeError('knowledge_direction_invalid', 400)
         filters = {} if filters is None else filters
         if not isinstance(filters, dict) or set(filters) - {'sender_ids', 'body_contains'}:
             raise KnowledgeError('knowledge_filters_invalid', 400)
@@ -227,7 +248,18 @@ class KnowledgeIndex:
         try:
             with self.data._open() as (connection, state):
                 self._check_binding(state)
-                catalog = self.data._catalog(state['binding_digest'], metadata)
+                connection.create_function('chatlens_sender_valid', 1, valid_sender, deterministic=True)
+                catalog = self._catalog(state, metadata, connection=connection)
+                self_id = trusted_self_identity(metadata, state['binding_digest'])
+                direction_where, direction_params = '', []
+                if direction != 'all':
+                    if self_id is None:
+                        raise KnowledgeError('knowledge_direction_identity_unavailable', 409)
+                    direction_where = (" AND chatlens_sender_valid(sender_id)=1 AND sender_id<>?" if direction == 'incoming'
+                                       else ' AND sender_id=?')
+                    direction_params = [self_id]
+                    where += direction_where
+                    params.extend(direction_params)
                 if senders:
                     known = {sender for alias in aliases for sender in catalog[alias]['sender_names']}
                     if any(sender not in known for sender in senders):
@@ -253,6 +285,8 @@ class KnowledgeIndex:
                 fallback = connection.execute('SELECT COUNT(*) FROM messages WHERE ' + where + ' AND NOT (' + VALID_SENT
                                               + ') AND julianday(observed_at) IS NOT NULL', params).fetchone()[0]
                 alias_where, alias_params = self._where(aliases, {'start': None, 'end': None})
+                alias_where += direction_where
+                alias_params.extend(direction_params)
                 if senders:
                     alias_where += ' AND sender_id IN (%s)' % ','.join('?' for _ in senders)
                     alias_params.extend(senders)
@@ -387,7 +421,7 @@ class KnowledgeIndex:
         try:
             with self.data._open() as (connection, state):
                 self._check_binding(state)
-                catalog = self.data._catalog(state['binding_digest'], metadata)
+                catalog = self._catalog(state, metadata, connection=connection)
                 columns = self._columns(1024 * 1024)
                 center = connection.execute('SELECT ' + columns + ' FROM messages WHERE alias=? AND rowid=?',
                                             (conversation_id, message_id)).fetchone()

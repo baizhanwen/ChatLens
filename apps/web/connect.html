@@ -43,16 +43,28 @@
 
         <section class="card setup-error" id="setup-error" role="alert" hidden><span class="eyebrow">CONNECTION NEEDS ATTENTION</span><h2>这一步暂时没有完成</h2><p id="setup-error-description"></p><div class="connect-actions"><button class="button button-primary" id="retry-initialization" type="button">重新尝试初始化</button><button class="button" id="check-status" type="button">重新检查状态</button></div><details class="technical-details"><summary>查看状态详情</summary><p id="setup-reason"></p></details></section>
 
-        <section class="card selection-card" id="selection-card" aria-labelledby="selection-title" hidden>
-          <div class="card-heading"><div><span class="eyebrow">YOUR FOCUS</span><h2 id="selection-title">选择要关注的会话</h2></div><span class="tag tag-neutral">1 个私聊 + 1 个群聊</span></div>
-          <p class="selection-description">当前版本先支持一位私聊联系人和一个群聊。只从开始关注后收到的新文字建立记录。</p>
-          <label class="input-field search-field connect-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 4.5 4.5"></path></svg><input type="search" id="setup-conversation-search" placeholder="搜索联系人或群名称" aria-label="搜索联系人或群名称" maxlength="256" autocomplete="off"></label><p class="field-help">这里只查找会话名称，不读取聊天正文。</p>
-          <div class="connect-list-feedback" id="conversation-feedback" role="status" hidden><span id="conversation-feedback-text"></span><button class="text-button" id="retry-conversations" type="button" hidden>重新读取</button></div>
-          <div class="connect-picker"><section class="picker-column" aria-labelledby="private-list-title"><div class="picker-heading"><h3 id="private-list-title">私聊</h3><span id="private-result-count">—</span></div><div class="picker-list" id="private-list" role="radiogroup" aria-label="选择一位私聊联系人"></div><div class="picked-summary"><span>已选私聊</span><strong id="selected-private">尚未选择</strong></div></section><section class="picker-column" aria-labelledby="group-list-title"><div class="picker-heading"><h3 id="group-list-title">群聊</h3><span id="group-result-count">—</span></div><div class="picker-list" id="group-list" role="radiogroup" aria-label="选择一个群聊"></div><div class="picked-summary"><span>已选群聊</span><strong id="selected-group">尚未选择</strong></div></section></div>
-          <div class="selection-footer"><div><strong id="selection-count">已选择 0 / 2</strong><p>你选中的会话，才会进入工作台。</p></div><button class="button button-primary" id="start-selected" type="button" disabled>开始关注这些会话<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"></path></svg></button></div>
+        <p class="connect-notice" id="scope-capability-note" hidden>当前启动器未提供关注范围管理能力，请使用支持此功能的本机入口。</p>
+
+        <section class="card scope-manager" id="scope-manager" aria-labelledby="scope-manager-title" hidden>
+          <div class="card-heading"><div><span class="eyebrow">CURRENT FOCUS</span><h2 id="scope-manager-title">当前关注范围</h2></div><span class="tag tag-success">独立保存</span></div>
+          <strong class="active-scope-label" id="active-scope-label">当前关注范围</strong><p class="active-scope-count" id="active-scope-count"></p>
+          <p class="selection-description">修改名单时，当前采集保持运行。只有点击「启用所选关注范围」后才会切换。</p>
+          <div class="connect-actions"><button class="button button-primary" id="manage-conversations" type="button">修改关注范围</button><button class="button" id="open-workspace" type="button">返回当前工作台</button></div>
         </section>
 
-        <section class="card starting-card" id="starting-card" role="status" hidden><span class="eyebrow">STARTING YOUR WORKSPACE</span><h2 id="starting-title">正在启动采集</h2><p id="starting-description">正在确认所选会话并建立新消息起点，请等待本机状态更新。</p><div class="connect-task"><span class="connect-spinner" aria-hidden="true"></span><div><strong id="starting-phase">等待本机采集就绪</strong><p id="starting-count"></p></div><span class="connect-elapsed" id="starting-elapsed"></span></div><button class="button button-primary" id="starting-button" type="button" disabled>正在启动采集</button></section>
+        <section class="card selection-card" id="selection-card" aria-labelledby="selection-title" hidden>
+          <div class="card-heading"><div><span class="eyebrow">YOUR FOCUS</span><h2 id="selection-title">选择要关注的会话</h2></div><span class="tag tag-neutral" id="selection-limit">可选 1–50 个会话</span></div>
+          <p class="selection-description">私聊与群聊均可多选，由你决定这次关注哪些沟通。新范围从启用后收到的新文字开始。</p>
+          <label class="input-field search-field connect-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 4.5 4.5"></path></svg><input type="search" id="setup-conversation-search" placeholder="搜索联系人或群名称" aria-label="搜索联系人或群名称" maxlength="256" autocomplete="off"></label><p class="field-help">这里只查找会话名称，不读取聊天正文。更换搜索词会保留已选会话。</p>
+          <div class="connect-list-feedback" id="conversation-feedback" role="status" hidden><span id="conversation-feedback-text"></span><button class="text-button" id="retry-conversations" type="button" hidden>重新读取</button></div>
+          <div class="connect-picker"><section class="picker-column" aria-labelledby="private-list-title"><div class="picker-heading"><h3 id="private-list-title">私聊</h3><span id="private-result-count">—</span></div><div class="picker-list" id="private-list" role="group" aria-label="选择私聊，可多选"></div><div class="picked-summary"><span>已选私聊</span><strong id="selected-private">尚未选择</strong></div></section><section class="picker-column" aria-labelledby="group-list-title"><div class="picker-heading"><h3 id="group-list-title">群聊</h3><span id="group-result-count">—</span></div><div class="picker-list" id="group-list" role="group" aria-label="选择群聊，可多选"></div><div class="picked-summary"><span>已选群聊</span><strong id="selected-group">尚未选择</strong></div></section></div>
+          <div class="selected-conversations" id="selected-conversations" aria-label="已选会话"></div>
+          <div class="selection-footer"><div><strong id="selection-count">已选择 0 / 50</strong><p>每个范围独立保存消息、AI 历史和采集位置。</p></div><button class="button button-primary" id="start-selected" type="button" disabled>启用所选关注范围</button></div>
+        </section>
+
+        <section class="card profiles-card" id="profiles-card" aria-labelledby="profiles-title" hidden><div class="card-heading"><div><span class="eyebrow">SAVED FOCUS</span><h2 id="profiles-title">已保存的关注范围</h2></div></div><p class="selection-description">切回旧范围会续采原来的记录；不同范围的消息与 AI 对话分别保留，不会合并。</p><div class="saved-profiles" id="saved-profiles"></div></section>
+
+        <section class="card starting-card" id="starting-card" role="status" hidden><span class="eyebrow">STARTING YOUR WORKSPACE</span><h2 id="starting-title">正在启动采集</h2><p id="starting-description">正在准备所选关注范围，请让微信保持后台并等待本机状态更新。</p><div class="connect-task"><span class="connect-spinner" aria-hidden="true"></span><div><strong id="starting-phase">等待本机采集就绪</strong><p id="starting-count"></p></div><span class="connect-elapsed" id="starting-elapsed"></span></div><button class="button button-primary" id="starting-button" type="button" disabled>正在启动采集</button></section>
         <p class="connect-footer-note"><span class="status-dot"></span>聊天内容保存在本机。当前不调用云端模型，也不会代发消息。</p>
       </main>
     </div>

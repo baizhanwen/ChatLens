@@ -15,7 +15,7 @@
 .connect-heading { margin-bottom: 28px; }
 .connect-heading h1 { font-size: 30px; }
 .connect-content > .card { margin-bottom: 24px; }
-.account-card, .initialization-card, .selection-card, .setup-error, .starting-card { padding: 25px 28px; }
+.account-card, .initialization-card, .selection-card, .setup-error, .starting-card, .scope-manager, .profiles-card { padding: 25px 28px; }
 .account-heading { display: flex; align-items: center; gap: 16px; }
 .connect-symbol { width: 48px; height: 48px; flex: 0 0 48px; border-radius: 12px; background: var(--accent-bg); display: grid; place-items: center; color: var(--nav-selected-text); }
 .connect-symbol svg { width: 25px; height: 25px; }
@@ -64,12 +64,13 @@
 .picker-list { min-height: 140px; max-height: 304px; overflow-y: auto; overscroll-behavior: contain; padding: 6px; }
 .picker-row { width: 100%; display: flex; align-items: center; gap: 11px; text-align: left; border: 1px solid transparent; border-radius: 7px; padding: 12px 10px; background: var(--card-bg); transition: background var(--transition),border-color var(--transition); }
 .picker-row:hover { background: var(--nav-hover-bg); }
-.picker-row[aria-checked="true"] { background: var(--nav-selected-bg); border-color: var(--nav-selected-bg); }
+.picker-row { cursor: pointer; }
+.picker-row.is-selected { background: var(--nav-selected-bg); border-color: var(--nav-selected-bg); }
 .picker-row .avatar { flex: 0 0 32px; width: 32px; height: 32px; font-size: 11px; }
 .picker-row > strong { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 12px; font-weight: 500; }
-.picker-radio { width: 15px; height: 15px; flex: 0 0 15px; border: 1px solid var(--focus); border-radius: 50%; position: relative; }
-.picker-row[aria-checked="true"] .picker-radio:after { position: absolute; content: ''; inset: 3px; background: var(--nav-selected-text); border-radius: 50%; }
-.picker-row:disabled { opacity: .6; }
+.picker-checkbox { flex: 0 0 16px; width: 16px; height: 16px; margin: 0; accent-color: var(--button-bg); cursor: pointer; }
+.picker-checkbox:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.picker-row.is-disabled { opacity: .6; cursor: default; }
 .picker-empty { min-height: 125px; display: grid; align-content: center; justify-items: center; padding: 20px; color: var(--text-secondary); text-align: center; }
 .picker-empty strong { font-size: 12px; font-weight: 500; }
 .picker-empty p { font-size: 11px; margin: 5px 0 0; line-height: 1.8; }
@@ -80,6 +81,21 @@
 .selection-footer strong { font-size: 12px; font-weight: 500; }
 .selection-footer p { font-size: 11px; margin: 5px 0 0; color: var(--text-secondary); }
 .selection-footer .button { flex-shrink: 0; }
+.selected-conversations { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 18px; }
+.selected-conversations:empty { margin: 0; }
+.selected-chip { max-width: 100%; padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--sidebar-bg); font-size: 11px; line-height: 1.8; overflow-wrap: anywhere; text-align: left; }
+.selected-chip:hover { border-color: var(--focus); }
+.scope-manager .card-heading, .profiles-card .card-heading { margin-bottom: 17px; }
+.scope-manager .card-heading h2, .profiles-card h2 { font-size: 23px; margin: 8px 0 0; }
+.active-scope-label { display: block; font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+.active-scope-count { margin: 6px 0 14px; font-size: 12px; }
+.saved-profiles { margin-top: 20px; }
+.scope-profile { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 0; border-top: 1px solid var(--border); }
+.scope-profile > div { min-width: 0; }
+.scope-profile strong { display: block; font-weight: 500; font-size: 13px; overflow-wrap: anywhere; }
+.scope-profile p { font-size: 11px; margin: 5px 0 0; }
+.scope-profile .button { flex-shrink: 0; font-size: 12px; }
+.scope-profile.is-active strong { color: var(--nav-selected-text); }
 .starting-card > .button { margin-top: 7px; }
 .connect-footer-note { display: flex; align-items: baseline; justify-content: center; gap: 8px; font-size: 11px; line-height: 1.9; color: var(--text-secondary); text-align: center; margin-top: 28px; }
 .connect-footer-note .status-dot { flex-shrink: 0; }
@@ -98,7 +114,7 @@
   .connect-heading { margin-bottom: 22px; }
   .connect-heading h1 { font-size: 27px; }
   .connect-content > .card { margin-bottom: 20px; }
-  .account-card, .initialization-card, .selection-card, .setup-error, .starting-card { padding: 20px; }
+  .account-card, .initialization-card, .selection-card, .setup-error, .starting-card, .scope-manager, .profiles-card { padding: 20px; }
   .account-heading { gap: 12px; flex-wrap: wrap; }
   .connect-symbol { width: 39px; height: 39px; flex-basis: 39px; border-radius: 10px; }
   .connect-symbol svg { width: 22px; height: 22px; }
@@ -125,6 +141,8 @@
   .picker-list { min-height: 110px; max-height: 260px; }
   .selection-footer { align-items: stretch; flex-direction: column; gap: 15px; }
   .selection-footer .button { width: 100%; }
+  .scope-profile { flex-wrap: wrap; gap: 10px; }
+  .scope-profile > div { flex: 1 1 100%; }
   .connect-notice { align-items: stretch; flex-direction: column; padding: 16px; gap: 12px; }
   .connect-footer-note { text-align: left; font-size: 10px; }
 }

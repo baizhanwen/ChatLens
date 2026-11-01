@@ -1,4 +1,4 @@
-"""Incremental reads of two explicitly selected conversations into a private store.
+"""Incremental reads of explicitly selected conversations into a private store.
 
 The source connections are SQLCipher read-only. The caller owns the private
 configuration, keys and destination; public return values contain counts only.
@@ -17,13 +17,15 @@ import re
 import stat
 
 from windows_selected_engine import (
-    ALIASES, ID, SHARDS, EngineError, _background, _columns, _decode, _key, _now, _open,
+    ID, SHARDS, EngineError, _background, _columns, _decode, _key, _now, _open,
 )
+from conversation_scope import LEGACY_ALIASES, ScopeError, normalize_conversations
 
 
 PAGE_SIZE = 128
 MAX_BATCH_BODY_BYTES = 16 * 1024 * 1024
-MAX_PAIR_BODY_BYTES = MAX_BATCH_BODY_BYTES // (len(SHARDS) * len(ALIASES))
+MAX_BATCH_MESSAGES = 10000
+MAX_PAIR_BODY_BYTES = MAX_BATCH_BODY_BYTES // (len(SHARDS) * len(LEGACY_ALIASES))
 REQUIRED_COLUMNS = {'local_id', 'local_type', 'create_time', 'real_sender_id', 'message_content'}
 
 
@@ -37,25 +39,8 @@ def _unsafe(info):
 
 def _config(value):
     try:
-        supplied = value['conversations']
-        if not isinstance(supplied, list) or len(supplied) != 2:
-            raise ValueError
-        result = []
-        for alias in ALIASES:
-            rows = [row for row in supplied if isinstance(row, dict) and row.get('alias') == alias]
-            if len(rows) != 1:
-                raise ValueError
-            row = rows[0]
-            chat_id = row['chat_id']
-            if (not isinstance(chat_id, str) or ID.fullmatch(chat_id) is None
-                    or (alias == 'group_test') != chat_id.endswith('@chatroom')
-                    or row['table'] != 'Msg_' + hashlib.md5(chat_id.encode()).hexdigest()):
-                raise ValueError
-            result.append({'alias': alias, 'chat_id': chat_id, 'table': row['table']})
-        if len({row['chat_id'] for row in result}) != 2:
-            raise ValueError
-        return result
-    except (KeyError, TypeError, ValueError):
+        return normalize_conversations(value)
+    except ScopeError:
         raise EngineError('continuous_configuration_invalid') from None
 
 
@@ -94,10 +79,14 @@ class ContinuousReader:
                        for relative in self._shards)
                 or len(set(self._shards)) != len(self._shards)):
             raise EngineError('continuous_shard_configuration_invalid')
-        self._pair_body_budget = min(MAX_PAIR_BODY_BYTES, MAX_BATCH_BODY_BYTES // (len(self._shards) * len(ALIASES)))
         self._store, self._native = store, native_state_callback
         self._root, self._keys = Path(db_root), {relative: _key(keys, relative) for relative in self._shards}
         self._chats = _config(config)
+        self._aliases = tuple(chat['alias'] for chat in self._chats)
+        pairs = len(self._shards) * len(self._chats)
+        self._pair_body_budget = min(MAX_PAIR_BODY_BYTES, MAX_BATCH_BODY_BYTES // pairs)
+        self._pair_page_size = min(PAGE_SIZE, max(1, MAX_BATCH_MESSAGES // pairs))
+        self._pair_offset = 0
         self.resumed = False
         self.baseline_completed_at = None
         try:
@@ -113,7 +102,7 @@ class ContinuousReader:
             if not self.resumed:
                 before = self._sample()
                 cursors = {relative: {} for relative in self._shards}
-                found = {alias: False for alias in ALIASES}
+                found = {alias: False for alias in self._aliases}
                 for relative, connection in self._connections.items():
                     for chat in self._chats:
                         connection.execute('BEGIN')
@@ -228,9 +217,9 @@ class ContinuousReader:
         if not isinstance(cursors, dict) or set(cursors) != set(self._shards):
             raise EngineError('continuous_checkpoint_invalid')
         for relative in self._shards:
-            if not isinstance(cursors[relative], dict) or set(cursors[relative]) != set(ALIASES):
+            if not isinstance(cursors[relative], dict) or set(cursors[relative]) != set(self._aliases):
                 raise EngineError('continuous_checkpoint_invalid')
-            for alias in ALIASES:
+            for alias in self._aliases:
                 cursor = cursors[relative][alias]
                 if (not isinstance(cursor, dict) or set(cursor) != {'local_id', 'present'}
                         or type(cursor['local_id']) is not int or cursor['local_id'] < 0
@@ -246,61 +235,78 @@ class ContinuousReader:
         snapshot = self._store.snapshot()
         self._validate_snapshot(snapshot, epochs)
         cursors = copy.deepcopy(snapshot['cursors'])
-        events = []
+        events, batch_bytes, batch_full = [], 0, False
+        pairs = [(relative, connection, chat) for relative, connection in self._connections.items()
+                 for chat in self._chats]
+        next_offset = self._pair_offset
         try:
-            for relative, connection in self._connections.items():
-                for chat in self._chats:
-                    alias, table = chat['alias'], chat['table']
-                    cursor = cursors[relative][alias]
-                    connection.execute('BEGIN')
-                    rows = None
-                    try:
-                        columns = _columns(connection, table)
-                        if columns is None:
-                            if cursor['present']:
-                                raise EngineError('continuous_selected_table_disappeared')
-                            continue
-                        if not REQUIRED_COLUMNS.issubset(columns):
-                            raise EngineError('continuous_message_schema_unsupported')
-                        cursor['present'] = True
-                        upper = _maximum(connection, table)
-                        if upper < cursor['local_id']:
-                            raise EngineError('continuous_source_cursor_regressed')
-                        compression = 'WCDB_CT_message_content' if 'WCDB_CT_message_content' in columns else 'NULL'
-                        sql = ('SELECT local_id,create_time,real_sender_id,%s,message_content '
-                               'FROM "%s" WHERE local_id>? AND local_id<=? '
-                               'AND (local_type & 4294967295)=1 ORDER BY local_id ASC LIMIT %d')
-                        rows = connection.execute(sql % (compression, table, PAGE_SIZE), (cursor['local_id'], upper))
-                        count, body_bytes, capped = 0, 0, False
-                        for local_id, sent_at, sender_id, compressed, value in rows:
-                            if type(local_id) is not int or not cursor['local_id'] < local_id <= upper:
-                                raise EngineError('continuous_source_local_id_invalid')
-                            body = _decode(value, compressed)
-                            size = len(body.encode('utf-8'))
-                            if body_bytes + size > min(self._pair_body_budget, MAX_PAIR_BODY_BYTES):
-                                capped = True
-                                break
-                            sender = _sender(connection, sender_id)
-                            if alias == 'group_test' and sender and body.startswith(sender + ':\n'):
-                                body = body[len(sender) + 2:]
-                            identity = [relative, chat['chat_id'], local_id, epochs[relative]]
-                            events.append({
-                                'source_key': hashlib.sha256(_canonical(identity)).hexdigest(),
-                                'alias': alias, 'source_local_id': local_id,
-                                'sent_at': sent_at if type(sent_at) is int else None,
-                                'sender_id': sender, 'body': body, 'observed_at': _now(),
-                            })
-                            body_bytes += size
-                            count += 1
-                            cursor['local_id'] = local_id
-                        # Fewer than one page means all remaining text was consumed.
-                        # Advancing across trailing media reads no media bodies.
-                        if not capped and count < PAGE_SIZE:
-                            cursor['local_id'] = upper
-                    finally:
-                        if rows is not None:
-                            rows.close()
-                        connection.rollback()
+            for position in range(len(pairs)):
+                index = (self._pair_offset + position) % len(pairs)
+                if len(events) >= MAX_BATCH_MESSAGES or batch_bytes >= MAX_BATCH_BODY_BYTES:
+                    next_offset = index
+                    break
+                relative, connection, chat = pairs[index]
+                next_offset = (index + 1) % len(pairs)
+                alias, table = chat['alias'], chat['table']
+                cursor = cursors[relative][alias]
+                connection.execute('BEGIN')
+                rows = None
+                try:
+                    columns = _columns(connection, table)
+                    if columns is None:
+                        if cursor['present']:
+                            raise EngineError('continuous_selected_table_disappeared')
+                        continue
+                    if not REQUIRED_COLUMNS.issubset(columns):
+                        raise EngineError('continuous_message_schema_unsupported')
+                    cursor['present'] = True
+                    upper = _maximum(connection, table)
+                    if upper < cursor['local_id']:
+                        raise EngineError('continuous_source_cursor_regressed')
+                    compression = 'WCDB_CT_message_content' if 'WCDB_CT_message_content' in columns else 'NULL'
+                    sql = ('SELECT local_id,create_time,real_sender_id,%s,message_content '
+                           'FROM "%s" WHERE local_id>? AND local_id<=? '
+                           'AND (local_type & 4294967295)=1 ORDER BY local_id ASC LIMIT %d')
+                    rows = connection.execute(sql % (compression, table, self._pair_page_size), (cursor['local_id'], upper))
+                    count, body_bytes, capped = 0, 0, False
+                    for local_id, sent_at, sender_id, compressed, value in rows:
+                        if type(local_id) is not int or not cursor['local_id'] < local_id <= upper:
+                            raise EngineError('continuous_source_local_id_invalid')
+                        body = _decode(value, compressed)
+                        size = len(body.encode('utf-8'))
+                        # A first individually bounded message may exceed its
+                        # fair share; otherwise a large text could block this
+                        # conversation forever when many chats are selected.
+                        if len(events) >= MAX_BATCH_MESSAGES or batch_bytes + size > MAX_BATCH_BODY_BYTES:
+                            capped, batch_full, next_offset = True, True, index
+                            break
+                        if count and body_bytes + size > min(self._pair_body_budget, MAX_PAIR_BODY_BYTES):
+                            capped = True
+                            break
+                        sender = _sender(connection, sender_id)
+                        if chat['chat_id'].endswith('@chatroom') and sender and body.startswith(sender + ':\n'):
+                            body = body[len(sender) + 2:]
+                        identity = [relative, chat['chat_id'], local_id, epochs[relative]]
+                        events.append({
+                            'source_key': hashlib.sha256(_canonical(identity)).hexdigest(),
+                            'alias': alias, 'source_local_id': local_id,
+                            'sent_at': sent_at if type(sent_at) is int else None,
+                            'sender_id': sender, 'body': body, 'observed_at': _now(),
+                        })
+                        body_bytes += size
+                        batch_bytes += size
+                        count += 1
+                        cursor['local_id'] = local_id
+                    # Fewer than one page means all remaining text was consumed.
+                    # Advancing across trailing media reads no media bodies.
+                    if not capped and count < self._pair_page_size:
+                        cursor['local_id'] = upper
+                finally:
+                    if rows is not None:
+                        rows.close()
+                    connection.rollback()
+                if batch_full:
+                    break
             after = self._sample()
             if not _background(before, after):
                 raise EngineError('continuous_native_state_not_ready')
@@ -319,6 +325,7 @@ class ContinuousReader:
         else:
             stats = self._store.stats()
             result = {'inserted': 0, 'duplicates': 0, 'total_messages': stats['total_messages']}
+        self._pair_offset = next_offset
         return {'new_messages': result['inserted'], 'duplicates': result['duplicates'],
                 'total_messages': result['total_messages'], 'cursors_advanced': changed,
                 'background_confirmed': True}

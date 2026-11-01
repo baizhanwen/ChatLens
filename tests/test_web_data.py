@@ -14,7 +14,8 @@ SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts/windows-proof'
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 from collector_private import write_private_json_new
-from continuous_store import CollectorStore
+from continuous_store import CollectorStore, StoreError
+from conversation_scope import alias_for, normalize_conversations
 from web_data import CollectorWebData, WebDataError
 
 NOW = datetime(2026, 10, 31, 10, 0, tzinfo=timezone.utc)
@@ -58,6 +59,12 @@ class WebDataTests(unittest.TestCase):
             {'id': 'group_test', 'name': '合成群聊', 'kind': 'group', 'sender_names': {}}
         ], **extra))
 
+    def verified_identity(self):
+        return {'schema_version': 1, 'state': 'verified', 'self_sender_id': 'synthetic_verified_self',
+                'method': 'private_peer_account_match', 'binding_digest': self.store.binding_digest,
+                'proof': {'account_candidate_matched': True, 'contact_candidate_matched': True,
+                          'private_non_peer_unique': True, 'private_peer_id': 'synthetic_sender'}}
+
     def status(self, stage='collecting', age=0, **extra):
         value = dict(schema_version=1, stage=stage, recorded_at_utc=(NOW - timedelta(seconds=age)).isoformat(),
                      started_at_utc=(NOW - timedelta(minutes=2)).isoformat(), resumed_from_checkpoint=True)
@@ -66,6 +73,101 @@ class WebDataTests(unittest.TestCase):
 
     def commit(self, *rows):
         return self.store.commit({}, {}, list(rows), {})
+
+    def dynamic_profile(self):
+        """A separately bound selected scope, never a mutation of the old store."""
+        self.store.close()
+        self.data = self.root / 'dynamic-profile'
+        self.private = self.data / 'private'
+        self.directory = self.private / 'store'
+        for directory in (self.data, self.private, self.directory):
+            directory.mkdir(mode=0o700)
+        chats = ['synthetic-peer-0', 'synthetic-peer-1', 'synthetic-peer-2',
+                 'synthetic-group-0@chatroom', 'synthetic-group-1@chatroom']
+        selected = normalize_conversations({'conversations': [
+            {'alias': alias_for(chat), 'chat_id': chat} for chat in chats]})
+        self.store = CollectorStore(self.directory, {'account': 'SYNTHETIC_DYNAMIC_ACCOUNT',
+                                                    'config': {'conversations': selected}})
+        cursors = {'message/message_0.db': {row['alias']: {'local_id': 0, 'present': True}
+                                         for row in selected}}
+        self.store.initialize(cursors, {})
+        self.reader = CollectorWebData(self.data, now=lambda: NOW)
+        identity = self.verified_identity()
+        peer = next(row for row in selected if row['chat_id'] == chats[0])
+        identity['proof'].update(private_peer_id=peer['chat_id'], private_alias=peer['alias'])
+        catalog = {'schema_version': 1, 'binding_digest': self.store.binding_digest,
+                   'identity': identity, 'conversations': []}
+        events = []
+        for index, row in enumerate(selected):
+            kind = 'group' if row['chat_id'].endswith('@chatroom') else 'private'
+            incoming = 'synthetic-member' if kind == 'group' else row['chat_id']
+            catalog['conversations'].append({'id': row['alias'], 'kind': kind, 'name': '合成会话%d' % index,
+                'sender_names': {incoming: '合成联系人%d' % index}})
+            for direction, sender in [('incoming', incoming), ('outgoing', 'synthetic_verified_self'), ('unknown', '')]:
+                events.append(event(len(events) + 1, row['alias'], body='ONLY_SCOPE_%d_%s' % (index, direction), sender=sender))
+        self.store.commit(cursors, cursors, events, {})
+        self.metadata('catalog.json', catalog)
+        return selected, catalog, cursors
+
+    def test_five_selected_conversations_are_isolated_in_listing_counts_search_and_pages(self):
+        selected, _, cursors = self.dynamic_profile()
+        outside = alias_for('synthetic-unselected-peer')
+        with self.assertRaisesRegex(StoreError, 'collector_event_scope_invalid'):
+            self.store.commit(cursors, cursors, [event(100, outside, body='EXCLUDED_DYNAMIC_BODY')], {})
+        # Deliberate DB-level corruption tests the independent read boundary;
+        # the production CollectorStore above refuses this out-of-scope event.
+        self.store._connection.execute('INSERT INTO messages VALUES (?,?,?,?,?,?,?)',
+                                       tuple(event(100, outside, body='EXCLUDED_DYNAMIC_BODY').values()))
+        before = hashlib.sha256(self.reader.database.read_bytes()).hexdigest()
+        rows = self.reader.conversations()['conversations']
+        self.assertEqual([row['id'] for row in rows], sorted(row['alias'] for row in selected))
+        self.assertEqual([row['count'] for row in rows], [3] * 5)
+        self.assertEqual(sum(row['type'] == 'private' for row in rows), 3)
+        self.assertEqual(sum(row['type'] == 'group' for row in rows), 2)
+        self.assertEqual(self.reader.status()['total_messages'], 15)
+        for index, row in enumerate(rows):
+            latest = self.reader.messages(row['id'], limit=2)
+            self.assertTrue(latest['has_more'])
+            self.assertTrue(all(item['conversation_id'] == row['id'] for item in latest['messages']))
+            older = self.reader.messages(row['id'], before=latest['before_cursor'], limit=2)
+            all_rows = older['messages'] + latest['messages']
+            self.assertEqual([item['direction'] for item in all_rows], ['incoming', 'outgoing', 'unknown'])
+            self.assertEqual([item['own'] for item in all_rows], [False, True, False])
+            self.assertEqual(len(self.reader.messages(row['id'], q='ONLY_SCOPE_%d_' % index)['messages']), 3)
+            self.assertEqual(self.reader.messages(row['id'], q='EXCLUDED_DYNAMIC_BODY')['messages'], [])
+        self.assertEqual(self.reader.messages()['messages'][0]['conversation_id'], rows[0]['id'])
+        for alias in (outside, 'private_test', 'group_test'):
+            for arguments in ({}, {'after': 0}, {'before': 101}, {'q': 'EXCLUDED_DYNAMIC_BODY'}):
+                with self.assertRaisesRegex(WebDataError, 'web_conversation_not_selected'):
+                    self.reader.messages(alias, **arguments)
+        self.assertNotIn('EXCLUDED_DYNAMIC_BODY', json.dumps([rows, self.reader.status()]))
+        self.assertEqual(hashlib.sha256(self.reader.database.read_bytes()).hexdigest(), before)
+
+    def test_dynamic_catalog_requires_binding_valid_alias_unique_rows_and_valid_kind(self):
+        _, catalog, _ = self.dynamic_profile()
+        invalid = []
+        missing = dict(catalog)
+        del missing['binding_digest']
+        invalid.append(missing)
+        invalid.append(dict(catalog, binding_digest='other-synthetic-account'))
+        invalid.append(dict(catalog, conversations=[]))
+        invalid.append(dict(catalog, conversations=[catalog['conversations'][0]] * 2))
+        for field, value in [('id', 'unselected_raw_source_identifier'), ('kind', 'unexpected_kind')]:
+            invalid.append(dict(catalog, conversations=[dict(catalog['conversations'][0], **{field: value})]))
+        invalid.append(dict(catalog, conversations=[{'id': alias_for('synthetic-limit-%d' % i),
+            'kind': 'private', 'name': '合成', 'sender_names': {}} for i in range(51)]))
+        for source in invalid:
+            self.metadata('catalog.json', source)
+            with self.assertRaises(WebDataError):
+                self.reader.conversations()
+            with self.assertRaises(WebDataError):
+                self.reader.status()
+        one = dict(catalog, conversations=catalog['conversations'][:1])
+        self.metadata('catalog.json', one)
+        self.assertEqual(len(self.reader.conversations()['conversations']), 1)
+        fifty = dict(catalog, conversations=[{'id': alias_for('synthetic-limit-%d' % i),
+            'kind': 'private', 'name': '合成', 'sender_names': {}} for i in range(50)])
+        self.assertEqual(len(self.reader._catalog(self.store.binding_digest, fifty)), 50)
 
     def test_empty_store_uses_selected_generic_names_without_fabricating_messages(self):
         rows = self.reader.conversations()['conversations']
@@ -88,11 +190,64 @@ class WebDataTests(unittest.TestCase):
         self.assertEqual([row['sender'] for row in messages], ['合成客户', '未知发送人', '我'])
         self.assertEqual([row['sender_known'] for row in messages], [True, False, True])
         self.assertTrue(all(row['own'] is False for row in messages))
+        self.assertTrue(all(row['direction'] == 'unknown' for row in messages))
         self.assertEqual(self.reader.status()['total_messages'], 4)
         public = json.dumps([rows, messages, self.reader.status()], ensure_ascii=False)
         for secret in ('EXCLUDED_BODY', 'unknown_raw_identifier', 'synthetic_sender', 'source_key',
                        str(self.private), 'SYNTHETIC_SECRET_ROOT'):
             self.assertNotIn(secret, public)
+
+    def test_verified_identity_projects_three_directions_without_exposing_identifiers(self):
+        self.catalog(binding_digest=self.store.binding_digest, identity=self.verified_identity())
+        self.commit(event(1, sender='synthetic_verified_self'), event(2, sender='synthetic_sender'),
+                    event(3, sender=''), event(4, sender='synthetic_nickname_me'),
+                    event(5, 'group_test', sender='synthetic_verified_self'),
+                    event(6, 'group_test', sender='synthetic_unmapped_peer'))
+        before = hashlib.sha256(self.reader.database.read_bytes()).hexdigest()
+        rows = self.reader.messages('private_test')['messages']
+        self.assertEqual([row['direction'] for row in rows], ['outgoing', 'incoming', 'unknown', 'incoming'])
+        self.assertEqual([row['own'] for row in rows], [True, False, False, False])
+        self.assertEqual([row['sender'] for row in rows], ['我', '合成客户', '未知发送人', '我'])
+        self.assertTrue(rows[0]['sender_known'])
+        group = self.reader.messages('group_test')['messages']
+        self.assertEqual([row['direction'] for row in group], ['outgoing', 'incoming'])
+        self.assertEqual(group[1]['sender'], '未知发送人')
+        public = json.dumps([rows, group, self.reader.conversations()], ensure_ascii=False)
+        for secret in ('synthetic_verified_self', 'synthetic_unmapped_peer', 'private_peer_id',
+                       'self_sender_id', 'private_peer_account_match', self.store.binding_digest):
+            self.assertNotIn(secret, public)
+        self.assertEqual(hashlib.sha256(self.reader.database.read_bytes()).hexdigest(), before)
+
+    def test_legacy_identity_fields_and_incomplete_proof_do_not_establish_direction(self):
+        self.commit(event(1, sender='synthetic_verified_self'))
+        for extra in [
+                {'self_sender_id': 'synthetic_verified_self'},
+                {'binding_digest': self.store.binding_digest,
+                 'identity': {'state': 'unknown', 'self_sender_id': 'synthetic_verified_self'}},
+                {'identity': self.verified_identity()},
+                {'binding_digest': self.store.binding_digest,
+                 'identity': dict(self.verified_identity(), binding_digest='other-synthetic-binding')},
+                {'binding_digest': self.store.binding_digest,
+                 'identity': dict(self.verified_identity(), proof={})}]:
+            with self.subTest(fields=sorted(extra)):
+                self.catalog(**extra)
+                row = self.reader.messages('private_test')['messages'][0]
+                self.assertFalse(row['own'])
+                self.assertEqual(row['direction'], 'unknown')
+
+    def test_identity_metadata_can_label_committed_messages_without_rewriting_store_or_checkpoint(self):
+        self.commit(event(1, sender='synthetic_verified_self'))
+        before = hashlib.sha256(self.reader.database.read_bytes()).hexdigest()
+        self.catalog()
+        self.assertEqual(self.reader.messages('private_test')['messages'][0]['direction'], 'unknown')
+        self.catalog(binding_digest=self.store.binding_digest, identity=self.verified_identity())
+        row = self.reader.messages('private_test')['messages'][0]
+        self.assertEqual(row['direction'], 'outgoing')
+        self.assertEqual(row['sender'], '我')
+        internal = self.reader._catalog(self.store.binding_digest,
+                                        self.reader._metadata('catalog.json'))
+        self.assertTrue(all(row['identity_verified'] for row in internal.values()))
+        self.assertEqual(hashlib.sha256(self.reader.database.read_bytes()).hexdigest(), before)
 
     def test_latest_before_after_pages_use_committed_rowids_ascending(self):
         self.commit(*(event(n) for n in range(1, 8)))
@@ -196,6 +351,7 @@ class WebDataTests(unittest.TestCase):
         self.metadata('catalog.json', {'schema_version': 1, 'conversations': []})
         with self.assertRaisesRegex(WebDataError, 'web_catalog_invalid'):
             self.reader.messages('private_test')
+        self.catalog()
         self.status(binding_digest='wrong-synthetic-binding')
         with self.assertRaisesRegex(WebDataError, 'web_status_binding_mismatch'):
             self.reader.status()

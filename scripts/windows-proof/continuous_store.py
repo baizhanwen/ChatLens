@@ -12,6 +12,14 @@ from pathlib import Path
 import re
 import sqlite3
 import stat
+import sys
+
+# Some historical consumers load this module by its absolute path. Keep its
+# sibling-only dependency available without requiring a global installation.
+_MODULES = str(Path(__file__).resolve().parent)
+if _MODULES not in sys.path:
+    sys.path.insert(0, _MODULES)
+from conversation_scope import ScopeError, aliases_from_binding, LEGACY_ALIASES
 
 
 VERSION = 1
@@ -113,6 +121,11 @@ class CollectorStore:
         self._closed = False
         self._fault_hook = fault_hook
         self.resumed = False
+        try:
+            self._aliases = aliases_from_binding(binding)
+        except ScopeError:
+            raise StoreError('collector_scope_invalid') from None
+        self._scope_configured = isinstance(binding, dict) and ('config' in binding or 'conversations' in binding)
         self._binding = hashlib.sha256(_json_map(binding).encode('utf-8')).hexdigest()
         try:
             self._prepare_directory()
@@ -257,6 +270,15 @@ class CollectorStore:
         if self._fault_hook is not None:
             self._fault_hook(stage)
 
+    def _validate_scope_cursors(self, cursors):
+        if self._aliases is None:
+            return
+        if not cursors and not self._scope_configured:
+            return  # Old synthetic/metadata-only stores have no source cursors.
+        if (not cursors or any(not isinstance(value, dict) or set(value) != set(self._aliases)
+                              for value in cursors.values())):
+            raise StoreError('collector_checkpoint_scope_invalid')
+
     def snapshot(self):
         self._require_open()
         try:
@@ -270,6 +292,8 @@ class CollectorStore:
                 raise StoreError('collector_checkpoint_invalid')
             cursor_map, epoch_map = json.loads(cursors), json.loads(epochs)
             _json_map(cursor_map); _json_map(epoch_map)
+            if initialized:
+                self._validate_scope_cursors(cursor_map)
             if initialized and (not isinstance(baseline, str) or not isinstance(last, str)):
                 raise StoreError('collector_checkpoint_invalid')
             if not initialized and (cursor_map or epoch_map or baseline is not None or last is not None or commits):
@@ -284,6 +308,7 @@ class CollectorStore:
     def initialize(self, cursors, epochs):
         self._check_files()
         cursor_json, epoch_json = _json_map(cursors), _json_map(epochs)
+        self._validate_scope_cursors(cursors)
         try:
             self._connection.execute('BEGIN IMMEDIATE')
             current = self.snapshot()
@@ -332,6 +357,10 @@ class CollectorStore:
         if not isinstance(events, (tuple, list)) or len(events) > 10000:
             raise StoreError('collector_event_batch_invalid')
         rows = [self._event(event) for event in events]
+        if self._aliases is not None and any(row[1] not in self._aliases for row in rows):
+            raise StoreError('collector_event_scope_invalid')
+        self._validate_scope_cursors(expected_cursors)
+        self._validate_scope_cursors(new_cursors)
         inserted = duplicates = 0
         try:
             self._connection.execute('BEGIN IMMEDIATE')
@@ -377,16 +406,24 @@ class CollectorStore:
     def binding_digest(self):
         return self._binding
 
-    def sender_ids_by_alias(self):
+    def sender_ids_by_alias(self, *, include_unknown=False):
         """Bounded metadata for senders already observed inside the selected scope."""
         self._check_files()
-        result = {'private_test': [], 'group_test': []}
+        if type(include_unknown) is not bool:
+            raise StoreError('collector_sender_metadata_invalid')
+        result = {alias: [] for alias in (self._aliases or LEGACY_ALIASES)}
         try:
             for alias in result:
+                condition = '' if include_unknown else ' AND sender_id IS NOT NULL'
                 rows = self._connection.execute(
-                    'SELECT DISTINCT sender_id FROM messages WHERE alias=? AND sender_id IS NOT NULL LIMIT 256',
+                    'SELECT DISTINCT sender_id FROM messages WHERE alias=?' + condition
+                    + ' ORDER BY sender_id LIMIT ' + ('257' if include_unknown else '256'),
                     (alias,)).fetchall()
-                result[alias] = [row[0] for row in rows if isinstance(row[0], str)]
+                result[alias] = [row[0] for row in rows if isinstance(row[0], str)][:256]
+                if include_unknown and (any(row[0] is None for row in rows) or len(rows) > 256):
+                    # None also marks a bounded/truncated sender set, so the
+                    # identity producer cannot mistake a sample for uniqueness.
+                    result[alias].append(None)
             return result
         except sqlite3.Error:
             raise StoreError('collector_sender_metadata_unavailable') from None

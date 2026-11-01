@@ -5,7 +5,7 @@
   const svgNS = 'http://www.w3.org/2000/svg';
   const initialDate = new Date();
   const LIVE = location.protocol !== 'file:';
-  const live = { connected: false, ready: false, error: null, status: null, session: null, timer: null, failures: 0, cycle: 0, selection: 0, overview: 0, search: null, searchRequest: 0, searching: false };
+  const live = { connected: false, ready: false, error: null, status: null, session: null, scopeGeneration: null, scopeInvalid: false, timer: null, failures: 0, cycle: 0, selection: 0, overview: 0, search: null, searchRequest: 0, searching: false };
   const liveCache = new Map();
   const CACHE_LIMIT = 1000;
   let sequence = 100;
@@ -42,11 +42,11 @@
     return svg;
   }
 
-  function seedMessage(chat, index, sender, body, hour, minute, day = 0) {
+  function seedMessage(chat, index, sender, body, hour, minute, day = 0, direction = 'incoming') {
     const date = new Date(initialDate);
     date.setDate(date.getDate() + day);
     date.setHours(hour, minute, 0, 0);
-    return { id: chat + '-' + index, sender, body, date, own: sender === '我' };
+    return { id: chat + '-' + index, sender, body, date, direction, own: direction === 'outgoing' };
   }
 
   function makeData() {
@@ -54,13 +54,13 @@
       { id: 'lin', name: '林女士 · 澄禾商贸', short: '林', type: 'private', color: 'sage', subtitle: '私聊 · 虚构客户会话', unread: 0,
         messages: [
           ['林女士', '上午好，上一批样品已经收到了，门店反馈很不错。', 9, 12],
-          ['我', '早上好！很高兴样品合适，新门店的数量确定了吗？', 9, 15],
+          ['我', '早上好！很高兴样品合适，新门店的数量确定了吗？', 9, 15, 0, 'outgoing'],
           ['林女士', '目前有两家店要一起上，想先订 800 套。', 9, 18],
           ['林女士', '另外包装上能加上我们自己的门店名称吗？', 9, 20],
-          ['我', '可以的，包装文字确认后我们再安排打样。', 9, 23],
+          ['我', '可以的，包装文字确认后我们再安排打样。', 9, 23, 0, 'outgoing'],
           ['林女士', '好的，我今天把设计稿发给你们。', 9, 25],
           ['林女士', '数量确认了：浅灰色 500 套，米白色 300 套。\n麻烦按这个数量更新一下报价。', 10, 32],
-          ['我', '收到，我按新的数量重新核算，稍后发你。', 10, 36],
+          ['我', '收到，我按新的数量重新核算，稍后发你。', 10, 36, 0, 'outgoing'],
           ['林女士', '这批我们希望下周五之前到店，能帮忙确认一下排期吗？', 10, 42],
           ['林女士', '如果时间来得及，我们今天就可以走定金流程。', 10, 48]
         ] },
@@ -68,10 +68,10 @@
         messages: [
           ['许设计', '早，首页的第二版稿件已经整理好了。', 9, 10],
           ['陈经理', '我看了一下，新版留白舒服很多。', 9, 14],
-          ['我', '下午我们把剩下两处文案过一遍。', 9, 19],
+          ['我', '下午我们把剩下两处文案过一遍。', 9, 19, 0, 'outgoing'],
           ['许设计', '可以，产品介绍的图也会一起补上。', 9, 30],
           ['陈经理', '客户希望周四能看到一个完整的预览版本。', 10, 8],
-          ['我', '收到，先按周四安排，今天把反馈收齐。', 10, 12],
+          ['我', '收到，先按周四安排，今天把反馈收齐。', 10, 12, 0, 'outgoing'],
           ['许设计', '还有一处想确认：品牌色继续沿用上一版的墨绿色吗？', 10, 37],
           ['陈经理', '对，品牌色保持一致，按钮可以再柔和一点。', 10, 51],
           ['许设计', '明白，更新好后我会在群里同步。', 10, 53]
@@ -79,11 +79,11 @@
       { id: 'zhou', name: '周先生 · 远山工作室', short: '周', type: 'private', color: 'blue', subtitle: '私聊 · 虚构合作会话', unread: 1,
         messages: [
           ['周先生', '你好，想了解一下你们的长期合作方案。', 9, 5],
-          ['我', '你好，我们可以先交流一下具体的使用场景。', 9, 9],
+          ['我', '你好，我们可以先交流一下具体的使用场景。', 9, 9, 0, 'outgoing'],
           ['周先生', '主要是给我们工作室的客户做定制，每个月大约 200 到 300 份。', 9, 16],
-          ['我', '了解。你们对交付周期有什么要求？', 9, 22],
+          ['我', '了解。你们对交付周期有什么要求？', 9, 22, 0, 'outgoing'],
           ['周先生', '通常两周左右，偶尔会有比较急的项目。', 9, 27],
-          ['我', '我整理一份按月合作的方案，今天晚些时候发你。', 9, 32],
+          ['我', '我整理一份按月合作的方案，今天晚些时候发你。', 9, 32, 0, 'outgoing'],
           ['周先生', '好的，辛苦。方案里也帮我列一下加急费用吧。', 10, 24]
         ] }
     ];
@@ -178,15 +178,20 @@
         list.append(element('div', 'day-divider', dayLabel(message.date)));
         previousDay = key;
       }
-      const row = element('article', 'message-row' + (message.own ? ' own' : '') + (message.id === options.newId ? ' new-arrival' : '') + (context?.targetId === message.id ? ' is-evidence-target' : ''));
+      const direction = ['incoming', 'outgoing', 'unknown'].includes(message.direction) ? message.direction : 'unknown';
+      const outgoing = direction === 'outgoing';
+      const row = element('article', 'message-row message-' + direction + (outgoing ? ' own' : '') + (message.id === options.newId ? ' new-arrival' : '') + (context?.targetId === message.id ? ' is-evidence-target' : ''));
       row.setAttribute('data-message-id', message.id);
-      const avatar = element('div', 'avatar ' + (message.own ? 'own' : chat.color), message.own ? '我' : message.sender.slice(0, 1));
+      row.dataset.direction = direction;
+      row.setAttribute('aria-label', outgoing ? '本人发出的消息' : direction === 'incoming' ? '收到的消息' : '收发方向未确认的消息');
+      const avatar = element('div', 'avatar ' + (outgoing ? 'own' : chat.color), outgoing ? '我' : message.sender.slice(0, 1));
       avatar.setAttribute('aria-hidden', 'true');
       const content = element('div', 'message-content');
       const meta = element('div', 'message-meta');
       const timestamp = element('time', '', timeText(message.date));
       if (message.date) timestamp.dateTime = message.date.toISOString();
-      meta.append(element('span', 'message-sender', message.sender), timestamp);
+      const directionLabel = element('span', 'message-direction-label', outgoing ? '本人' : direction === 'incoming' ? '收到' : '收发方向未确认');
+      meta.append(element('span', 'message-sender', message.sender), directionLabel, timestamp);
       const body = element('p', 'message-body');
       appendHighlighted(body, message.body, query);
       content.append(meta, body);
@@ -269,7 +274,7 @@
     const nearBottom = atBottom() && preferences.autoScroll;
     const body = newTexts[chat.id][sequence % newTexts[chat.id].length];
     const latestTime = chat.messages[chat.messages.length - 1].date.getTime();
-    const message = { id: 'preview-new-' + sequence++, sender: chat.type === 'group' ? '许设计' : (chat.id === 'lin' ? '林女士' : '周先生'), body, date: new Date(Math.max(Date.now(), latestTime + 60000)), own: false };
+    const message = { id: 'preview-new-' + sequence++, sender: chat.type === 'group' ? '许设计' : (chat.id === 'lin' ? '林女士' : '周先生'), body, date: new Date(Math.max(Date.now(), latestTime + 60000)), direction: 'incoming', own: false };
     chat.messages.push(message);
     lastUpdate = new Date();
     if (!nearBottom || $('message-search').value.trim()) pending.set(activeId, (pending.get(activeId) || 0) + 1);
@@ -499,11 +504,68 @@
     return error;
   }
 
+  function renderScopeControls() {
+    const supported = LIVE && Boolean(live.scopeGeneration) && !live.scopeInvalid;
+    $('scope-manage-sidebar').hidden = !supported;
+    $('settings-scope-card').hidden = !supported;
+  }
+
+  function invalidateScope(navigateAway = true) {
+    if (live.scopeInvalid) { if (navigateAway) location.replace('/connect.html?manage=1'); return; }
+    live.scopeInvalid = true;
+    live.connected = false;
+    live.ready = false;
+    live.scopeGeneration = null;
+    live.session = null;
+    live.status = null;
+    live.cycle++;
+    live.selection++;
+    live.searchRequest++;
+    clearTimeout(live.timer);
+    clearTimeout(live.searchTimer);
+    live.search = null;
+    live.evidence = null;
+    liveCache.clear();
+    conversations = [];
+    activeId = null;
+    pending.clear();
+    scrollPositions.clear();
+    logRows = [];
+    ai.statusRequest++;
+    ai.threadRequest++;
+    ai.evidenceRequest++;
+    ai.jobRequest++;
+    ai.planRequest++;
+    ai.modelFormRequest = (ai.modelFormRequest || 0) + 1;
+    clearTimeout(ai.jobTimer);
+    clearTimeout(ai.testTimer);
+    clearTimeout(ai.planTimer);
+    ai.job = ai.testJob = ai.plan = ai.provider = ai.status = null;
+    ai.threadId = ai.planSignature = ai.consentKey = null;
+    ai.turns = [];
+    ai.threads = [];
+    ai.previewThreads.clear();
+    for (const id of ['ai-question', 'model-api-key', 'message-search', 'conversation-search']) $(id).value = '';
+    $('ai-cloud-confirm').checked = false;
+    for (const id of ['conversation-list', 'message-list', 'ai-turns', 'ai-thread-list', 'activity-log']) $(id).replaceChildren();
+    $('ai-scope').replaceChildren(new Option('等待重新连接', 'all'));
+    document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
+    document.querySelector('.app-shell').hidden = true;
+    const notice = element('main', 'scope-change-card');
+    notice.setAttribute('role', 'status');
+    notice.append(element('h1', '', '关注范围已变化'), element('p', '', '正在重新接入当前范围，之前的消息与回答已从本页清除。'));
+    document.body.append(notice);
+    if (navigateAway) location.replace('/connect.html?manage=1');
+  }
+
   async function api(route, token, options = {}) {
+    if (live.scopeInvalid) throw apiError('scope_changed', 409);
+    const generation = live.scopeGeneration;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     try {
       const headers = token ? { Authorization: 'Bearer ' + token } : {};
+      if (generation) headers['X-ChatLens-Scope'] = generation;
       if (options.method === 'POST') headers['Content-Type'] = 'application/json';
       const response = await fetch(new URL(route, location.origin), {
         credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
@@ -511,7 +573,13 @@
       });
       let result;
       try { result = await response.json(); } catch { throw apiError('invalid_response', response.status); }
-      if (!response.ok) throw apiError(/^[a-z0-9_]{1,100}$/.test(result?.error?.code || '') ? result.error.code : 'http_' + response.status, response.status);
+      if (live.scopeInvalid || generation !== live.scopeGeneration) throw apiError('scope_changed', 409);
+      if (!response.ok) {
+        const code = /^[a-z0-9_]{1,100}$/.test(result?.error?.code || '') ? result.error.code : 'http_' + response.status;
+        if (code === 'scope_changed') invalidateScope();
+        throw apiError(code, response.status);
+      }
+      if (route !== '/api/session' && typeof result?.scope_generation === 'string' && result.scope_generation !== generation) { invalidateScope(); throw apiError('scope_changed', 409); }
       return result;
     } finally { clearTimeout(timeout); }
   }
@@ -527,7 +595,8 @@
     const messages = payload.messages.map(row => {
       if (!row || !Number.isSafeInteger(row.id) || row.id < 1 || typeof row.body !== 'string' || typeof row.sender !== 'string' || (row.conversation_id || row.conversation) !== id) throw apiError('invalid_response');
       const date = typeof row.sent_at === 'number' ? liveDate(row.sent_at * 1000) : null;
-      return { id: row.id, sender: row.sender, body: row.body, date, observed: liveDate(row.observed_at), own: row.own === true };
+      const direction = ['incoming', 'outgoing', 'unknown'].includes(row.direction) ? row.direction : 'unknown';
+      return { id: row.id, sender: row.sender, body: row.body, date, observed: liveDate(row.observed_at), direction, own: direction === 'outgoing' };
     });
     const ids = messages.map(row => row.id);
     if (ids.some((value, index) => index && value <= ids[index - 1])) throw apiError('invalid_response');
@@ -667,11 +736,12 @@
 
   function scheduleLive(epoch) {
     clearTimeout(live.timer);
-    if (live.error?.status === 401 || epoch !== live.cycle) return;
+    if (live.scopeInvalid || live.error?.status === 401 || epoch !== live.cycle) return;
     live.timer = setTimeout(() => live.ready ? pollLive(epoch) : connectLive(), live.failures ? Math.min(10000, 1000 * 2 ** Math.min(live.failures, 4)) : 1000);
   }
 
   async function connectLive() {
+    if (live.scopeInvalid) return;
     const epoch = ++live.cycle;
     clearTimeout(live.timer);
     live.error = null;
@@ -684,7 +754,12 @@
       token = null;
       if (epoch !== live.cycle) return;
       if (session?.mode !== 'live' || session.capabilities?.read_messages !== true) throw apiError('invalid_response');
+      const generation = typeof session.scope_generation === 'string' && /^[a-zA-Z0-9_-]{16,128}$/.test(session.scope_generation) ? session.scope_generation : null;
+      if (live.session && generation !== live.scopeGeneration || session.scope_switching === true) { invalidateScope(); return; }
+      if (session.scope_generation !== undefined && !generation) throw apiError('invalid_response');
+      live.scopeGeneration = generation;
       live.session = session;
+      renderScopeControls();
       if (location.hash) history.replaceState(null, '', location.pathname + location.search);
       const [metadata, status] = await Promise.all([api('/api/conversations'), api('/api/status')]);
       if (epoch !== live.cycle) return;
@@ -1094,6 +1169,8 @@
       $(id).textContent = date ? date.toLocaleString('zh-CN', { hour12: false }) + (LIVE ? '' : '（虚构）') : '暂无记录';
     }
     $('ai-kb-state').textContent = !knowledge ? '等待本机状态' : knowledge.ready ? '可检索已采文字' : '等待知识库就绪';
+    const identity = knowledge?.direction_identity;
+    $('ai-kb-identity').textContent = !LIVE ? '虚构身份示例' : identity?.state === 'verified' && identity.verified === true ? '已自动核验' : '等待本机核验，未确认方向会单独标注';
     $('knowledge-description').textContent = LIVE ? '只覆盖选定会话中，启用后已经采集并保存的文字。' : '这是虚构知识库示例，没有读取真实聊天。';
     $('ai-welcome-boundary').textContent = LIVE ? '仅使用选定会话中启用后已采集的文字。' : '当前为虚构对话预览，不连接模型或真实聊天。';
   }
@@ -1746,8 +1823,8 @@
   [dialog].forEach(modal => modal.addEventListener('close', () => {
     if (window.innerWidth <= 640) $('nav-toggle').focus({ preventScroll: true });
   }));
-  window.addEventListener('pagehide', clearModelDraft);
-  window.addEventListener('pageshow', event => { if (event.persisted && currentView === 'settings') loadModelSettings(); });
+  window.addEventListener('pagehide', () => { clearModelDraft(); if (LIVE && live.scopeGeneration) invalidateScope(false); });
+  window.addEventListener('pageshow', event => { if (!event.persisted) return; if (LIVE && (live.scopeInvalid || live.scopeGeneration)) { invalidateScope(); return; } if (currentView === 'settings') loadModelSettings(); });
   document.addEventListener('keydown', event => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'k' && !dialog.open && !$('knowledge-dialog').open) {
       event.preventDefault(); navigate('messages'); $('workbench').classList.remove('mobile-thread-open'); $('conversation-search').focus();

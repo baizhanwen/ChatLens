@@ -20,6 +20,7 @@ from collector_private import read_private_json, write_private_json_new
 from continuous_reader import EngineError
 from continuous_store import CollectorStore
 from web_data import CollectorWebData
+from conversation_scope import alias_for
 
 
 class MacNativeProbeTests(unittest.TestCase):
@@ -248,6 +249,41 @@ class MacCollectorTests(unittest.TestCase):
         self.assertEqual(self.source.driver.old_reads, [])
         self.assertEqual(self.source.driver.forbidden_reads, [])
         self.assertEqual(provider.status()['total_messages'], 2)
+
+    def test_multiple_private_and_group_scope_has_independent_durable_cursors(self):
+        second_private = 'synthetic_mac_second_peer'
+        second_group = 'synthetic_mac_second_group@chatroom'
+        chats = [PEER, GROUP, second_private, second_group]
+        self.source.create_table(self.source.writer, second_private)
+        self.source.create_table(self.source.writer, second_group)
+        self.source.insert(second_private, 1, OLD)
+        self.source.insert(second_group, 1, OLD)
+        self.source.writer.commit()
+        self.replace_private(self.selected, {'conversations': [
+            {'alias': alias_for(chat), 'chat_id': chat} for chat in chats]})
+        session = self.session()
+        self.assertEqual(len(session.config['conversations']), 4)
+        collector = self.collector(session)
+        baseline = collector.baseline_completed_at
+        for index, chat in enumerate(chats):
+            self.source.insert(chat, 2, 'SYNTHETIC_MULTI_NEW_%d' % index)
+        self.source.insert(OTHER, 2, UNSELECTED)
+        self.source.writer.commit()
+        self.assertEqual(collector.poll()['new_messages'], 4)
+        self.assertEqual(collector.store.stats()['total_messages'], 4)
+        self.assertEqual(set(collector.store.sender_ids_by_alias()), {alias_for(chat) for chat in chats})
+        collector.close()
+        self.source.insert(second_private, 3, 'SYNTHETIC_MULTI_PAUSED_PRIVATE')
+        self.source.insert(second_group, 3, 'SYNTHETIC_MULTI_PAUSED_GROUP')
+        self.source.writer.commit()
+        resumed = self.collector(mac.prepare_session(self.data))
+        self.assertTrue(resumed.resumed)
+        self.assertEqual(resumed.baseline_completed_at, baseline)
+        self.assertEqual(resumed.poll()['new_messages'], 2)
+        self.assertEqual(resumed.store.stats()['total_messages'], 6)
+        self.assertEqual(resumed.poll()['new_messages'], 0)
+        self.assertEqual(self.source.driver.old_reads, [])
+        self.assertEqual(self.source.driver.forbidden_reads, [])
 
     def test_stopped_collector_resumes_same_baseline_catches_up_without_replaying(self):
         collector = self.collector()

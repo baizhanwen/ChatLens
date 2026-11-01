@@ -1,0 +1,62 @@
+{
+  "status": "passed",
+  "scope": "actual_macos_manager_http_sqlite_ai_profiles_with_synthetic_source_and_provider",
+  "checks": [
+    "real_http_ready_picker_discovery_and_empty_or_over_limit_do_not_change_scope",
+    "picker_enforces_fifty_and_keeps_native_keyboard_accessible_checkboxes",
+    "multiple_private_and_group_choices_survive_search_and_clear",
+    "select_five_starts_real_durable_profile_and_every_api_uses_active_scope",
+    "real_messages_distinguish_received_self_and_unknown_without_raw_identity",
+    "unconfigured_statistics_use_all_five_scopes_with_zero_provider_calls",
+    "completed_synthetic_model_answer_is_persisted_only_in_current_profile",
+    "opening_catalog_while_running_keeps_collector_and_selection_scope_unchanged",
+    "scope_switch_rejects_old_nonce_and_discards_late_real_http_and_model_results",
+    "stale_picker_and_detached_old_checkbox_cannot_rebind_selection_to_new_nonce",
+    "restore_profile_keeps_original_messages_checkpoint_and_both_history_kinds",
+    "another_account_with_same_scope_hash_does_not_inherit_profiles_model_or_chats",
+    "390px_scope_manager_picker_and_search_keep_same_selection_without_overflow",
+    "running_account_return_uses_same_manager_and_restores_a_without_reusing_any_old_nonce"
+  ],
+  "passed_check_count": 14,
+  "source_sha256": {
+    "apps/web/index.html": "af99a9bce22c16afeb6198f45ffba775fc314ec7cd312ff0156ba2246ab91f91",
+    "apps/web/app.js": "5547c746b0348f914d7a973fca4f92b79ac01c464c35a3a47aebfeddea945f83",
+    "apps/web/styles.css": "3e0c1a51adadcf0fb653c80240af7fe8e6d34eef31f5780e4d5406a09fb48f92",
+    "apps/web/connect.html": "66d961ed566ef49b2dd5af2e81c2180940d66e8f48ea7211d0526b12577e6ce1",
+    "apps/web/connect.js": "4819c8008226f3fdd8a39544b936f72b0eebb1fe04dd4939a7c06dfb1bba7266",
+    "apps/web/connect.css": "fe87a5a3bda71bbb90f13f5afa166f797525ab82c12b99125584b7d8c2207f47",
+    "scripts/web-multi-smoke.cjs": "d4b8550b580ac170b45be6956f3d8881abde0e89b36f615863f1f6fa430b7734",
+    "tests/web_multi_fixture.py": "9da4ec346f5d8f36523bc34b059a14da2553d675979720d47010cb9680232e47",
+    "tests/web_ai_fixture.py": "76683ab4a989fd3fbacae0c6351416d6979f3b9273e84e03ea9205200b59413d",
+    "scripts/macos_web.py": "e85ca36a7617ac2bf0dee7974994ba687f60a4385b2e8fd9508aa0c9c574e06a",
+    "scripts/macos_web_server.py": "7f3cfde5c9e95e02782a41df59cc069ed47bd92c83a64e1cd859bdeb5c121186",
+    "scripts/ai_service.py": "b9dfb7c7526cd3d0e68b5de7f36de754a10294d551a4b7f747bd7e22eec424bf",
+    "scripts/ai_knowledge.py": "9d024668840614600c478ef4296adf878b24b2be93159666950a28c43d8a3e97",
+    "scripts/ai_query.py": "ad2c2b5b6a5d6ddcbccef27e7dd90181990ba13b84cd580a9713f2d55cee8565",
+    "scripts/ai_statistics.py": "d77c2b882644afc80662df04a2519d06ed4c24b270b6f91893b4d1a46d983058",
+    "scripts/ai_provider.py": "279be60690934c5994bc7a99b928859c06ae6f610c820c071a22c78b08b110f7",
+    "scripts/ai_web_server.py": "11e88b85b14092a8c1722c6ba4f696e05e5075be501c5d190d014e164255c19d",
+    "scripts/windows-proof/web_data.py": "7b6917859fa3bb5d9f5f8517011ef2376808692b3e64c52feb7aeb2edf8aaee1",
+    "scripts/windows-proof/web_server.py": "eee83d0db863f8370e14e32a4fc76dc15b89ca67e7a4ac38c66623e3b2e3253a",
+    "scripts/windows-proof/continuous_store.py": "e44a06a7f2a4a474f4e0623d891d55e14198f959b66fa2ebe58b501ef99c79be",
+    "scripts/windows-proof/conversation_scope.py": "974b5a8df919e20384f18834f2971a317a8df108bbf53fd3e44a5e5780827443",
+    "scripts/windows-proof/wechat_identity.py": "af4399b1a0f06f9417f5de9c244b364cd7ad16eb2417cd591199bb3a9406fcbf"
+  },
+  "viewports": [
+    "1440x1000",
+    "390x844"
+  ],
+  "browser_runtime_errors": 0,
+  "browser_external_requests": 0,
+  "network_guard": {
+    "loopback_only": true,
+    "blocked_attempts": 1,
+    "self_test_passed": true
+  },
+  "synthetic_provider_calls": 2,
+  "synthetic_provider_raw_identity_leaks": 0,
+  "selection_requests": 5,
+  "real_wechat_or_cloud_used": false,
+  "delayed_api_responses": "real_bytes_forwarded_unchanged",
+  "restored_checkpoint_and_messages_identical": true
+}

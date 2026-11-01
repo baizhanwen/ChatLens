@@ -56,7 +56,7 @@ ChatLens 的 AI 首页帮助你从已采集的微信文字里找重点、回看�
 
 模型配置保存为账号私有目录下的 `provider.json`。Mac 文件权限为 `0600`，目录权限为 `0700`；Windows 源码使用当前用户的私有 ACL。AI 历史保存在同目录的 `threads/`，包含提问、回答及引用片段；这些文件采用权限保护，**未加密**。原采集消息库同样是权限保护的普通 SQLite。
 
-Mac 使用各账号自己的 `artifacts/private/macos-web/accounts/<本机账号摘要>/assistant/`；Windows 源码接入使用所选 `collector-data/private/assistant/`。不同账号的配置和历史分开，AI 读取原采集库时不重建基线、不改消息或游标、不取得采集写锁。
+Mac 原关注范围使用 `artifacts/private/macos-web/accounts/<本机账号摘要>/assistant/`，新关注范围使用该账号下的 `profiles/<范围摘要>/assistant/`，各自独立保存对话；同账号新范围首次可沿用模型配置，其他账号不复制。Windows 源码接入仍使用所选 `collector-data/private/assistant/`。AI 读取原采集库时不重建基线、不改消息或游标、不取得采集写锁。范围切换与收发身份见[收发身份与多会话](收发身份与多会话.md)。
 
 不要把这些私有目录、API Key、数据库、完整本机登录地址或真实聊天截图上传 GitHub、反馈到聊天或交给第三方。公开报告只记录明确脱敏的状态与计数。网页设置不把 API Key 写入浏览器本地存储，模型错误也不会直接展示上游原始响应。
 

@@ -83,7 +83,10 @@ class AiLifecycleTests(unittest.TestCase):
     def status_request(self, server):
         connection = http.client.HTTPConnection(*server.server_address, timeout=3)
         try:
-            connection.request('GET', '/api/ai/status', headers={'Cookie': 'chatlens_session=' + server.token})
+            headers = {'Cookie': 'chatlens_session=' + server.token}
+            if callable(getattr(server.data, 'public_scope_context', None)):
+                headers['X-ChatLens-Scope'] = server.data.public_scope_context()['scope_generation']
+            connection.request('GET', '/api/ai/status', headers=headers)
             response = connection.getresponse()
             return response.status, json.loads(response.read())
         finally:
