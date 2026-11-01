@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "user_returned_real_windows_selected_text_second_run_after_start_first_retest_instructions",
+  "test_date_local": "2026-11-01",
+  "timezone": "Asia/Shanghai",
+  "scope": "two_user_selected_conversations_four_controlled_new_texts_only",
+  "report_started_at_utc": "2026-11-01T02:37:02.432868+00:00",
+  "baseline_completed_at_utc": "2026-11-01T02:37:15.385362+00:00",
+  "finished_at_utc": "2026-11-01T02:39:23.031154+00:00",
+  "status": "通过",
+  "reported_business_read_status": "通过",
+  "reported_reason": "four_selected_controlled_new_texts_verified",
+  "verified_capability": "background_read_of_selected_controlled_new_texts_with_active_collection_evidence",
+  "python_version": "3.14.10",
+  "target_client_version": "4.1.15.56",
+  "key_authentication": {
+    "message/message_0.db": true,
+    "message/message_1.db": true,
+    "contact/contact.db": true
+  },
+  "driver_smoke": {
+    "status": "通过",
+    "cipher_version": "4.19.0 community",
+    "sqlite_version": "3.53.4",
+    "wal_committed_visible": true,
+    "wal_uncommitted_hidden": true,
+    "readonly_write_denied": true,
+    "compression_verified": true,
+    "scope": "new_synthetic_private_fixture_only"
+  },
+  "contact_resolution": {
+    "status": "通过",
+    "private_test_matches": 1,
+    "group_test_matches": 1
+  },
+  "summary": {
+    "status": "通过",
+    "reason": "controlled_selected_text_verified",
+    "all_expected_tokens_observed": true,
+    "observed_events": 4,
+    "unique_source_messages": 4,
+    "baseline_completed_at": "2026-11-01T02:37:15.385362+00:00",
+    "conversations": [
+      {
+        "alias": "private_test",
+        "tokens": [
+          {
+            "token_index": 1,
+            "matched_count": 1,
+            "verified": true
+          },
+          {
+            "token_index": 2,
+            "matched_count": 1,
+            "verified": true
+          }
+        ]
+      },
+      {
+        "alias": "group_test",
+        "tokens": [
+          {
+            "token_index": 1,
+            "matched_count": 1,
+            "verified": true
+          },
+          {
+            "token_index": 2,
+            "matched_count": 1,
+            "verified": true
+          }
+        ]
+      }
+    ]
+  },
+  "controlled_observations": [
+    {
+      "alias": "private_test",
+      "token_index": 1,
+      "body_exact_match": true,
+      "expected_sender_match": true,
+      "background_confirmed": true,
+      "source_time_local": "2026-11-01T10:38:41+08:00"
+    },
+    {
+      "alias": "group_test",
+      "token_index": 1,
+      "body_exact_match": true,
+      "expected_sender_match": true,
+      "background_confirmed": true,
+      "source_time_local": "2026-11-01T10:38:59+08:00"
+    },
+    {
+      "alias": "private_test",
+      "token_index": 2,
+      "body_exact_match": true,
+      "expected_sender_match": true,
+      "background_confirmed": true,
+      "source_time_local": "2026-11-01T10:39:10+08:00"
+    },
+    {
+      "alias": "group_test",
+      "token_index": 2,
+      "body_exact_match": true,
+      "expected_sender_match": true,
+      "background_confirmed": true,
+      "source_time_local": "2026-11-01T10:39:22+08:00"
+    }
+  ],
+  "native_state_before": {
+    "probe_succeeded": true,
+    "running": true,
+    "frontmost": false,
+    "screen_locked": false
+  },
+  "native_state_after": {
+    "probe_succeeded": true,
+    "running": true,
+    "frontmost": false,
+    "screen_locked": false
+  },
+  "private_acl_verified": true,
+  "selected_keys_saved": true,
+  "poll_retries": 0,
+  "messages_sent_by_tool": 0,
+  "cloud_calls": 0,
+  "source_database_records_modified": false,
+  "source_process_modified": false,
+  "source_shm_may_receive_normal_sqlite_lock_metadata": true,
+  "live_arrival_during_active_polling_status": "通过",
+  "live_arrival_evidence_basis": {
+    "supervisor_collecting_seconds": 98.03,
+    "observed_order": [
+      [
+        "private_test",
+        1
+      ],
+      [
+        "group_test",
+        1
+      ],
+      [
+        "private_test",
+        2
+      ],
+      [
+        "group_test",
+        2
+      ]
+    ],
+    "source_timestamps_after_baseline": true,
+    "start_enter_timestamp_recorded": false,
+    "per_message_acquired_timestamp_recorded": false,
+    "interpretation": "Consistent with the instructed start-first retest: active collection spans about 98 seconds, four source timestamps span 41 seconds near completion, and observations alternate private/group. Collection start is inferred from phase accounting, not an explicit wall-clock start field; this supports the controlled active-collection case and is not a strict latency measurement."
+  },
+  "supervisor_lifecycle": {
+    "status": "通过",
+    "reason": "child_finished",
+    "last_stage": "finalizing",
+    "child_started": true,
+    "child_exit_code": 0,
+    "timed_out": false,
+    "interrupted": false,
+    "child_cleanup_confirmed": true,
+    "elapsed_seconds": 140.894,
+    "active_group_seconds": {
+      "initial": 1.816,
+      "post_input": 0.0,
+      "collecting": 98.03,
+      "finalizing": 0.201
+    }
+  },
+  "strict_end_to_end_latency_status": "未验证",
+  "strict_end_to_end_latency_measured": false,
+  "restart_recovery_status": "未验证",
+  "large_scale_and_long_running_status": "未验证",
+  "evidence_boundary": "Four controlled messages across two selected conversations matched exact bodies, expected sender and route, each once, with background/unlocked read-state samples. Active collection phase evidence supports receiving during this retest. No numeric per-message latency, continuous window-state trace, source WAL origin attribution, restart recovery, lock-screen, other versions or production-distribution claim. Earlier first-run evidence is preserved separately."
+}

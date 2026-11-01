@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "scope": "local_synthetic_implementation_and_regression_only",
+  "python_test_count": 281,
+  "new_collector_test_count": 85,
+  "skipped": 0,
+  "failed": 0,
+  "test_environment": "isolated macOS Python 3.12.14 with SQLCipher and zstandard; source and target fixtures synthetic only",
+  "checks": [
+    "atomic_message_and_cursor_transactions",
+    "normal_stop_and_resume",
+    "actual_child_exit_before_and_after_commit",
+    "separate_process_lock_contention",
+    "two_selected_conversations_only",
+    "old_body_not_materialized",
+    "fixed_shards_and_key_epoch_binding",
+    "bounded_pagination_and_memory",
+    "busy_native_pause_without_advancing",
+    "private_file_acl_order_mock",
+    "heartbeat_and_graceful_owned_child_stop",
+    "fixed_runtime_and_sanitized_reports"
+  ],
+  "stress_report": "synthetic-10000-recovery.json",
+  "windows_continuous_execution_status": "未验证",
+  "real_wechat_restart_recovery_status": "未验证",
+  "long_running_real_stability_status": "未验证"
+}

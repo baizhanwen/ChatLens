@@ -33,6 +33,7 @@ docs/evidence/
 .secrets.key
 secrets.enc
 scripts/windows-proof/results/
+collector-data/
 scripts/native/bin/
 docs/evidence/ui-test-data/
 docs/evidence/electron-profile/

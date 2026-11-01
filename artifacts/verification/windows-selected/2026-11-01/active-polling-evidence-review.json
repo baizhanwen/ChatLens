@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "scope": "second_attachment_pair_consistency_and_redacted_evidence_review",
+  "checks": [
+    "four_unique_alias_token_pairs",
+    "all_exact_body_sender_route_checks_pass",
+    "each_expected_token_once",
+    "four_unique_event_digests",
+    "source_times_after_new_baseline",
+    "read_before_after_and_final_background_samples",
+    "normal_exit_no_timeout_or_interruption",
+    "collecting_phase_about_98_seconds",
+    "per_message_latency_not_inferred",
+    "prior_run_evidence_not_overwritten",
+    "raw_files_privately_saved_byte_exact"
+  ],
+  "live_arrival_during_active_polling_status": "通过",
+  "strict_end_to_end_latency_status": "未验证",
+  "restart_recovery_status": "未验证"
+}

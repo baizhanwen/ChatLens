@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "scope": "static_public_package_integrity_and_privacy_review_only",
+  "package_name": "ChatLens-Windows-Collector-20261101.zip",
+  "bytes": 15470275,
+  "sha256": "075aebd5b88d4f3db821084daafd6184eef9bea6cf38c3d23bb4f1727fde9f6d",
+  "file_count": 71,
+  "public_source_file_count": 14,
+  "checks": [
+    "crc",
+    "exact_manifest_whitelist",
+    "each_file_sha256_and_size",
+    "current_source_bytes_match",
+    "python_ast",
+    "ps1_bom_crlf",
+    "fixed_upstream_cache_hashes",
+    "stdlib_sqlite_package_and_native_binaries",
+    "sqlcipher_and_zstandard_extensions",
+    "licenses_retained",
+    "private_identifiers_paths_old_codes_excluded",
+    "no_database_private_or_results_members",
+    "old_selected_packages_unchanged"
+  ],
+  "windows_powershell_parse_status": "未验证",
+  "windows_execution_status": "未验证",
+  "real_wechat_continuous_recovery_status": "未验证",
+  "boundary": "Static package review and local synthetic verification do not prove this new Windows package runs or recovers live WeChat messages."
+}

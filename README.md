@@ -8,9 +8,13 @@
 
 ## 新版 Web 方向与数据库读取依赖记录
 
-更新于 2026-10-30。上文及后面的启动、视觉读取、Electron 构建说明属于原开发版。后续方向为本机采集服务配合 Web 界面，优先处理选定微信会话在启用后收到的新文字消息。
+更新于 2026-11-01。上文及后面的启动、视觉读取、Electron 构建说明属于原开发版。后续方向为本机采集服务配合 Web 界面，优先处理选定微信会话在启用后收到的新文字消息。
 
-已在 macOS 27.0、Apple Silicon arm64、微信 4.1.11（269136）进行两轮本机验证：2026-10-26 在微信隐藏且非前台时完整读取文件传输助手两条文字；2026-10-27 读取用户选定私聊和测试群共六条受控来信，正文、发送人和归属全部匹配、各一次，并在停止后重启补回其中两条、没有重报旧事件。Windows、另一台独立电脑、最小化、100 条规模及长期稳定性尚未验证。详见 [单会话报告](docs/微信后台读取验证.md) 与 [私聊群聊报告](docs/私聊群聊后台读取验证.md)。
+2026-11-01 Windows 微信 4.1.15.56 已完成两轮选定私聊／群聊后台文字读取，每轮四条，正文、发送人和会话归属均匹配，每条各取得一次。首轮先发消息再开始采集，证明基线后的消息可读回；第二轮记录约 98 秒实际收取阶段，支持采集运行中陆续接收四条新文字。Python 3.14.10、SQLCipher 4.19.0 community／SQLite 3.53.4 的包内加载与合成 WAL／压缩检查通过。严格端到端延迟、Windows 停止恢复和长期稳定性仍未验证。无需 Codex 的便携读取已在这台 Windows 执行，尚不等同另一台电脑或普通用户完整安装验收。脱敏证据见 [首轮结果](artifacts/verification/windows-selected/2026-11-01/received-selected-text-summary.json) 与 [第二轮结果](artifacts/verification/windows-selected/2026-11-01/received-active-polling-summary.json)，详见 [Windows 验证记录](docs/Windows环境检测与读取验证.md)。下文带日期的旧状态保留作历史记录。
+
+持续采集与恢复实现已完成，Windows 新包为 `artifacts/deliverables/windows-check/ChatLens-Windows-Collector-20261101.zip`，入口 `Start-Collector.cmd`。首次在本机选择成功 r2 的 `private/selected-config.json`，配对密钥在同目录；以后重开同一个包自动复用 `collector-data`。READY 即已采集，不再按开始回车；Ctrl+C 正常停止，恢复从已提交位置补采。两个选定会话的新文字正文与游标一起保存到本机权限保护的普通 SQLite，未加密，不上传或调用模型。85 项新增相关测试、全套 281 项和一万条合成停止恢复对照通过；新包 Windows 原生持续采集和真实停止恢复仍未验证。操作、故障边界及运行四条／停机两条验收见 [持续采集与恢复](docs/持续采集与恢复.md)。
+
+已在 macOS 27.0、Apple Silicon arm64、微信 4.1.11（269136）进行两轮本机验证：2026-10-26 在微信隐藏且非前台时完整读取文件传输助手两条文字；2026-10-27 读取用户选定私聊和测试群共六条受控来信，正文、发送人和归属全部匹配、各一次，并在停止后重启补回其中两条、没有重报旧事件。Mac 的另一台独立电脑、最小化、100 条规模及长期稳定性尚未验证；Windows 最新边界见上一段。详见 [单会话报告](docs/微信后台读取验证.md) 与 [私聊群聊报告](docs/私聊群聊后台读取验证.md)。
 
 以下记录用于后续独立交付和最终安装说明；目前仍是验证脚本，尚无普通用户的一键初始化流程。
 
@@ -20,6 +24,7 @@
 | Python | 元信息探针、首次初始化使用本机 Apple Python 3.9.6；只读消息验证使用隔离 Python 3.12.14。最终打包方案待验证 |
 | Windows 便携验证运行时 | 第三包捆绑 Python 官方 3.15.2 x64 embeddable，仅在包目录运行，原始 ZIP SHA256 与官方发布页一致；不安装到系统、不安装 pip。2026-10-30 实机完成 message_0 首页密钥校验，正文与 WAL 读取未验证 |
 | Windows 选定会话测试依赖 | 第四包自带 Python 3.14.10 官方 x64 embeddable、`sqlcipher3==0.6.4` 普通 cp314 Windows x64 wheel、`zstandard==0.25.0` cp314 wheel。与第三包分开，版本匹配；不安装全局环境。原始摘要固定在清单，Windows 实际加载先做私有虚构 DB／WAL 验证 |
+| Windows 持续采集依赖 | 新包复用上述固定 Python／SQLCipher／zstandard，目标私有消息库使用 Python 标准库 `sqlite3`，官方 `_sqlite3.pyd`、`sqlite3.dll` 与标准库包已核对入包。进程／私有 ACL 用 Windows 系统 API，单实例锁用 `msvcrt`；不安装其他 Python、Node、Codex、服务或开机自启 |
 | Apple 开发工具 | 当前 Mac 初始化使用 LLDB 及其 Python 绑定；复制和临时签名使用系统 `ditto`、`codesign`。原生状态探针由 Swift 编译。独立用户需检测相应工具并按官方方式准备，不能假定随 Python 自动提供 |
 | `sqlcipher3-wheels==0.5.7` | 在隔离环境中安装二进制 wheel，以 SQLCipher 只读打开加密消息库及 WAL |
 | `zstandard==0.25.0` | 在隔离环境中解码压缩的文字正文 |

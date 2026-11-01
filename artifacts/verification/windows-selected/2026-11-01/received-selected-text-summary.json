@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "user_returned_real_windows_selected_text_result_with_user_reported_send_order",
+  "test_date_local": "2026-11-01",
+  "timezone": "Asia/Shanghai",
+  "package": {
+    "name": "ChatLens-Windows-SelectedTest-20261030-r2.zip",
+    "sha256": "ff01179fb3e22b0c90b130b0ba1ad54d51bfe7e754cb200cf27cebb7fa800bbd",
+    "package_identity": "expected_r2_archive_rechecked_locally; attachment does not carry package digest"
+  },
+  "report_started_at_utc": "2026-11-01T02:24:39.700178+00:00",
+  "baseline_completed_at_utc": "2026-11-01T02:25:14.125258+00:00",
+  "finished_at_utc": "2026-11-01T02:28:25.483328+00:00",
+  "scope": "two_user_selected_conversations_four_controlled_texts_after_baseline_only",
+  "status": "通过",
+  "verified_capability": "background_read_of_four_controlled_messages_created_after_baseline",
+  "reported_business_read_status": "通过",
+  "reported_reason": "four_selected_controlled_new_texts_verified",
+  "target_client_version": "4.1.15.56",
+  "python_version": "3.14.10",
+  "key_authentication": {
+    "message/message_0.db": true,
+    "message/message_1.db": true,
+    "contact/contact.db": true
+  },
+  "driver_smoke": {
+    "status": "通过",
+    "cipher_version": "4.19.0 community",
+    "sqlite_version": "3.53.4",
+    "wal_committed_visible": true,
+    "wal_uncommitted_hidden": true,
+    "readonly_write_denied": true,
+    "compression_verified": true,
+    "scope": "new_synthetic_private_fixture_only"
+  },
+  "contact_resolution": {
+    "status": "通过",
+    "private_test_matches": 1,
+    "group_test_matches": 1
+  },
+  "controlled_sample": {
+    "events": 4,
+    "unique_source_messages": 4,
+    "expected_tokens": 4,
+    "each_token_matches_once": true,
+    "all_bodies_exact": true,
+    "all_expected_senders_match": true,
+    "all_conversation_routes_match": true,
+    "all_reads_background_confirmed": true,
+    "all_source_timestamps_after_baseline": true
+  },
+  "summary": {
+    "status": "通过",
+    "reason": "controlled_selected_text_verified",
+    "all_expected_tokens_observed": true,
+    "observed_events": 4,
+    "unique_source_messages": 4,
+    "baseline_completed_at": "2026-11-01T02:25:14.125258+00:00",
+    "conversations": [
+      {
+        "alias": "private_test",
+        "tokens": [
+          {
+            "token_index": 1,
+            "matched_count": 1,
+            "verified": true
+          },
+          {
+            "token_index": 2,
+            "matched_count": 1,
+            "verified": true
+          }
+        ]
+      },
+      {
+        "alias": "group_test",
+        "tokens": [
+          {
+            "token_index": 1,
+            "matched_count": 1,
+            "verified": true
+          },
+          {
+            "token_index": 2,
+            "matched_count": 1,
+            "verified": true
+          }
+        ]
+      }
+    ]
+  },
+  "native_state_before": {
+    "probe_succeeded": true,
+    "running": true,
+    "frontmost": false,
+    "screen_locked": false
+  },
+  "native_state_after": {
+    "probe_succeeded": true,
+    "running": true,
+    "frontmost": false,
+    "screen_locked": false
+  },
+  "private_acl_verified": true,
+  "selected_keys_saved": true,
+  "wal_preconditions": {
+    "message/message_0.db": {
+      "database_exists": true,
+      "wal_exists": true,
+      "wal_bytes": 4194304,
+      "shm_exists": true
+    },
+    "message/message_1.db": {
+      "database_exists": true,
+      "wal_exists": true,
+      "wal_bytes": 115392,
+      "shm_exists": true
+    },
+    "contact/contact.db": {
+      "database_exists": true,
+      "wal_exists": true,
+      "wal_bytes": 4194304,
+      "shm_exists": true
+    }
+  },
+  "poll_retries": 0,
+  "messages_sent_by_tool": 0,
+  "cloud_calls": 0,
+  "source_database_records_modified": false,
+  "source_process_modified": false,
+  "source_shm_may_receive_normal_sqlite_lock_metadata": true,
+  "user_reported_order": {
+    "messages_sent_before_start_enter": true,
+    "basis": "user_statement_in_chat",
+    "start_enter_timestamp_recorded": false
+  },
+  "live_arrival_during_active_polling_status": "未验证",
+  "strict_end_to_end_latency_status": "未验证",
+  "strict_end_to_end_latency_measured": false,
+  "restart_recovery_status": "未验证",
+  "large_scale_and_long_running_status": "未验证",
+  "supervisor_lifecycle": {
+    "status": "通过",
+    "reason": "child_finished",
+    "child_started": true,
+    "child_exit_code": 0,
+    "timed_out": false,
+    "interrupted": false,
+    "child_cleanup_confirmed": true,
+    "elapsed_seconds": 226.037,
+    "active_group_seconds": {
+      "initial": 2.419,
+      "post_input": 0.0,
+      "collecting": 0.0,
+      "finalizing": 0.0
+    }
+  },
+  "supervisor_interpretation": "Successful normal exit only. Group time zero is not zero message latency and this run did not exercise hard timeout termination.",
+  "evidence_boundary": "Four exact controlled messages were read from selected private/group conversations while the client was sampled in background. User sent all messages before pressing the collection-start Enter; this verifies retrieval after baseline, not arrival during active polling or strict end-to-end latency. No per-message acquired timestamp is present. Background was sampled at reads, not continuously throughout the user input wait. No claim of all-conversation coverage, restart recovery, lock-screen, other client versions or production distribution.",
+  "next_validation": "Reuse r2 with fresh codes: READY then start Enter, then sender sends the four messages. Strict numeric latency needs a separate measurement design."
+}

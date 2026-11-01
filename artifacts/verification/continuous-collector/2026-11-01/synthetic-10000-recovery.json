@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "explicit_synthetic_sqlcipher_sources_and_private_sqlite_destination",
+  "generated_at_utc": "2026-11-01T02:51:16.932036+00:00",
+  "status": "通过",
+  "controlled_events": 10000,
+  "first_run_committed": 5000,
+  "restored_on_restart": 5000,
+  "caught_up_after_closed_collector": 5000,
+  "replayed_committed_events": 0,
+  "all_body_sender_route_rows_checked": "body_and_conversation_and_source_local_id_exact; sender resolved by synthetic mapping",
+  "identical_body_distinct_source_ids_preserved": true,
+  "old_and_unselected_body_reads": 0,
+  "empty_restart_new_events": 0,
+  "destination_quick_check": "ok",
+  "bounded_nonempty_polls": 20,
+  "elapsed_seconds": 0.301,
+  "real_windows_execution_status": "未验证",
+  "real_wechat_continuous_recovery_status": "未验证",
+  "boundary": "Synthetic encrypted DB/WAL and actual local persistence only; not real WeChat, long-duration stability or Windows API validation."
+}

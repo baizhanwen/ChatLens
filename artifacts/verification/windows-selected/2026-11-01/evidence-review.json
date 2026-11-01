@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "scope": "attachment_internal_consistency_and_sanitized_evidence_only",
+  "checks": [
+    "four_alias_token_pairs_once",
+    "four_unique_event_digests",
+    "body_sender_route_background_all_true",
+    "all_source_timestamps_after_baseline",
+    "three_page_keys_authenticated",
+    "runtime_synthetic_smoke_passed",
+    "native_before_after_background",
+    "normal_child_exit_without_timeout",
+    "private_originals_byte_matched_and_mode_0600",
+    "public_summary_excludes_event_digests_names_paths_keys_and_bodies"
+  ],
+  "verified_capability": "background_read_after_baseline",
+  "active_poll_arrival_status": "未验证",
+  "strict_latency_status": "未验证"
+}
