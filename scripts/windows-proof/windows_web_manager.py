@@ -454,6 +454,11 @@ class WindowsWebManager:
         public_reasons = {'windows_account_root_invalid', 'windows_account_handle_invalid',
             'windows_account_device_unresolved', 'windows_account_open_database_unavailable',
             'windows_account_changed_or_ambiguous', 'windows_account_open_database_matched',
+            'windows_account_mapped_database_matched', 'windows_account_mapped_database_unavailable',
+            'windows_account_mapped_query_unavailable',
+            'windows_account_mapped_api_unavailable', 'windows_account_mapped_region_unavailable',
+            'windows_account_mapped_name_unavailable', 'windows_account_mapped_budget_exceeded',
+            'windows_account_mapped_process_changed',
             'windows_account_probe_unavailable'}
         self.account_probe_reason = reason if reason in public_reasons else 'windows_account_probe_unavailable'
         self.account_matched = matched
@@ -708,6 +713,11 @@ class WindowsWebManager:
             reasons = {'windows_account_not_checked', 'windows_account_root_invalid', 'windows_account_handle_invalid',
                        'windows_account_device_unresolved', 'windows_account_open_database_unavailable',
                        'windows_account_changed_or_ambiguous', 'windows_account_open_database_matched',
+                       'windows_account_mapped_database_matched', 'windows_account_mapped_database_unavailable',
+                       'windows_account_mapped_query_unavailable',
+                       'windows_account_mapped_api_unavailable', 'windows_account_mapped_region_unavailable',
+                       'windows_account_mapped_name_unavailable', 'windows_account_mapped_budget_exceeded',
+                       'windows_account_mapped_process_changed',
                        'windows_account_probe_unavailable'}
             stage = connection.get('collector_stage')
             return {'schema_version': 1, 'kind': 'chatlens_windows_connection_diagnostics', 'platform': 'windows',

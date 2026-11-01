@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "source_scan": {
+    "history_commits": 24,
+    "history_blobs": 833,
+    "working_files": 676,
+    "sensitive_findings": 0
+  },
+  "synthetic_png_ocr": {
+    "files": 44,
+    "sensitive_findings": 0
+  },
+  "desktop_and_390px_synthetic_screenshots_visually_reviewed": true,
+  "fresh_browser_checks": 44,
+  "unchanged_ai_dependency_hashes_revalidated_against_prior_33_check_report": true,
+  "package_sha256": "b1c61e551e16000b317baa458d0a06a23dcc0f7901633c8d1bcda936943d25dd",
+  "package_source_bytes_match_current_tree": true,
+  "old_six_local_package_hashes_unchanged": true,
+  "license_state_preserved": true,
+  "real_native_canary_user_reported_status": "通过",
+  "real_windows_region_classification_and_wechat_account_status": "未验证",
+  "other_windows_pc_status": "待外部条件",
+  "private_user_screenshots_or_configs_published": false
+}

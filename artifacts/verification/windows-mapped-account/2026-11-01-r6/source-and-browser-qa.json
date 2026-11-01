@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "unit_tests": 746,
+  "unit_elapsed_seconds": 27.269,
+  "native_mapper_contract_tests": 16,
+  "account_probe_contract_tests": 31,
+  "windows_manager_tests": 31,
+  "fresh_browser_checks": 44,
+  "fresh_browser_sets": {
+    "windows_connection": 16,
+    "windows_multi": 14,
+    "mac_multi": 14
+  },
+  "viewports": [
+    "1440x1000",
+    "988x776",
+    "390x844"
+  ],
+  "unit_log_sha256": "6df53938d0601ae333ec27dfd82a57d7f94b7f49e3bcf7813b70b029d39d5393",
+  "browser_sources_match_final_source": true,
+  "native_map_canary_user_reported_status": "通过",
+  "real_wechat_mapped_account_status": "未验证",
+  "real_new_messages_received_sent_or_restart_status": "未验证",
+  "second_windows_machine_status": "待外部条件",
+  "host_native_windows_calls_executed": false,
+  "real_chat_sources_or_cloud_used_during_tests": false,
+  "source_sha256": {
+    "scripts/windows-proof/windows_mapped_files.py": "5d84b8d3e7687134195dad4007c8dc1651b780a7d70243b3712f9173e67b7b7f",
+    "scripts/windows-proof/windows_account_probe.py": "8fbcd6eea3a8cdea75106ce6ce8228aa245e82bd8c1221f557f0ceb5ac4e0ca3",
+    "scripts/windows-proof/windows_web_manager.py": "d85986f3a209c567e36a1002b36472821585001c655643c0b33563037766657e",
+    "apps/web/connect.js": "9cdc472606d53e5f0be6a89cad58163f0a6e0d73c1bc9f69b0ffb8f060d9bf47",
+    "tests/test_windows_mapped_files.py": "a5e42d2928f40c06a5b589a3f744e23fd0213a9d4e95d03bd44b94ee298678bb",
+    "tests/test_windows_account_probe.py": "e49cfbf44e03ecfdb28f1715f7e5d160fd0ba8145578579946f951dd83f23a8a"
+  }
+}

@@ -12,7 +12,7 @@ assert(!fs.existsSync(output),'Choose a new evidence directory.');fs.mkdirSync(o
 const names=['apps/web/index.html','apps/web/app.js','apps/web/styles.css','apps/web/connect.html','apps/web/connect.js','apps/web/connect.css',
  'scripts/web-windows-connection-smoke.cjs','tests/web_windows_multi_fixture.py','tests/web_ai_fixture.py',
  'scripts/windows-proof/windows_web_manager.py','scripts/windows-proof/windows_web_server.py','scripts/windows-proof/web_runtime.py',
- 'scripts/windows-proof/windows_account_probe.py','scripts/windows-proof/windows_process_detection.py'];
+ 'scripts/windows-proof/windows_account_probe.py','scripts/windows-proof/windows_process_detection.py','scripts/windows-proof/windows_mapped_files.py'];
 const hashes=()=>Object.fromEntries(names.map(name=>[name,createHash('sha256').update(fs.readFileSync(path.join(root,name))).digest('hex')]));
 const before=hashes(),checks=[],issues={page:0,external:0};
 const check=async(name,fn)=>{await fn();checks.push(name);};
@@ -69,8 +69,9 @@ async function main(){
    const raw=fs.readFileSync(target,'utf8'),value=JSON.parse(raw);
    assert.deepEqual(Object.keys(value).sort(),['schema_version','kind','platform','connection_state','account_reason','checks','account_diagnostics','selected_conversation_count','collector_running','collector_stage'].sort());
    assert.equal(value.kind,'chatlens_windows_connection_diagnostics');assert.equal(value.schema_version,1);
-   assert.equal(value.connection_state,'account_unverified');assert.equal(value.account_reason,'windows_account_open_database_unavailable');
-   assert.equal(value.account_diagnostics.handles_seen,80);assert.equal(value.account_diagnostics.file_type_handles,0);assert.equal(value.account_diagnostics.query_completed,true);
+   assert.equal(value.connection_state,'account_unverified');assert.equal(value.account_reason,'windows_account_mapped_database_unavailable');
+   assert.equal(value.account_diagnostics.handles_seen,0);assert.equal(value.account_diagnostics.file_type_handles,0);assert.equal(value.account_diagnostics.query_completed,true);
+   assert.equal(value.account_diagnostics.mapped_file_query_used,true);assert.equal(value.account_diagnostics.mapped_verification_passes,2);assert.equal(value.account_diagnostics.mapped_regions_queried,160);assert.equal(value.account_diagnostics.mapped_data_regions_seen,12);assert.equal(value.account_diagnostics.mapped_name_query_failures,0);
    assert.equal(value.account_diagnostics.family_process_count,5);assert.equal(value.account_diagnostics.family_processes_completed,5);assert.equal(value.account_diagnostics.main_database_names_seen,0);assert.equal(value.account_diagnostics.helper_database_names_seen,0);
    assert(value.checks.process_running);assert(!value.checks.account_verified);assert.equal(value.selected_conversation_count,2);
    assert(!/synthetic-peer|synthetic-group|scope_generation|creation_time|\\\\|\/Users\/|wxid_|enc_key|api_key|"pid"|"path"/.test(raw));

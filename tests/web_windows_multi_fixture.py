@@ -165,7 +165,7 @@ class SyntheticWindowsRuntime:
         self.account_state = 'matched'
         self.process_state = 'not_running' if wait_for_wechat else 'ready'
         self.process_pid, self.process_birth = 12, 34
-        self.account_reason = 'windows_account_open_database_matched'
+        self.account_reason = 'windows_account_mapped_database_matched'
         self.manager = WindowsWebManager(self.data, ROOT / 'scripts/windows-proof', self.root / 'output',
             pid=None if read_only else 12, creation_time=None if read_only else 34,
             read_only=read_only, wait_for_wechat=wait_for_wechat,
@@ -176,13 +176,15 @@ class SyntheticWindowsRuntime:
             start_collector=self.start_child, stop_collector=self.stop_child,
             catalog_loader=lambda _: self.choices,
             account_probe=lambda: {'state': self.account_state, 'matched': self.account_state == 'matched',
-                'diagnostics': {'schema_version': 1, 'handles_seen': 80, 'handles_with_name': 20,
-                    'file_type_handles': 0 if self.account_state == 'unknown' else 6, 'query_completed': True,
+                'diagnostics': {'schema_version': 1, 'handles_seen': 0, 'file_type_handles': 0,
+                    'query_completed': True, 'mapped_file_query_used': True, 'mapped_verification_passes': 2,
+                    'mapped_regions_queried': 160, 'mapped_data_regions_seen': 12,
+                    'mapped_names_seen': 12, 'mapped_pagefile_regions_skipped': 8, 'mapped_name_query_failures': 0,
                     'family_process_count': 5, 'family_processes_completed': 5,
                     'main_database_names_seen': 0, 'helper_database_names_seen': 0 if self.account_state == 'unknown' else 2},
                 'reason': self.account_reason if self.account_state=='matched' else
                           'windows_account_changed_or_ambiguous' if self.account_state=='mismatch' else
-                          'windows_account_open_database_unavailable'})
+                          'windows_account_mapped_database_unavailable'})
         self.manager.output.mkdir()
         self.jobs, self.stopping = Queue(), threading.Event()
         self.owner = threading.Thread(target=self.loop, daemon=True)

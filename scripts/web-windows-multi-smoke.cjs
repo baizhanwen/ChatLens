@@ -16,7 +16,7 @@ assert(!fs.existsSync(output), 'Use a new evidence directory.');
 fs.mkdirSync(output, {recursive: true});
 const sourceNames = ['apps/web/index.html','apps/web/app.js','apps/web/styles.css','apps/web/connect.html','apps/web/connect.js','apps/web/connect.css',
   'scripts/web-windows-multi-smoke.cjs','tests/web_windows_multi_fixture.py','tests/web_ai_fixture.py',
-  'scripts/windows-proof/windows_web_manager.py','scripts/windows-proof/windows_web_server.py','scripts/windows-proof/windows_account_probe.py','scripts/windows-proof/windows_process_detection.py',
+  'scripts/windows-proof/windows_web_manager.py','scripts/windows-proof/windows_web_server.py','scripts/windows-proof/windows_account_probe.py','scripts/windows-proof/windows_process_detection.py','scripts/windows-proof/windows_mapped_files.py',
   'scripts/windows-proof/web_runtime.py','scripts/windows-proof/web_data.py','scripts/windows-proof/web_server.py',
   'scripts/windows-proof/collector_service.py','scripts/windows-proof/collector_supervisor.py','scripts/windows-proof/collector_web_meta.py',
   'scripts/windows-proof/continuous_reader.py','scripts/windows-proof/continuous_store.py','scripts/windows-proof/wechat_identity.py','scripts/windows-proof/conversation_scope.py',

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "kind": "chatlens_received_windows_mapped_canary_summary",
+  "evidence_type": "user_returned_standalone_native_canary_json",
+  "source_tool_version": "20261101-02",
+  "canary_native_mapping_status": "通过",
+  "exact_source_commit_verified": false,
+  "wechat_mapping_paths_status": "未验证",
+  "wechat_account_binding_status": "未验证",
+  "new_reader_end_to_end_status": "未验证",
+  "native_result": {
+    "schema_version": 1,
+    "tool_version": "20261101-02",
+    "kind": "chatlens_windows_mapped_path_selfcheck",
+    "status": "通过",
+    "reason": "mapped_selfcheck_canary_file_metadata_observed",
+    "diagnostics": {
+      "mapped_regions_created": 1,
+      "mapped_name_characters": 123,
+      "native_api_attempted": true,
+      "fixture_created": true,
+      "fixture_closed": true,
+      "parent_fixture_removed": true,
+      "drive_mapping_succeeded": true,
+      "map_created": true,
+      "map_closed": true,
+      "mapped_query_completed": true,
+      "mapped_query_truncated": false,
+      "self_canary_exact_path_seen": true,
+      "cleanup_succeeded": true
+    }
+  },
+  "scope": "Only a self-created synthetic mapped file path; no WeChat, other PID, source database or account identity was checked.",
+  "raw_path_address_handle_pid_or_chat_included": false
+}

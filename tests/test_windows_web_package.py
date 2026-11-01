@@ -85,13 +85,17 @@ class WindowsWebPackageTests(unittest.TestCase):
             prefix = package.PREFIX + '/'
             entries = {name[len(prefix):]: archive.read(name) for name in archive.namelist()}
         manifest = json.loads(entries.pop(package.MANIFEST))
-        self.assertEqual(manifest['package_revision'], '20261101-r5')
+        self.assertEqual(manifest['package_revision'], '20261101-r6')
         self.assertIn('prefer exactly one visible, unowned main-window candidate', manifest['process_selection'])
         self.assertIn('cached fixed states', manifest['connection_diagnostics'])
         self.assertEqual(manifest['account_process_family']['maximum_members'], 16)
         self.assertEqual(manifest['account_process_family']['windows_execution_status'], '未验证')
         self.assertEqual(manifest['account_process_family']['shared_enumeration_budget_seconds'], 3)
         self.assertEqual(manifest['account_process_family']['child_timeout_seconds'], 6)
+        self.assertEqual(manifest['account_process_family']['verification_passes'], 2)
+        self.assertEqual(manifest['account_process_family']['shared_region_limit'], 32768)
+        self.assertIn('query-only mapped-file metadata', manifest['account_process_family']['evidence'])
+        self.assertIn('QueryVirtualMemoryInformation', manifest['account_process_family']['native_route'])
         self.assertEqual(manifest['conversation_limits'], {'minimum': 1, 'maximum': 50})
         self.assertEqual(set(entries), {entry['name'] for entry in manifest['files']})
         for entry in manifest['files']:
@@ -101,6 +105,7 @@ class WindowsWebPackageTests(unittest.TestCase):
         self.assertIn('windows_web_server.py', entries)
         self.assertIn('windows_account_probe.py', entries)
         self.assertIn('windows_process_detection.py', entries)
+        self.assertIn('windows_mapped_files.py', entries)
         self.assertTrue({'web/connect.html', 'web/connect.js', 'web/connect.css'} <= entries.keys())
         self.assertTrue(all(b'SYNTHETIC_PRIVATE_DATA_MUST_NOT_SHIP' not in data for data in entries.values()))
         self.assertFalse(any('private' in Path(name).parts or 'collector-data' in Path(name).parts
@@ -175,7 +180,7 @@ class WindowsWebPackageTests(unittest.TestCase):
         self.assertNotIn("Read-Host '输入候选编号", text)
         self.assertIn('窗口存在不代表已登录', text)
         self.assertIn('登录原账号后可在网页重新检测', text)
-        for required in ('windows_web_manager.py', 'windows_web_server.py', 'windows_account_probe.py', 'windows_process_detection.py', 'conversation_scope.py',
+        for required in ('windows_web_manager.py', 'windows_web_server.py', 'windows_account_probe.py', 'windows_process_detection.py', 'windows_mapped_files.py', 'conversation_scope.py',
                          'wechat_identity.py', 'web/connect.html', 'web/connect.js', 'web/connect.css'):
             self.assertIn("'" + required + "'", text)
         self.assertIn('collector-data 文件夹', text)
@@ -186,6 +191,7 @@ class WindowsWebPackageTests(unittest.TestCase):
         shipped = {Path(name).stem for name in collector_package.SOURCES if name.endswith('.py')}
         self.assertIn('windows_account_probe', shipped)
         self.assertIn('windows_process_detection', shipped)
+        self.assertIn('windows_mapped_files', shipped)
         directory = ROOT / 'scripts/windows-proof'
         local_modules = {file.stem for file in directory.glob('*.py')}
         for name in collector_package.SOURCES:
@@ -205,6 +211,7 @@ class WindowsWebPackageTests(unittest.TestCase):
         text = launcher.decode('utf-8-sig')
         self.assertIn("'windows_account_probe.py'", text)
         self.assertIn("'windows_process_detection.py'", text)
+        self.assertIn("'windows_mapped_files.py'", text)
 
 
 if __name__ == '__main__':

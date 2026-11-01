@@ -409,14 +409,18 @@ class WindowsManagerTests(unittest.TestCase):
         manager=self.waiting_manager();self.detect_process(manager,logged_in=False)
         counts={'schema_version':1,'handles_seen':80,'handles_with_name':20,
                 'file_type_handles':0,'query_completed':True,'family_process_count':5,
-                'family_processes_completed':5,'main_database_names_seen':0,'helper_database_names_seen':0}
+                'family_processes_completed':5,'main_database_names_seen':0,'helper_database_names_seen':0,
+                'mapped_file_query_used':True,'mapped_verification_passes':2,'mapped_regions_queried':160,
+                'mapped_data_regions_seen':12,'mapped_pagefile_regions_skipped':8,'mapped_names_seen':12,
+                'mapped_name_query_failures':0}
+        self.probe_result['reason']='windows_account_mapped_database_unavailable'
         self.probe_result['diagnostics']=counts
         self.clock_value+=4;manager.tick()
         document=manager.connection_diagnostics(expected_generation=manager.scope_generation)
         self.assertEqual(set(document),{'schema_version','kind','platform','connection_state','account_reason',
             'checks','account_diagnostics','selected_conversation_count','collector_running','collector_stage'})
         self.assertEqual(document['account_diagnostics'],counts)
-        self.assertEqual(document['account_reason'],'windows_account_open_database_unavailable')
+        self.assertEqual(document['account_reason'],'windows_account_mapped_database_unavailable')
         self.assertEqual(document['connection_state'],'account_unverified')
         self.assertTrue(document['checks']['process_running'])
         self.assertFalse(document['checks']['account_verified'])

@@ -62,24 +62,36 @@ class Snapshot:
 
 class WindowsAccountProbeTests(unittest.TestCase):
     def family_probe(self, paths_by_pid, *, families=None, denied=(), capture=None, fail_member=None,
-                     reused_member=None, wrong_image=None, clock=None):
+                     reused_member=None, wrong_image=None, clock=None, incomplete_member=None,
+                     close_failure=None, reader_error=None, api_error=None):
+        """Real family lifecycle with an explicit synthetic mapped-file adapter."""
         before=[{'pid':12,'parent_pid':8,'creation_time':34},
                 {'pid':13,'parent_pid':12,'creation_time':35}]
         families = families if families is not None else [before,before]
-        evidence={'family_calls':[],'opened':[],'closed':[],'queries':{},'times':{}}
+        evidence={'family_calls':[],'opened':[],'closed':[],'queries':{},'times':{},'mapped_calls':[]}
         executable=r'C:\synthetic\Weixin.exe'
-        class FamilySnapshot(Snapshot):
-            def PssCaptureSnapshot(self,process,*arguments):
-                self.current=process
-                self.paths=list(paths_by_pid.get(process,()))
-                self.index=0
-                if capture is not None:capture(process)
-                return super().PssCaptureSnapshot(process,*arguments)
-            def PssWalkSnapshot(self,*arguments):
-                if self.current==fail_member:return 24
-                return super().PssWalkSnapshot(*arguments)
-        api=FamilySnapshot()
-        api.GetLogicalDrives=lambda:0
+        api=SimpleNamespace(GetLogicalDrives=lambda:0,calls=[])
+        reader_clock=clock or (lambda:0)
+        visits={}
+        def reader(_api,handle,*,diagnostics,deadline,max_regions,clock):
+            self.assertIs(_api,api)
+            for key in probe.MAPPED_COUNTS:diagnostics[key]=0
+            diagnostics['query_completed']=False
+            evidence['mapped_calls'].append((handle,deadline,max_regions))
+            api.calls.append(('mapped',handle,deadline,max_regions))
+            visits[handle]=visits.get(handle,0)+1
+            if capture is not None:capture(handle)
+            if clock()>deadline:raise probe.PlatformError('synthetic_mapped_deadline')
+            rows=list(paths_by_pid(handle,visits[handle]) if callable(paths_by_pid) else paths_by_pid.get(handle,()))
+            needed=max(1,len(rows))
+            diagnostics['mapped_regions_queried']=min(needed,max_regions)
+            if needed>max_regions:raise probe.PlatformError('synthetic_mapped_region_limit')
+            if reader_error is not None:raise reader_error
+            if handle==fail_member:raise probe.PlatformError('windows_mapped_name_unavailable')
+            diagnostics['mapped_data_regions_seen']=len(rows)
+            diagnostics['mapped_names_seen']=len(rows)
+            diagnostics['query_completed']=handle!=incomplete_member
+            return rows
         def opened(access,inherit,pid):
             evidence['opened'].append((access,inherit,pid))
             return None if pid in denied else pid
@@ -99,29 +111,26 @@ class WindowsAccountProbeTests(unittest.TestCase):
             if callable(families):rows=families(len(evidence['family_calls']))
             else:rows=families[min(len(evidence['family_calls'])-1,len(families)-1)]
             return validate_process_family(rows,pid,birth)
-        native=SimpleNamespace(OpenProcess=opened,CloseHandle=lambda pid:evidence['closed'].append(pid) or 1,
-            QueryFullProcessImageNameW=image,GetProcessTimes=created,GetCurrentProcess=lambda:99)
-        with patch.object(probe,'_api',return_value=native),patch.object(probe,'_SnapshotAPI',return_value=api), \
-             patch.object(probe,'path_is_local',return_value=True),patch.object(probe,'verified_process_family',side_effect=family):
-            result=probe.probe_direct(12,34,executable,ROOT,diagnostics={},clock=clock or (lambda:0))
+        def closed(pid):
+            evidence['closed'].append(pid)
+            return pid!=close_failure
+        native=SimpleNamespace(OpenProcess=opened,CloseHandle=closed,
+            QueryFullProcessImageNameW=image,GetProcessTimes=created)
+        with patch.object(probe,'_api',return_value=native),patch.object(probe,'MappedFilesAPI',return_value=api,side_effect=api_error), \
+             patch.object(probe,'mapped_paths',side_effect=reader),patch.object(probe,'path_is_local',return_value=True), \
+             patch.object(probe,'verified_process_family',side_effect=family), \
+             patch.object(probe,'_SnapshotAPI',side_effect=AssertionError('production must not use PSS')):
+            result=probe.probe_direct(12,34,executable,ROOT,diagnostics={},clock=reader_clock)
         return result,api,evidence
 
     def direct(self, api, *, diagnostics=None):
-        executable = r'C:\synthetic\Weixin.exe'
-        def image(handle, flags, buffer, size):
-            buffer.value = executable
-            C.cast(size,C.POINTER(C.c_uint32)).contents.value = len(executable)
-            return 1
-        def created(handle, timestamp, *unused):
-            C.cast(timestamp,C.POINTER(probe.FILETIME)).contents.low = 34
-            return 1
-        native=SimpleNamespace(OpenProcess=lambda *_:42,CloseHandle=lambda _:1,
-            QueryFullProcessImageNameW=image,GetProcessTimes=created,GetCurrentProcess=lambda:99)
-        api.GetLogicalDrives=lambda:0
-        with patch.object(probe,'_api',return_value=native),patch.object(probe,'_SnapshotAPI',return_value=api), \
-             patch.object(probe,'path_is_local',return_value=True), \
-             patch.object(probe,'verified_process_family',return_value=[{'pid':12,'parent_pid':8,'creation_time':34}]):
-            return probe.probe_direct(12,34,executable,ROOT,diagnostics=diagnostics)
+        """Classify only the explicitly requested legacy PSS diagnostic table."""
+        try:
+            paths=self.snapshot(api,diagnostics=diagnostics)
+            return probe.classify_paths(paths,ROOT,diagnostics=diagnostics)
+        except probe.PlatformError:
+            if diagnostics is not None:diagnostics['query_completed']=False
+            return probe._result('unknown','windows_account_probe_unavailable',diagnostics)
 
     def test_only_unique_matching_root_is_accepted_and_paths_are_never_returned(self):
         paths = [ROOT + r'\message\message_0.db', ROOT + r'\contact\contact.db-wal']
@@ -254,37 +263,16 @@ class WindowsAccountProbeTests(unittest.TestCase):
         self.assertEqual(options['stderr'], subprocess.DEVNULL)
         self.assertEqual(options['stdin'], subprocess.DEVNULL)
 
-    def test_native_outer_revalidates_full_buffer_and_creation_time_around_snapshot(self):
-        api = Snapshot([('File', ROOT + r'\message\message_0.db')])
-        executable = r'C:\synthetic\Weixin.exe'
-        capacities, opened, closed = [], [], []
-        def query(handle, flags, image, size):
-            capacity = C.cast(size, C.POINTER(C.c_uint32))
-            capacities.append(capacity.contents.value)
-            if capacity.contents.value <= len(executable):
-                return 0
-            image.value = executable
-            capacity.contents.value = len(executable)
-            return 1
-        def process_times(handle, created, *unused):
-            C.cast(created, C.POINTER(probe.FILETIME)).contents.low = 34
-            return 1
-        native = SimpleNamespace(OpenProcess=lambda *args: opened.append(args) or 42,
-            CloseHandle=lambda handle: closed.append(handle) or 1,
-            QueryFullProcessImageNameW=query, GetProcessTimes=process_times,
-            GetCurrentProcess=lambda: 99)
-        api.GetLogicalDrives = lambda: 0
-        with patch.object(probe, '_api', return_value=native), patch.object(probe, '_SnapshotAPI', return_value=api), \
-             patch.object(probe, 'path_is_local', return_value=True), \
-             patch.object(probe,'verified_process_family',side_effect=lambda executable,pid,birth,**options:[{'pid':pid,'parent_pid':8,'creation_time':birth}]):
-            self.assertTrue(probe.probe_direct(12, 34, executable, ROOT)['matched'])
-            self.assertEqual(capacities, [32768, 32768])
-            self.assertEqual(opened, [(0x450, False, 12)])
-            self.assertEqual(closed, [42])
-            api.calls.clear()
-            self.assertEqual(probe.probe_direct(12, 35, executable, ROOT)['state'], 'unknown')
-            self.assertFalse(any(row[0] == 'capture' for row in api.calls))
-            self.assertEqual(closed, [42, 42])
+    def test_native_outer_revalidates_full_buffer_and_creation_time_around_each_mapped_pass(self):
+        result,_,evidence=self.family_probe({13:[ROOT+r'\message\message_0.db-shm']})
+        self.assertTrue(result['matched'])
+        self.assertEqual(evidence['opened'],[(0x400,False,12),(0x400,False,13)]*2)
+        self.assertEqual(evidence['queries'],{12:4,13:4})
+        self.assertEqual(evidence['times'],{12:4,13:4})
+        self.assertEqual(evidence['closed'],[12,13]*2)
+        self.assertEqual(result['reason'],'windows_account_mapped_database_matched')
+        self.assertTrue(result['diagnostics']['mapped_file_query_used'])
+        self.assertEqual(result['diagnostics']['handles_seen'],0)
 
     def test_child_timeout_failure_or_untrusted_output_fails_closed(self):
         bad = [b'not-json', b'{}', json.dumps({'state': 'matched', 'matched': True, 'reason': ROOT}).encode(),
@@ -426,33 +414,58 @@ class WindowsAccountProbeTests(unittest.TestCase):
         self.assertTrue(check(data+b' '*(4096-len(data)))['matched'])
         self.assertEqual(check(data+b' '*(4097-len(data)))['state'],'unknown')
 
-    def test_stable_main_without_db_and_helper_with_original_db_is_matched(self):
-        result,api,evidence=self.family_probe({13:[('File',ROOT+r'\message\message_0.db')]})
+    def test_stable_main_without_db_and_helper_with_original_mapped_db_is_matched(self):
+        result,api,evidence=self.family_probe({13:[ROOT+r'\message\message_0.db-shm']})
         self.assertEqual(result['state'],'matched')
         counts=result['diagnostics']
         self.assertEqual(counts['family_process_count'],2)
         self.assertEqual(counts['family_processes_completed'],2)
         self.assertEqual(counts['main_database_names_seen'],0)
-        self.assertEqual(counts['helper_database_names_seen'],1)
+        self.assertEqual(counts['helper_database_names_seen'],2)
+        self.assertEqual(counts['mapped_verification_passes'],2)
+        self.assertEqual(counts['mapped_regions_queried'],4)
+        self.assertTrue(counts['mapped_file_query_used'])
         self.assertTrue(counts['query_completed'])
-        self.assertEqual([row[2] for row in evidence['opened']],[12,13])
-        self.assertEqual(evidence['closed'],[12,13])
+        self.assertEqual([row[2] for row in evidence['opened']],[12,13]*2)
+        self.assertEqual(evidence['closed'],[12,13]*2)
         self.assertEqual([(row[1],row[2]) for row in evidence['family_calls']],[(12,34),(12,34)])
-        self.assertTrue(all(row[2:]==(12,0) for row in api.calls if row[0]=='capture'))
+        self.assertTrue(all(row[0]=='mapped' for row in api.calls))
         self.assertEqual(set(result),{'state','matched','reason','diagnostics'})
         self.assertNotIn(ROOT,json.dumps(result));self.assertNotIn('pid',json.dumps(result))
 
-    def test_family_other_account_root_is_mismatch_and_named_non_files_do_not_prove_it(self):
-        result,_,_=self.family_probe({12:[('File',ROOT+r'\contact\contact.db')],
-                                     13:[('File',OTHER+r'\message\message_0.db')]})
+    def test_family_other_account_root_is_mismatch_and_empty_mapped_paths_are_unknown(self):
+        result,_,_=self.family_probe({12:[ROOT+r'\contact\contact.db-shm'],
+                                     13:[OTHER+r'\message\message_0.db-shm']})
         self.assertEqual(result['state'],'mismatch')
         self.assertTrue(result['diagnostics']['query_completed'])
-        self.assertEqual(result['diagnostics']['matching_root_paths'],1)
-        self.assertEqual(result['diagnostics']['other_root_paths'],1)
-        unknown,_,_=self.family_probe({13:[('',ROOT+r'\message\message_0.db'),('Mutant',ROOT+r'\contact\contact.db')]})
+        self.assertEqual(result['diagnostics']['matching_root_paths'],2)
+        self.assertEqual(result['diagnostics']['other_root_paths'],2)
+        unknown,_,_=self.family_probe({})
         self.assertEqual(unknown['state'],'unknown')
-        self.assertEqual(unknown['diagnostics']['all_named_db_candidates'],2)
+        self.assertEqual(unknown['reason'],'windows_account_mapped_database_unavailable')
+        self.assertEqual(unknown['diagnostics']['mapped_names_seen'],0)
         self.assertEqual(unknown['diagnostics']['helper_database_names_seen'],0)
+        self.assertEqual(unknown['diagnostics']['mapped_verification_passes'],2)
+
+    def test_both_mapped_passes_need_positive_account_evidence(self):
+        for empty_visit in (1,2):
+            def paths(pid,visit):
+                return [ROOT+r'\message\message_0.db-shm'] if pid==13 and visit!=empty_visit else []
+            with self.subTest(empty_visit=empty_visit):
+                result,_,_=self.family_probe(paths)
+                self.assertEqual(result['state'],'unknown')
+                self.assertFalse(result['matched'])
+                self.assertEqual(result['reason'],'windows_account_mapped_database_unavailable')
+                self.assertEqual(result['diagnostics']['mapped_verification_passes'],2)
+                self.assertTrue(result['diagnostics']['query_completed'])
+        for foreign_visit in (1,2):
+            def paths(pid,visit):
+                return [(OTHER if visit==foreign_visit else ROOT)+r'\message\message_0.db-shm'] if pid==13 else []
+            with self.subTest(foreign_visit=foreign_visit):
+                result,_,_=self.family_probe(paths)
+                self.assertEqual(result['state'],'mismatch')
+                self.assertEqual(result['reason'],'windows_account_changed_or_ambiguous')
+                self.assertEqual(result['diagnostics']['mapped_verification_passes'],2)
 
     def test_missing_new_reused_or_disconnected_family_members_cannot_match(self):
         before=[{'pid':12,'parent_pid':8,'creation_time':34},{'pid':13,'parent_pid':12,'creation_time':35}]
@@ -462,65 +475,125 @@ class WindowsAccountProbeTests(unittest.TestCase):
                   [dict(before[0],parent_pid=13),before[1]]]
         for after in variants:
             with self.subTest(after=after):
-                result,_,_=self.family_probe({13:[('File',ROOT+r'\message\message_0.db')]},families=[before,after])
+                result,_,_=self.family_probe({13:[ROOT+r'\message\message_0.db-shm']},families=[before,after])
                 self.assertEqual(result['state'],'unknown')
                 self.assertFalse(result['diagnostics']['query_completed'])
 
-    def test_any_inaccessible_incomplete_or_reused_member_prevents_partial_match(self):
-        source={12:[('File',ROOT+r'\message\message_0.db')],13:[('File',ROOT+r'\contact\contact.db')]}
-        for options in ({'denied':(13,)},{'fail_member':13},{'reused_member':13},{'wrong_image':13}):
+    def test_any_inaccessible_incomplete_reused_or_unclosed_member_prevents_partial_match(self):
+        source={12:[ROOT+r'\message\message_0.db-shm'],13:[ROOT+r'\contact\contact.db-shm']}
+        cases = [({'denied':(13,)},'windows_account_mapped_process_changed'),
+                 ({'fail_member':13},'windows_account_mapped_name_unavailable'),
+                 ({'reused_member':13},'windows_account_mapped_process_changed'),
+                 ({'wrong_image':13},'windows_account_mapped_process_changed'),
+                 ({'incomplete_member':13},'windows_account_mapped_region_unavailable'),
+                 ({'close_failure':13},'windows_account_mapped_query_unavailable')]
+        for options,reason in cases:
             with self.subTest(options=options):
                 result,_,evidence=self.family_probe(source,**options)
                 self.assertEqual(result['state'],'unknown')
+                self.assertEqual(result['reason'],reason)
                 self.assertFalse(result['diagnostics']['query_completed'])
-                self.assertEqual(result['diagnostics']['family_processes_completed'],1)
                 self.assertIn(12,evidence['closed'])
+                self.assertLess(result['diagnostics']['mapped_verification_passes'],2)
 
-    def test_shared_family_deadline_does_not_reset_for_helpers_or_final_metadata(self):
+    def test_shared_family_deadline_does_not_reset_for_second_pass_or_final_metadata(self):
         clock=SimpleNamespace(value=0)
         def capture(pid):clock.value=2 if pid==12 else 4
-        result,api,evidence=self.family_probe({13:[('File',ROOT+r'\message\message_0.db')]},
+        result,api,evidence=self.family_probe({13:[ROOT+r'\message\message_0.db-shm']},
             capture=capture,clock=lambda:clock.value)
         self.assertEqual(result['state'],'unknown')
         self.assertFalse(result['diagnostics']['query_completed'])
         self.assertEqual(evidence['family_calls'][0][3],3)
         self.assertEqual(result['diagnostics']['family_processes_completed'],1)
-        self.assertEqual(len([row for row in api.calls if row[0]=='walk']),1)
+        self.assertEqual(result['diagnostics']['mapped_verification_passes'],0)
+        self.assertEqual(result['diagnostics']['mapped_regions_queried'],1)
+        clock.value=0
+        def second_pass(pid):
+            if len(calls)==2:clock.value=4
+            calls.append(pid)
+        calls=[]
+        second,_,_=self.family_probe({13:[ROOT+r'\message\message_0.db-shm']},capture=second_pass,clock=lambda:clock.value)
+        self.assertEqual(second['state'],'unknown')
+        self.assertEqual(second['diagnostics']['mapped_verification_passes'],1)
+        self.assertFalse(second['diagnostics']['query_completed'])
         clock.value=0
         before=[{'pid':12,'parent_pid':8,'creation_time':34},{'pid':13,'parent_pid':12,'creation_time':35}]
         def family(phase):
             if phase==2:clock.value=4
             return before
-        final,_,_=self.family_probe({13:[('File',ROOT+r'\message\message_0.db')]},families=family,clock=lambda:clock.value)
+        final,_,_=self.family_probe({13:[ROOT+r'\message\message_0.db-shm']},families=family,clock=lambda:clock.value)
         self.assertEqual(final['state'],'unknown')
         self.assertFalse(final['diagnostics']['query_completed'])
 
-    def test_family_handles_share_one_budget_and_member_limit_is_not_bypassed(self):
-        with patch.object(probe,'MAX_HANDLES',2):
-            result,_,_=self.family_probe({12:[('File',ROOT+r'\message\message_0.db')],
-                                         13:[('File',ROOT+r'\contact\contact.db')]})
+    def test_family_mapped_regions_share_one_budget_and_member_limit_is_not_bypassed(self):
+        with patch.object(probe,'MAX_REGIONS',2):
+            result,_,_=self.family_probe({12:[ROOT+r'\message\message_0.db-shm'],
+                                         13:[ROOT+r'\contact\contact.db-shm']})
         self.assertEqual(result['state'],'unknown')
-        self.assertLessEqual(result['diagnostics']['handles_seen'],2)
+        self.assertLessEqual(result['diagnostics']['mapped_regions_queried'],2)
+        self.assertEqual(result['diagnostics']['mapped_verification_passes'],1)
         self.assertFalse(result['diagnostics']['query_completed'])
         oversized=[{'pid':12,'parent_pid':8,'creation_time':34}]+[
             {'pid':pid,'parent_pid':12,'creation_time':pid+34} for pid in range(20,36)]
         invalid,api,evidence=self.family_probe({},families=[oversized])
         self.assertEqual(invalid['state'],'unknown')
         self.assertEqual(evidence['opened'],[])
-        self.assertFalse(any(row[0]=='capture' for row in api.calls))
+        self.assertEqual(api.calls,[])
 
-    def test_family_metadata_failure_is_unknown_and_four_new_counts_are_sanitized(self):
+    def test_family_metadata_failure_is_unknown_and_mapper_diagnostics_are_sanitized(self):
         def failed(_):raise probe.PlatformError('windows_process_access_unavailable')
         result,_,evidence=self.family_probe({},families=failed)
         self.assertEqual(result['state'],'unknown')
         self.assertFalse(result['diagnostics']['query_completed'])
         self.assertEqual(evidence['opened'],[])
         clean={'schema_version':1,'family_process_count':2,'family_processes_completed':2,
-               'main_database_names_seen':0,'helper_database_names_seen':1,'query_completed':True}
+               'main_database_names_seen':0,'helper_database_names_seen':1,'query_completed':True,
+               'mapped_file_query_used':True,'mapped_verification_passes':2,
+               **{key:1 for key in probe.MAPPED_COUNTS}}
         self.assertEqual(probe.sanitize_diagnostics(clean),clean)
         for value in (dict(clean,family_process_count=True),dict(clean,helper_database_names_seen=32769),
-                      dict(clean,family_members=[12,13])):
+                      dict(clean,family_members=[12,13]),dict(clean,mapped_file_query_used=1),
+                      dict(clean,mapped_regions_queried=-1)):
             self.assertEqual(probe.sanitize_diagnostics(value),{})
+
+    def test_mapped_failures_export_only_fixed_capability_categories(self):
+        cases = [
+            ('windows_mapped_api_unavailable','windows_account_mapped_api_unavailable'),
+            ('windows_mapped_allocation_unavailable','windows_account_mapped_region_unavailable'),
+            ('windows_mapped_sdk_layout_invalid','windows_account_mapped_region_unavailable'),
+            ('windows_mapped_name_invalid','windows_account_mapped_name_unavailable'),
+            ('windows_mapped_query_deadline','windows_account_mapped_budget_exceeded'),
+            ('windows_process_snapshot_limit','windows_account_mapped_budget_exceeded'),
+            ('windows_mapped_allocation_changed','windows_account_mapped_process_changed'),
+            ('windows_account_process_reused','windows_account_mapped_process_changed'),
+            (ROOT,'windows_account_mapped_query_unavailable')]
+        for code,public in cases:
+            with self.subTest(code=code):
+                result,_,_=self.family_probe({12:[ROOT+r'\message\message_0.db-shm']},
+                    reader_error=probe.PlatformError(code))
+                self.assertEqual(result['state'],'unknown')
+                self.assertEqual(result['reason'],public)
+                self.assertFalse(result['diagnostics']['query_completed'])
+                self.assertNotIn(ROOT,json.dumps(result))
+        native,_,evidence=self.family_probe({},api_error=probe.PlatformError('windows_mapped_api_unavailable'))
+        self.assertEqual(native['reason'],'windows_account_mapped_api_unavailable')
+        self.assertEqual(evidence['opened'],[])
+        unexpected,_,_=self.family_probe({},reader_error=RuntimeError(ROOT))
+        self.assertEqual(unexpected['reason'],'windows_account_mapped_query_unavailable')
+        self.assertNotIn(ROOT,json.dumps(unexpected))
+
+    def test_child_requires_both_complete_mapped_passes_for_new_matched_reason(self):
+        detail={'schema_version':1,'query_completed':True,'mapped_file_query_used':True,
+                'mapped_verification_passes':2,'family_process_count':2,'family_processes_completed':2}
+        base={'state':'matched','matched':True,'reason':'windows_account_mapped_database_matched'}
+        def check(value):
+            return probe.WindowsAccountProbe(12,34,'SYNTHETIC_EXE',ROOT,
+                runner=lambda *a,**k:subprocess.CompletedProcess([],0,json.dumps(value).encode()))()
+        self.assertTrue(check(dict(base,diagnostics=detail))['matched'])
+        for invalid in (base,dict(base,diagnostics={**detail,'mapped_verification_passes':1}),
+                        dict(base,diagnostics={**detail,'mapped_file_query_used':False}),
+                        dict(base,diagnostics={**detail,'family_processes_completed':1})):
+            self.assertEqual(check(invalid)['state'],'unknown')
 
 
 if __name__ == '__main__':

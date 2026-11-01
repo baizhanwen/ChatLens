@@ -1,13 +1,13 @@
 """Bounded, metadata-only check of the selected Windows process's DB account.
 
-Uses documented Process Snapshotting handle-name capture (flags 0x0c), never
+Uses two complete passes of documented mapped-file metadata queries, never
 VA cloning, process-memory reads, database reads or process writes. A strictly
 verified same-executable process family stays inside the owned short-lived child,
-so a native API stall
-cannot hold the Web manager indefinitely. No paths leave the child.
+so a native API stall cannot hold the Web manager indefinitely. No paths leave
+the child. Legacy PSS name parsing remains a low-level diagnostic only.
 
-SDK references: Microsoft Learn processsnapshot PssCaptureSnapshot,
-PssWalkSnapshot, PSS_HANDLE_ENTRY and PSS_CAPTURE_FLAGS.
+SDK references: Microsoft Learn VirtualQueryEx, QueryVirtualMemoryInformation,
+GetMappedFileNameW, and processsnapshot PSS_HANDLE_ENTRY for legacy diagnostics.
 """
 from __future__ import annotations
 
@@ -24,28 +24,32 @@ import time
 
 from windows_keyproof_platform import FILETIME, PlatformError, _api, _path, path_is_local
 from windows_process_detection import verified_process_family
+from windows_mapped_files import MappedFilesAPI, MAPPED_COUNTS, mapped_paths
 
 HANDLE_NAME_FLAGS = 0x04 | 0x08
-PROCESS_METADATA_ACCESS = 0x400 | 0x40 | 0x10
+PROCESS_METADATA_ACCESS = 0x400  # PROCESS_QUERY_INFORMATION only.
 MAX_HANDLES = 32768
+MAX_REGIONS = 32768
 SNAPSHOT_COUNTS = (
     'handles_seen', 'handles_with_name', 'type_names_present', 'file_type_handles',
     'file_names_retained', 'all_named_db_candidates', 'database_names_seen',
     'matching_root_paths', 'other_root_paths', 'unresolved_database_paths')
-DIAGNOSTIC_COUNTS = SNAPSHOT_COUNTS + ('family_process_count', 'family_processes_completed',
-                                      'main_database_names_seen', 'helper_database_names_seen')
-DIAGNOSTIC_KEYS = {'schema_version', 'query_completed', *DIAGNOSTIC_COUNTS}
+DIAGNOSTIC_COUNTS = SNAPSHOT_COUNTS + MAPPED_COUNTS + (
+    'family_process_count', 'family_processes_completed',
+    'main_database_names_seen', 'helper_database_names_seen', 'mapped_verification_passes')
+DIAGNOSTIC_BOOLEANS = ('query_completed', 'mapped_file_query_used')
+DIAGNOSTIC_KEYS = {'schema_version', *DIAGNOSTIC_BOOLEANS, *DIAGNOSTIC_COUNTS}
 
 
 def sanitize_diagnostics(value):
     """Public counts only: permit subsets, never names, IDs or native details."""
     if (not isinstance(value, dict) or not set(value).issubset(DIAGNOSTIC_KEYS)
             or type(value.get('schema_version')) is not int or value['schema_version'] != 1
-            or 'query_completed' in value and type(value['query_completed']) is not bool
+            or any(type(value[key]) is not bool for key in DIAGNOSTIC_BOOLEANS if key in value)
             or any(type(value[key]) is not int or not 0 <= value[key] <= 32768
                    for key in DIAGNOSTIC_COUNTS if key in value)):
         return {}
-    return {key: value[key] for key in ('schema_version', *DIAGNOSTIC_COUNTS, 'query_completed') if key in value}
+    return {key: value[key] for key in ('schema_version', *DIAGNOSTIC_COUNTS, *DIAGNOSTIC_BOOLEANS) if key in value}
 
 
 def _prepare_diagnostics(value, *, reset=False):
@@ -55,7 +59,8 @@ def _prepare_diagnostics(value, *, reset=False):
     if reset:
         clean = {}
     value.clear()
-    value.update({'schema_version': 1, **{key: 0 for key in DIAGNOSTIC_COUNTS}, 'query_completed': False})
+    value.update({'schema_version': 1, **{key: 0 for key in DIAGNOSTIC_COUNTS},
+                  **{key: False for key in DIAGNOSTIC_BOOLEANS}})
     value.update(clean)
     return value
 
@@ -229,19 +234,63 @@ def snapshot_paths(api, process_handle, *, clock=time.monotonic, diagnostics=Non
             api.PssFreeSnapshot(_api().GetCurrentProcess(), snapshot)
 
 
+def _mapped_failure_reason(error):
+    """Coarse fixed categories only; native details and arbitrary codes stay private."""
+    code = getattr(error, 'code', None) if isinstance(error, PlatformError) else None
+    categories = {
+        'windows_account_mapped_api_unavailable': {
+            'windows_mapped_api_unavailable', 'windows_x64_python_required'},
+        'windows_account_mapped_name_unavailable': {
+            'windows_mapped_name_invalid', 'windows_mapped_name_unavailable',
+            'windows_account_handle_invalid'},
+        'windows_account_mapped_budget_exceeded': {
+            'windows_mapped_budget_invalid', 'windows_mapped_query_deadline',
+            'windows_mapped_region_limit', 'windows_account_mapped_deadline',
+            'windows_account_mapped_region_limit', 'windows_process_snapshot_deadline',
+            'windows_process_snapshot_limit'},
+        'windows_account_mapped_process_changed': {
+            'windows_account_process_identity_invalid', 'windows_account_process_unavailable',
+            'windows_account_process_query_failed', 'windows_account_executable_mismatch',
+            'windows_account_process_time_unavailable', 'windows_account_process_reused',
+            'windows_account_process_family_changed', 'windows_mapped_process_unavailable',
+            'windows_mapped_allocation_changed', 'windows_process_access_unavailable',
+            'windows_process_family_ambiguous', 'windows_process_family_cycle',
+            'windows_process_family_disconnected', 'windows_process_family_identity_changed',
+            'windows_process_family_invalid', 'windows_process_family_parent_reused',
+            'windows_process_path_unavailable', 'windows_process_snapshot_unavailable',
+            'windows_process_version_unavailable', 'windows_process_version_unsupported',
+            'windows_process_architecture_unsupported'},
+        'windows_account_mapped_region_unavailable': {
+            'windows_mapped_allocation_invalid', 'windows_mapped_allocation_kind_unknown',
+            'windows_mapped_allocation_unavailable', 'windows_mapped_metadata_unavailable',
+            'windows_mapped_region_invalid', 'windows_mapped_region_kind_unknown',
+            'windows_mapped_sdk_layout_invalid', 'windows_mapped_system_bounds_invalid',
+            'windows_process_sdk_layout_invalid', 'windows_account_mapped_incomplete'},
+    }
+    if isinstance(code, str):
+        for public, codes in categories.items():
+            if code in codes:
+                return public
+    return 'windows_account_mapped_query_unavailable'
+
+
 def probe_direct(pid, creation_time, executable, db_root, *, diagnostics=None, clock=time.monotonic):
-    """A complete stable family is proved in the child; only counts leave it."""
+    """Only two complete, account-bound mapped-file passes may establish a match."""
     public_diagnostics = diagnostics
     totals = _prepare_diagnostics({}, reset=True)
+    totals['mapped_file_query_used'] = True
     deadline = clock() + 3
+
     def budget():
         if clock() > deadline:
-            raise PlatformError('windows_account_snapshot_deadline')
+            raise PlatformError('windows_account_mapped_deadline')
+
     def finish(state, reason):
         if isinstance(public_diagnostics, dict):
             public_diagnostics.clear()
             public_diagnostics.update(totals)
         return _result(state, reason, totals if public_diagnostics is not None else None)
+
     try:
         if type(pid) is not int or not 0 < pid <= 0xffffffff or type(creation_time) is not int or not 0 < creation_time < 2**64:
             raise PlatformError('windows_account_process_identity_invalid')
@@ -251,7 +300,7 @@ def probe_direct(pid, creation_time, executable, db_root, *, diagnostics=None, c
         family = verified_process_family(executable, pid, creation_time, clock=clock, deadline=deadline)
         totals['family_process_count'] = len(family)
         budget()
-        native, api = _api(), _SnapshotAPI()
+        native, api = _api(), MappedFilesAPI()
         device_map = {}
         drives = api.GetLogicalDrives()
         for index in range(26):
@@ -260,58 +309,84 @@ def probe_direct(pid, creation_time, executable, db_root, *, diagnostics=None, c
                 drive, target = chr(65 + index) + ':', C.create_unicode_buffer(32768)
                 if api.QueryDosDeviceW(drive, target, len(target)):
                     device_map[target.value.casefold()] = drive.casefold()
-        paths = []
-        for member in sorted(family, key=lambda row: (row['pid'] != pid, row['pid'])):
-            budget()
-            handle = native.OpenProcess(PROCESS_METADATA_ACCESS, False, member['pid'])
-            if not handle:
-                raise PlatformError('windows_account_process_unavailable')
-            try:
-                image, size = C.create_unicode_buffer(32768), C.c_uint32(32768)
-                timestamps = [FILETIME() for _ in range(4)]
-                def verify():
-                    budget()
-                    size.value = len(image)
-                    if not native.QueryFullProcessImageNameW(handle, 0, image, C.byref(size)):
-                        raise PlatformError('windows_account_process_query_failed')
-                    if ntpath.normcase(image.value) != ntpath.normcase(executable):
-                        raise PlatformError('windows_account_executable_mismatch')
-                    if not native.GetProcessTimes(handle, *(C.byref(x) for x in timestamps)):
-                        raise PlatformError('windows_account_process_time_unavailable')
-                    if timestamps[0].low | timestamps[0].high << 32 != member['creation_time']:
-                        raise PlatformError('windows_account_process_reused')
-                    budget()
-                verify()
-                member_diagnostics = {}
+
+        classifications = []
+        for _ in range(2):
+            pass_paths = []
+            totals['family_processes_completed'] = 0
+            for member in sorted(family, key=lambda row: (row['pid'] != pid, row['pid'])):
+                budget()
+                handle = native.OpenProcess(PROCESS_METADATA_ACCESS, False, member['pid'])
+                if not handle:
+                    raise PlatformError('windows_account_process_unavailable')
                 try:
-                    member_paths = snapshot_paths(api, handle, diagnostics=member_diagnostics, clock=clock,
-                                                  deadline=deadline, max_handles=MAX_HANDLES - totals['handles_seen'])
+                    image, size = C.create_unicode_buffer(32768), C.c_uint32(32768)
+                    timestamps = [FILETIME() for _ in range(4)]
+
+                    def verify():
+                        budget()
+                        size.value = len(image)
+                        if not native.QueryFullProcessImageNameW(handle, 0, image, C.byref(size)):
+                            raise PlatformError('windows_account_process_query_failed')
+                        if (not 0 < size.value < len(image)
+                                or ntpath.normcase(image.value) != ntpath.normcase(executable)):
+                            raise PlatformError('windows_account_executable_mismatch')
+                        if not native.GetProcessTimes(handle, *(C.byref(x) for x in timestamps)):
+                            raise PlatformError('windows_account_process_time_unavailable')
+                        if timestamps[0].low | timestamps[0].high << 32 != member['creation_time']:
+                            raise PlatformError('windows_account_process_reused')
+                        budget()
+
+                    verify()
+                    member_diagnostics = {}
+                    try:
+                        member_paths = mapped_paths(api, handle, diagnostics=member_diagnostics, clock=clock,
+                            deadline=deadline, max_regions=MAX_REGIONS - totals['mapped_regions_queried'])
+                    finally:
+                        for key in MAPPED_COUNTS:
+                            count = member_diagnostics.get(key, 0)
+                            if type(count) is not int or not 0 <= count <= MAX_REGIONS:
+                                raise PlatformError('windows_account_mapped_diagnostic_invalid')
+                            accumulated = totals[key] + count
+                            totals[key] = min(32768, accumulated)
+                            if key == 'mapped_regions_queried' and accumulated > MAX_REGIONS:
+                                raise PlatformError('windows_account_mapped_region_limit')
+                    verify()
+                    if member_diagnostics.get('query_completed') is not True:
+                        raise PlatformError('windows_account_mapped_incomplete')
+                    totals['family_processes_completed'] += 1
+                    key = 'main_database_names_seen' if member['pid'] == pid else 'helper_database_names_seen'
+                    for path in member_paths:
+                        if not isinstance(path, str) or '\0' in path or len(path) > 32768:
+                            raise PlatformError('windows_account_handle_invalid')
+                        if _database_path_shape(path):
+                            _count(totals, key)
+                    pass_paths.extend(member_paths)
                 finally:
-                    for key in SNAPSHOT_COUNTS:
-                        totals[key] = min(32768, totals[key] + member_diagnostics.get(key, 0))
-                verify()
-                if member_diagnostics.get('query_completed') is not True:
-                    raise PlatformError('windows_account_snapshot_incomplete')
-                totals['family_processes_completed'] += 1
-                key = 'main_database_names_seen' if member['pid'] == pid else 'helper_database_names_seen'
-                for path in member_paths:
-                    if _database_path_shape(path):
-                        _count(totals, key)
-                paths.extend(member_paths)
-            finally:
-                native.CloseHandle(handle)
+                    if not native.CloseHandle(handle):
+                        raise PlatformError('windows_account_process_close_failed')
+            budget()
+            classified = classify_paths(pass_paths, db_root, device_map, diagnostics=totals)
+            classifications.append((classified['state'], classified['reason']))
+            totals['mapped_verification_passes'] += 1
+
         budget()
         after = verified_process_family(executable, pid, creation_time, clock=clock, deadline=deadline)
         if after != family:
             raise PlatformError('windows_account_process_family_changed')
         budget()
-        classified = classify_paths(paths, db_root, device_map, diagnostics=totals)
-        budget()
         totals['query_completed'] = True
-        return finish(classified['state'], classified['reason'])
-    except Exception:
+        if any(state == 'mismatch' for state, _ in classifications):
+            return finish('mismatch', 'windows_account_changed_or_ambiguous')
+        if all(state == 'matched' for state, _ in classifications):
+            return finish('matched', 'windows_account_mapped_database_matched')
+        reason = next(reason for state, reason in classifications if state != 'matched')
+        if reason == 'windows_account_open_database_unavailable':
+            reason = 'windows_account_mapped_database_unavailable'
+        return finish('unknown', reason)
+    except Exception as error:
         totals['query_completed'] = False
-        return finish('unknown', 'windows_account_probe_unavailable')
+        return finish('unknown', _mapped_failure_reason(error))
 
 
 class WindowsAccountProbe:
@@ -353,6 +428,14 @@ class WindowsAccountProbe:
                 if result['matched'] and clean.get('query_completed') is not True:
                     raise ValueError
                 result['diagnostics'] = clean
+            if result['matched'] and result['reason'] == 'windows_account_mapped_database_matched':
+                clean = result.get('diagnostics', {})
+                if (clean.get('mapped_file_query_used') is not True
+                        or clean.get('mapped_verification_passes') != 2
+                        or type(clean.get('family_process_count')) is not int
+                        or not 1 <= clean['family_process_count'] <= 16
+                        or clean.get('family_processes_completed') != clean['family_process_count']):
+                    raise ValueError
             return result
         except Exception:
             return _result('unknown', 'windows_account_probe_unavailable')
