@@ -15,7 +15,8 @@ from web_data import WebDataError
 WINDOWS_STATIC = {'/connect.html': ('connect.html', 'text/html; charset=utf-8'),
               '/connect.js': ('connect.js', 'text/javascript; charset=utf-8'),
               '/connect.css': ('connect.css', 'text/css; charset=utf-8')}
-MUTATIONS = {'/api/setup/initialize', '/api/setup/select', '/api/setup/catalog', '/api/setup/profile'}
+MUTATIONS = {'/api/setup/initialize', '/api/setup/select', '/api/setup/catalog', '/api/setup/profile',
+             '/api/setup/recheck', '/api/setup/start'}
 
 
 def _pairs(rows):
@@ -178,7 +179,7 @@ def make_windows_server(manager, static_dir, *, port=0, token=None):
                 if supplied_generation is not None and supplied_generation != self._generation():
                     self._json(409, {'error': {'code': 'scope_changed'}})
                     return
-                if parsed.path in ('/api/setup/initialize', '/api/setup/catalog'):
+                if parsed.path in ('/api/setup/initialize', '/api/setup/catalog', '/api/setup/recheck', '/api/setup/start'):
                     if value:
                         raise ValueError
                 elif parsed.path == '/api/setup/profile':
@@ -200,7 +201,11 @@ def make_windows_server(manager, static_dir, *, port=0, token=None):
             except (ValueError, UnicodeError, RecursionError, OSError, socket.timeout):
                 self._json(400, {'error': {'code': 'windows_setup_body_invalid'}})
                 return
-            if parsed.path == '/api/setup/initialize':
+            if parsed.path == '/api/setup/recheck':
+                self._operation(lambda: self.server.data.request_recheck(expected_generation=self._generation()))
+            elif parsed.path == '/api/setup/start':
+                self._operation(lambda: self.server.data.request_start(expected_generation=self._generation()))
+            elif parsed.path == '/api/setup/initialize':
                 self._operation(lambda: self.server.data.request_initialize(expected_generation=self._generation())
                                 if self._generation() else self.server.data.request_initialize())
             elif parsed.path == '/api/setup/catalog':
@@ -214,5 +219,5 @@ def make_windows_server(manager, static_dir, *, port=0, token=None):
                                 if self._generation() else self.server.data.select(value['private_id'], value['group_id']))
 
     server.RequestHandlerClass = WindowsHandler
-    server.launch_url = server.base_url + '/#token=' + server.token
+    server.launch_url = server.base_url + '/connect.html#token=' + server.token
     return server

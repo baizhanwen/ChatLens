@@ -6,9 +6,9 @@
 
 ## 本机使用
 
-从项目根目录 `Start-ChatLens.command` 打开 Mac 本机入口，按页面完成当前登录微信的识别、首次本机初始化和会话选择。Windows 原采集／Web 包的运行说明见 [本机 Web 工作台](../../docs/本机Web工作台.md)；其历史交付包不因源码增加 AI 就自动具备新功能。Mac 接入步骤见 [本机 Mac Web](../../docs/本机MacWeb.md)。
+从项目根目录 `Start-ChatLens.command` 打开 Mac 本机入口，按页面完成当前登录微信的识别、首次本机初始化和会话选择。Windows r3从 `Start-ChatLens.cmd` 打开接入引导，复用旧 `collector-data`，区分程序、账号读取、配置、范围和实际采集阶段；本人登录后可同页重新检测并开始。未就绪时说明原因，原消息可以明确离线浏览，工作台始终提供连接引导入口。步骤见 [Windows新版测试包](../../docs/Windows新版测试包.md)，旧交付包不因源码更新而自动具备这些功能。Mac 接入步骤见 [本机 Mac Web](../../docs/本机MacWeb.md)。
 
-Mac 设置或侧栏的「管理关注范围」可多选1–50个私聊／群聊，跨搜索保留选择；每个账号和关注范围分别保存数据与 AI 历史，旧范围可切回。本人身份核验后原消息标明“本人／收到”，无法核验的方向明确显示未知；统计和引用使用同一判断。见[收发身份与多会话](../../docs/收发身份与多会话.md)。
+Mac及Windows r3设置或侧栏的「管理关注范围」可多选1–50个私聊／群聊，跨搜索保留选择；每个账号和关注范围分别保存数据与 AI 历史，旧范围可切回。Windows未完成账号读取核验时入口仍可找到，但会说明为何暂不能修改。本人身份核验后原消息标明“本人／收到”，无法核验的方向明确显示未知；统计和引用使用同一判断。见[收发身份与多会话](../../docs/收发身份与多会话.md)。
 
 工作台使用启动器提供的 `http://127.0.0.1:端口` 地址。登录片段在建立 HttpOnly 本机会话后移除；不要分享完整登录地址。普通静态 HTTP 服务没有本项目 API，会显示连接错误。
 
@@ -45,6 +45,8 @@ MiniMax 预设为 `https://api.minimax.cn/v1`、`https://api.minimax.io/v1`，�
 node scripts/web-preview-smoke.cjs --output .build/new-preview-evidence
 node scripts/web-live-smoke.cjs --output .build/new-reader-evidence
 node scripts/web-ai-smoke.cjs --output .build/new-ai-evidence
+node scripts/web-windows-connection-smoke.cjs --output .build/new-windows-connection-evidence
+node scripts/web-windows-multi-smoke.cjs --output .build/new-windows-multi-evidence
 ```
 
 每次使用新的输出目录，保留历史证据。`file://` 脚本独立验证虚构 AI 和原消息／采集交互；reader 脚本验证实际本机 HTTP 与合成消息库，AI 服务未接入时保持明确不可用；AI 脚本使用实际 `AiAssistant`、`KnowledgeIndex`、临时 `CollectorStore` 与真实本机 HTTP，供应商端为明确的本机合成服务，不模拟浏览器 API 响应。覆盖配置与显式测试、云端确认门槛、多轮／范围／取消／错误重试、引用定位、消息与采集回归及 390px 适配。

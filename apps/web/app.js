@@ -5,7 +5,7 @@
   const svgNS = 'http://www.w3.org/2000/svg';
   const initialDate = new Date();
   const LIVE = location.protocol !== 'file:';
-  const live = { connected: false, ready: false, error: null, status: null, session: null, scopeGeneration: null, scopeInvalid: false, timer: null, failures: 0, cycle: 0, selection: 0, overview: 0, search: null, searchRequest: 0, searching: false };
+  const live = { connected: false, ready: false, error: null, status: null, setup: null, session: null, scopeGeneration: null, scopeInvalid: false, timer: null, failures: 0, cycle: 0, selection: 0, overview: 0, search: null, searchRequest: 0, searching: false };
   const liveCache = new Map();
   const CACHE_LIMIT = 1000;
   let sequence = 100;
@@ -508,6 +508,9 @@
     const supported = LIVE && Boolean(live.scopeGeneration) && !live.scopeInvalid;
     $('scope-manage-sidebar').hidden = !supported;
     $('settings-scope-card').hidden = !supported;
+    const connection = live.session?.platform === 'windows' ? live.setup?.connection : null;
+    $('scope-settings-help').hidden = !supported || !connection || connection.can_modify_scope === true;
+    $('scope-settings-help').textContent = connection?.state === 'explicit_read_only' ? '当前为离线只读，不能修改关注范围。你仍可进入连接引导，查看模式说明和已保存范围。' : connection?.state === 'cleanup_required' ? '上一轮采集尚未确认退出，暂不能修改范围。进入连接引导查看处理步骤。' : '需要先核验原账号的本机读取范围，才能修改会话。点击下方入口，在连接引导中重新检测并继续。';
   }
 
   function invalidateScope(navigateAway = true) {
@@ -518,6 +521,7 @@
     live.scopeGeneration = null;
     live.session = null;
     live.status = null;
+    live.setup = null;
     live.cycle++;
     live.selection++;
     live.searchRequest++;
@@ -658,8 +662,83 @@
     unavailable: ['采集状态不可用', 'waiting', '尚未收到采集程序状态。已保存消息可查看，不能据此确认正在采集。']
   };
 
+  function windowsConnectionDetails() {
+    const value = live.session?.platform === 'windows' ? live.setup?.connection : null;
+    if (!value) return null;
+    const phase = typeof value.collector_stage === 'string' ? value.collector_stage : null;
+    const running = typeof value.collector_running === 'boolean' ? value.collector_running : value.checks?.collecting === true;
+    if (phase !== null && ['connected', 'stopped'].includes(value.state)) {
+      if (running) {
+        const stages = {
+          starting: ['正在准备采集', 'waiting', '采集进程已经启动，正在等待本轮实际状态。原消息和进度保留，请勿重复开始。'],
+          collecting: liveStates.collecting,
+          paused: ['采集暂时暂停', 'waiting', '本轮采集进程仍在运行。若微信在前台或屏幕锁定，请让微信保持后台并解锁，再等待读取条件恢复。'],
+          stale: ['等待本轮采集心跳', 'waiting', '暂未收到本轮新鲜心跳，不能据此认定采集已经停止。原内容保留，当前不会重复启动另一轮采集。'],
+          error: ['本轮采集异常', 'failure', '本轮采集报告异常，进程仍在运行。请保留进度，并进入连接引导查看实际状态。'],
+          stopping: ['正在停止采集', 'waiting', '正在保存本轮进度并结束进程，请等待正常退出，不要重复开始。'],
+          stopped: ['正在确认采集退出', 'waiting', '采集已报告停止，正在等待本轮进程确认退出。原消息和检查点保留。']
+        };
+        return stages[phase] || stages.stale;
+      }
+      if (phase === 'error') return ['上一轮采集异常结束', 'failure', '原消息和检查点保留。请进入连接引导查看原因，重新检测后再开始采集。'];
+    }
+    if (value.checks?.collecting === true) return null;
+    if (value.reason === 'windows_reader_configuration_unavailable') return ['读取配置需要检查', 'waiting', '原账号读取已核验，但现有配置尚未通过检查。进入连接引导查看原因，原数据和检查点会保留。'];
+    if (value.state === 'account_unverified' && typeof value.reason === 'string' && value.reason.startsWith('windows_process_')) return ['微信程序尚未完成核验', 'waiting', '程序路径、版本或访问条件仍需检查。进入连接引导查看具体原因，不能据此判断账号是否登录。'];
+    const details = {
+      waiting_for_wechat: ['等待本机微信', 'waiting', '请打开微信并由你完成登录，再进入连接引导点击“重新检测微信”。查看已有消息不表示正在采集。'],
+      checking_account: ['正在核验账号读取', 'waiting', '正在检测微信程序和原账号的本机读取范围，请等待连接引导中的实际状态更新。'],
+      account_unverified: ['账号读取尚未核验', 'waiting', '程序存在不代表已完成登录。请在连接引导查看具体原因，完成本人操作后重新检测。'],
+      wrong_account: ['微信账号不匹配', 'failure', '当前微信与这份资料的账号不一致，已停止采集并隔离原数据。请切回原账号后重新检测。'],
+      connected: ['尚未开始采集', 'waiting', '原账号的本机读取范围已核验。在连接引导点击“开始采集”，即可从保存位置继续。'],
+      stopped: ['采集已停止', 'waiting', '已保存消息仍可查看。在连接引导重新检测或点击“开始采集”继续，不必退出本工具。'],
+      explicit_read_only: ['离线只读 · 未采集', 'waiting', '当前入口只查看已保存消息，不检测微信、不接收新消息，也不能修改关注范围。'],
+      cleanup_required: ['等待上一轮采集退出', 'waiting', '上一轮采集尚未确认结束，暂不能开始或修改范围。请在连接引导查看处理步骤。']
+    };
+    return details[value.state] || ['等待连接微信', 'waiting', '请进入连接引导核对当前状态，再开始采集。'];
+  }
+
+  function renderWindowsConnectionBanner() {
+    const show = live.session?.platform === 'windows' && !live.scopeInvalid;
+    const banner = $('windows-workspace-connection');
+    banner.hidden = !show;
+    document.body.classList.toggle('windows-connection-visible', show);
+    if (!show) return;
+    const value = live.setup?.connection, details = windowsConnectionDetails();
+    const running = typeof value?.collector_running === 'boolean' ? value.collector_running : value?.checks?.collecting === true;
+    $('workspace-connection-title').textContent = details?.[0] || (running ? liveStates[live.status?.state]?.[0] || '采集进程已启动' : '连接微信与使用引导');
+    $('workspace-connection-description').textContent = details?.[2] || (running ? (liveStates[live.status?.state]?.[2] || '采集进程运行中，实际阶段和新消息以本机保存结果为准。') : '在引导中检查微信程序、账号读取、配置和关注范围，再主动开始采集。');
+    banner.classList.toggle('is-attention', Boolean(details) && details[1] !== 'failure');
+    banner.classList.toggle('is-error', details?.[1] === 'failure');
+    $('workspace-connection-guide').classList.toggle('button-primary', !running);
+    renderScopeControls();
+  }
+
+  async function refreshWindowsConnection(epoch) {
+    if (live.session?.platform !== 'windows') return true;
+    const setup = await api('/api/setup');
+    if (epoch !== live.cycle) return false;
+    if (!setup || setup.platform !== 'windows' || setup.connection && (typeof setup.connection.can_read_saved !== 'boolean' || typeof setup.connection.can_modify_scope !== 'boolean')) throw apiError('invalid_response');
+    live.setup = setup;
+    renderWindowsConnectionBanner();
+    if (setup.connection?.can_read_saved === false) {
+      if (conversations.length || ai.turns.length || liveCache.size) { invalidateScope(); return false; }
+      live.connected = false;
+      live.ready = true;
+      live.error = null;
+      live.failures = 0;
+      live.status = null;
+      renderLiveStatus();
+      renderAiControls();
+      return false;
+    }
+    return true;
+  }
+
   function stateDetails() {
     if (live.error) return [live.error.status === 401 ? '本机会话已失效' : '页面连接中断', 'failure', live.error.status === 401 ? '请从本机启动器重新打开工作台。已显示内容保留，暂不更新。' : '暂时无法连接本机服务。已显示内容可能已过期，恢复连接后会继续读取。'];
+    const connectionDetails = windowsConnectionDetails();
+    if (connectionDetails) return connectionDetails;
     if (!live.connected) return ['正在连接本机服务', 'waiting', '正在读取真实采集状态和已保存消息。'];
     return liveStates[live.status?.state] || liveStates.unavailable;
   }
@@ -695,11 +774,12 @@
     $('live-retry').disabled = live.error?.status === 401;
     $('live-retry').textContent = live.error?.status === 401 ? '请从启动器重新打开' : '重新连接';
     document.querySelector('.sidebar-local > div').replaceChildren(document.createTextNode('本机采集'), element('span', '', live.error ? '连接已中断 · 内容可能已过期' : live.connected ? title : '正在连接本机服务'));
-    $('live-page-state').textContent = live.connected ? '本机服务已连接' : '尚未连接';
+    $('live-page-state').textContent = live.connected || live.setup && !live.error ? '本机服务已连接' : '尚未连接';
     $('live-resume-state').textContent = live.status?.resumed_from_checkpoint === true ? '已从保存位置继续' : live.status?.resumed_from_checkpoint === false ? '本次首次启用' : '暂无恢复记录';
     const heartbeat = liveDate(live.status?.heartbeat_at);
     $('live-heartbeat').textContent = heartbeat ? heartbeat.toLocaleTimeString('zh-CN', { hour12: false }) : '尚未收到';
     document.querySelectorAll('.property-list dd')[2].textContent = title;
+    renderWindowsConnectionBanner();
     updateLiveElapsed();
   }
 
@@ -761,6 +841,7 @@
       live.session = session;
       renderScopeControls();
       if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+      if (!await refreshWindowsConnection(epoch)) return;
       const [metadata, status] = await Promise.all([api('/api/conversations'), api('/api/status')]);
       if (epoch !== live.cycle) return;
       acceptStatus(status);
@@ -778,6 +859,7 @@
 
   async function pollLive(epoch) {
     try {
+      if (!await refreshWindowsConnection(epoch)) return;
       const [metadata, status] = await Promise.all([api('/api/conversations'), api('/api/status')]);
       if (epoch !== live.cycle) return;
       acceptStatus(status);
@@ -1026,6 +1108,7 @@
     $('confirm-preview').textContent = '知道了';
     ['message-search'].forEach(id => { $(id).maxLength = 256; });
     $('live-retry').addEventListener('click', connectLive);
+    if (typeof ResizeObserver === 'function') new ResizeObserver(entries => { for (const entry of entries) document.body.style.setProperty('--workspace-connection-height', entry.target.getBoundingClientRect().height + 'px'); }).observe($('windows-workspace-connection'));
     $('load-older').addEventListener('click', loadOlder);
   }
 

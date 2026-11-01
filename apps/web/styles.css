@@ -518,6 +518,16 @@ dialog p { font-size: 13px; line-height: 1.9; }
   font-size: 12px; line-height: 1.8; overflow-wrap: anywhere;
 }
 .live-connection-notice .button { flex-shrink: 0; }
+.workspace-connection-banner { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 18px 22px; margin: 0 0 24px; background: var(--sidebar-bg); border: 1px solid var(--border); border-radius: 12px; }
+.workspace-connection-copy { min-width: 0; }
+.workspace-connection-copy .eyebrow { font-size: 8px; }
+.workspace-connection-copy h2 { font-size: 15px; margin: 6px 0 5px; line-height: 1.6; font-weight: 600; }
+.workspace-connection-copy p { margin: 0; color: var(--text-label); font-size: 11px; line-height: 1.8; overflow-wrap: anywhere; }
+.workspace-connection-banner > .button { flex-shrink: 0; font-size: 11px; }
+.workspace-connection-banner.is-attention { background: var(--waiting-bg); }
+.workspace-connection-banner.is-error { background: var(--failure-bg); }
+.windows-connection-visible .ai-view { height: calc(100dvh - var(--topbar-height) - var(--content-y) * 2 - var(--workspace-connection-height, 130px) - 24px); min-height: 500px; }
+.scope-settings-help { padding: 12px 14px; background: var(--sidebar-bg); border: 1px solid var(--border); border-radius: 8px; margin: 12px 0 18px; color: var(--text-label); }
 .load-older { display: flex; margin: 14px auto 6px; font-size: 12px; }
 .live-mode .message-footer { min-height: 64px; }
 .live-mode .stat-state { font-size: 22px; }
@@ -663,6 +673,10 @@ dialog p { font-size: 13px; line-height: 1.9; }
 }
 @media (max-width: 640px) {
   .live-connection-notice { align-items: stretch; flex-direction: column; padding: 14px; gap: 10px; }
+  .workspace-connection-banner { align-items: stretch; flex-direction: column; gap: 13px; padding: 16px; }
+  .workspace-connection-banner > .button { justify-content: center; width: 100%; }
+  .workspace-connection-copy h2 { font-size: 14px; }
+  .windows-connection-visible .ai-view { min-height: 500px; }
   .live-mode .message-footer > span { display: block; font-size: 10px; }
   .live-mode .message-footer .button { width: auto; min-width: 95px; }
   .live-mode .stat-state { font-size: 14px; }

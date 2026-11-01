@@ -12,10 +12,11 @@ from build_windows_selected_package import ARTIFACTS, CACHE_DIRECTORY, cached_ar
 
 PREFIX = 'ChatLens-Windows-Web'
 MANIFEST = 'WEB-MANIFEST.json'
-PACKAGE_REVISION = '20261101-r2'
+PACKAGE_REVISION = '20261101-r3'
 SOURCES = (
     'Start-Web.ps1', 'Start-ChatLens.cmd', 'README-WEB.txt',
-    'web_runtime.py', 'web_server.py', 'windows_web_manager.py', 'windows_web_server.py', 'windows_account_probe.py',
+    'web_runtime.py', 'web_server.py', 'windows_web_manager.py', 'windows_web_server.py',
+    'windows_account_probe.py', 'windows_process_detection.py',
     'web_data.py', 'collector_web_meta.py',
     'collector_service.py', 'collector_supervisor.py', 'collector_private.py',
     'continuous_reader.py', 'continuous_store.py', 'conversation_scope.py', 'wechat_identity.py', 'windows_selected_engine.py',
@@ -72,6 +73,10 @@ def build(root, output):
         'built_at_utc': datetime.now(timezone.utc).isoformat(),
         'scope': 'explicit_1_to_50_conversation_profiles_with_received_sent_unknown_statistics',
         'conversation_limits': {'minimum': 1, 'maximum': 50},
+        'startup': 'Interactive readiness guide with retryable Windows process and current-account verification; explicit collection start; no automatic read-only fallback.',
+        'account_readiness': 'Pending until the original local account and reader configuration are verified; process/window presence is not login or network-online proof.',
+        'collector_readiness': 'Only a fresh heartbeat from the currently owned collector establishes actual initialization, collecting, paused or stale state; saved data and a launched process do not establish collection readiness.',
+        'native_windows_sdk_execution_status': '未验证',
         'isolation': 'Account-bound profiles with independent store, checkpoint and AI history; stale scope requests are rejected.',
         'upgrade_handling': 'Reuse the selected existing collector-data in place. Preserve the legacy store, baseline, assistant and configuration. New profiles use separate private directories.',
         'windows_execution_status': '未验证', 'web_live_end_to_end_status': '未验证',

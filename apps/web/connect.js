@@ -2,8 +2,9 @@
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
-  const stages = new Set(['needs_initialization', 'ready_to_select', 'starting', 'running', 'error']);
-  const state = { setup: null, generation: null, connected: false, error: null, busy: null, epoch: 0, setupRequest: 0, timer: null, failures: 0, listRequest: 0, listLoading: false, listError: false, listMore: false, rows: [], selected: new Map(), selectionSeeded: false, pickerGeneration: null, loadedGeneration: null, editing: false, redirecting: false, recovering: false, enterWorkspace: false, stayOnSetup: new URLSearchParams(location.search).get('manage') === '1' };
+  const stages = new Set(['needs_initialization', 'ready_to_select', 'ready_to_start', 'starting', 'running', 'error', 'waiting_for_wechat', 'needs_connection']);
+  const connectionStates = new Set(['waiting_for_wechat', 'checking_account', 'account_unverified', 'wrong_account', 'connected', 'stopped', 'explicit_read_only', 'cleanup_required']);
+  const state = { setup: null, platform: null, generation: null, connected: false, error: null, busy: null, epoch: 0, setupRequest: 0, timer: null, failures: 0, listRequest: 0, listLoading: false, listError: false, listMore: false, rows: [], selected: new Map(), selectionSeeded: false, pickerGeneration: null, loadedGeneration: null, editing: false, redirecting: false, recovering: false, enterWorkspace: false, stayOnSetup: new URLSearchParams(location.search).get('manage') === '1' };
   const renderedLists = new Map();
   let profilesSignature = '';
   let searchTimer;
@@ -13,9 +14,16 @@
   function ignored(problem) { return ['stale_response', 'scope_changed'].includes(problem?.code); }
   function allowedOrigin() { return location.protocol === 'http:' && location.hostname === '127.0.0.1'; }
   function validGeneration(value) { return typeof value === 'string' && /^[a-zA-Z0-9_-]{16,128}$/.test(value); }
-  function working() { return state.busy !== null || state.setup?.initialization?.state === 'working' || state.setup?.stage === 'starting' || state.setup?.scope_switching === true; }
+  function windows() { return state.platform === 'windows' || state.setup?.platform === 'windows'; }
+  function connection() { return windows() ? state.setup?.connection : null; }
+  function collectorStage(value = connection()) { return typeof value?.collector_stage === 'string' ? value.collector_stage : null; }
+  function collectorRunning(value = connection()) { return typeof value?.collector_running === 'boolean' ? value.collector_running : value?.checks?.collecting === true; }
+  function collectorReady(value = connection()) { const stage = collectorStage(value); return value?.can_read_saved === true && collectorRunning(value) && (stage === null ? value?.checks?.collecting === true : ['collecting', 'paused'].includes(stage)); }
+  function canOpenWorkspace() { return connection()?.can_read_saved === true && (!collectorRunning() || collectorReady()); }
+  function connectionAction(kind) { const value = connection(); return value?.['can_' + kind] === true && Array.isArray(value.actions) && value.actions.includes(kind); }
+  function working() { return state.busy !== null || state.setup?.initialization?.state === 'working' || state.setup?.stage === 'starting' || state.setup?.scope_switching === true || connection()?.state === 'checking_account' || collectorRunning() && collectorStage() === 'starting'; }
   function catalogReady() { return state.setup?.catalog?.state === 'ready' || state.setup?.stage === 'ready_to_select'; }
-  function canSelect() { return state.connected && Boolean(state.generation) && state.editing && ['ready_to_select', 'running', 'error'].includes(state.setup?.stage) && catalogReady() && !working(); }
+  function canSelect() { return state.connected && Boolean(state.generation) && state.editing && (windows() ? connection()?.can_modify_scope === true : ['ready_to_select', 'running', 'error'].includes(state.setup?.stage)) && catalogReady() && !working(); }
   function scopeLimit() { const value = state.setup?.scope_limits?.total; return Number.isSafeInteger(value) && value > 0 ? Math.min(value, 50) : 50; }
   function resetPicker() { state.listRequest++; state.rows = []; state.selected.clear(); state.selectionSeeded = false; state.pickerGeneration = null; state.loadedGeneration = null; state.listLoading = false; state.listError = false; state.listMore = false; state.editing = false; clearTimeout(searchTimer); $('setup-conversation-search').value = ''; renderedLists.clear(); }
 
@@ -38,7 +46,7 @@
         if (code === 'scope_changed') recoverScope();
         throw error(code, response.status);
       }
-      if (typeof result?.scope_generation === 'string' && result.scope_generation !== generation && !['/api/session', '/api/setup', '/api/setup/select', '/api/setup/profile'].includes(route)) { recoverScope(); throw error('scope_changed', 409); }
+      if (typeof result?.scope_generation === 'string' && result.scope_generation !== generation && !['/api/session', '/api/setup', '/api/setup/select', '/api/setup/profile', '/api/setup/recheck', '/api/setup/start'].includes(route)) { recoverScope(); throw error('scope_changed', 409); }
       return result;
     } finally { clearTimeout(timeout); }
   }
@@ -65,10 +73,12 @@
   function acceptSetup(value) {
     if (!value || !stages.has(value.stage) || !value.account || typeof value.account.detected !== 'boolean' || value.account.display_name != null && typeof value.account.display_name !== 'string') throw error('invalid_response');
     if (value.scope_generation !== undefined && !validGeneration(value.scope_generation)) throw error('invalid_response');
+    if (value.platform === 'windows' && value.connection && (!connectionStates.has(value.connection.state) || typeof value.connection.can_read_saved !== 'boolean' || typeof value.connection.can_modify_scope !== 'boolean')) throw error('invalid_response');
     const nextGeneration = value.scope_generation || state.generation;
     const changed = nextGeneration !== state.generation;
     if (changed) { resetPicker(); if (!state.enterWorkspace) state.stayOnSetup = true; }
     state.generation = nextGeneration;
+    if (typeof value.platform === 'string') state.platform = value.platform;
     state.setup = value;
     state.connected = true;
     state.error = null;
@@ -77,9 +87,9 @@
     if (value.stage === 'starting' || value.scope_switching) { state.editing = false; state.listRequest++; state.listLoading = false; }
     render();
     if (canSelect() && state.loadedGeneration !== state.generation && !state.listLoading) loadConversations();
-    if (value.stage === 'running' && (state.enterWorkspace || !state.stayOnSetup) && !state.redirecting) openWorkspace();
+    if ((windows() ? state.enterWorkspace && collectorReady() : value.stage === 'running' && (state.enterWorkspace || !state.stayOnSetup)) && !state.redirecting) openWorkspace();
   }
-  function openWorkspace() { if (!state.connected || state.setup?.stage !== 'running' || state.setup?.scope_switching || state.redirecting) return; state.redirecting = true; const target = ['/', '/index.html'].includes(state.setup.workspace_path) ? state.setup.workspace_path : '/'; location.assign(target); }
+  function openWorkspace() { if (!state.connected || (windows() ? !canOpenWorkspace() : state.setup?.stage !== 'running') || state.setup?.scope_switching || state.redirecting) return; state.redirecting = true; const target = ['/', '/index.html'].includes(state.setup.workspace_path) ? state.setup.workspace_path : '/'; location.assign(target); }
   function schedule(epoch) { clearTimeout(state.timer); if (state.error?.status === 401 || !allowedOrigin() || epoch !== state.epoch || state.redirecting) return; state.timer = setTimeout(() => poll(epoch), state.failures ? Math.min(10000, 1000 * 2 ** Math.min(state.failures, 4)) : 1000); }
 
   async function connect() {
@@ -90,6 +100,7 @@
       const session = await api('/api/session', { token }); token = null;
       if (epoch !== state.epoch) return;
       const generation = validGeneration(session?.scope_generation) ? session.scope_generation : null;
+      if (typeof session?.platform === 'string') state.platform = session.platform;
       if (session?.scope_generation !== undefined && !generation) throw error('invalid_response');
       if (generation !== state.generation) { resetPicker(); state.setup = null; }
       state.generation = generation;
@@ -122,6 +133,113 @@
     for (const prefix of ['progress', 'starting']) { $(prefix + '-phase').textContent = phase; $(prefix + '-count').textContent = detail; $(prefix + '-elapsed').textContent = seconds === null ? '' : String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0'); }
   }
 
+  function windowsCopy(value = {}) {
+    const phase = collectorStage(value);
+    if (collectorRunning(value) && ['connected', 'stopped'].includes(value.state) && phase !== null) {
+      const phases = {
+        starting: ['正在准备采集', 'running', '等待本轮状态', '采集进程已经启动，正在等待本轮采集状态确认。请保持页面打开，不要重复点击开始；原消息和检查点保留。'],
+        collecting: ['正在采集所选会话', 'running', '本轮采集中', '本轮采集状态已确认，可以进入工作台查看新文字。显示内容以本机实际保存的消息为准。'],
+        paused: ['采集暂时暂停', 'waiting', '等待读取条件', '本轮采集仍在运行，目前处于暂停阶段。若微信在前台或屏幕锁定，请让微信保持后台并解锁屏幕，再等待状态恢复，不需要重复开始。'],
+        stale: ['等待本轮采集心跳', 'waiting', '状态暂未确认', '暂未收到本轮的新鲜采集心跳，不能据此认定已经停止。原消息和进度保留，当前不会重复启动另一轮采集。'],
+        error: ['本轮采集需要处理', 'failure', '采集异常', '本轮采集报告异常。请保留原窗口、数据和检查点，按实际状态原因处理；进程结束前不会重复开始采集。'],
+        stopping: ['正在结束采集', 'waiting', '正在保存进度', '采集仍在结束和保存进度，请等待本轮进程正常退出后再继续。'],
+        stopped: ['正在确认采集退出', 'waiting', '等待正常结束', '采集已报告停止，正在等待本轮进程确认退出。请保留页面，不要重复开始。']
+      };
+      return phases[phase] || phases.stale;
+    }
+    if (phase === 'error' && value.state === 'stopped') return ['上一轮采集异常结束', 'failure', '需要检查', '原消息和检查点仍在。请查看本轮实际原因，重新检测原账号和读取条件后，再开始采集。'];
+    if (value.checks?.collecting === true) return ['采集已启动', 'running', '采集进程运行中', '可以进入工作台查看实际采集阶段和新文字，或修改关注范围。微信在前台等情况会暂停读取，请以工作台状态为准。'];
+    if (value.reason === 'windows_reader_configuration_unavailable') return ['读取配置需要检查', 'waiting', '配置未就绪', '原账号的读取范围已核验，但已有配置未通过检查。请保留原资料，确认选择的是此前测试成功的完整 collector-data，再重新检测。'];
+    if (value.state === 'account_unverified' && typeof value.reason === 'string' && value.reason.startsWith('windows_process_')) return [value.reason === 'windows_process_version_unsupported' ? '当前微信版本尚未支持' : '微信程序暂未完成核验', 'waiting', '程序检查未完成', '请按上方的实际检测说明处理，再点击“重新检测微信”。程序核验未完成时不会把状态判断为已经登录。'];
+    const unverified = value.reason === 'windows_account_open_database_unavailable';
+    const copies = {
+      waiting_for_wechat: ['等待本机微信', 'waiting', '未找到微信进程', '请打开这台电脑上的微信，并由你完成扫码或手机登录确认，再点击“重新检测微信”。本工具不会替你登录。'],
+      checking_account: ['正在检查微信与账号', 'running', '正在核验', '正在检查微信程序和原账号的本机读取范围。请等待实际状态返回，不需要退出或重启本工具。'],
+      account_unverified: [unverified ? '尚未确认微信登录' : '账号读取核验未完成', 'waiting', '尚未核验', unverified ? '请在微信窗口完成“进入微信”或手机登录确认，再点击“重新检测微信”。仅检测到程序还不能开始采集。' : '目前无法核验原账号的本机读取范围。请确认微信窗口已完成登录，再重新检测；若仍未完成，可查看下方状态原因。不会据此认定你尚未登录。'],
+      wrong_account: ['当前微信与原资料账号不匹配', 'failure', '账号不匹配', '请在微信中切回这份资料对应的原账号，再点击“重新检测微信”。已停止原采集，不会把两个账号的消息或配置混在一起。'],
+      connected: ['原账号读取已核验', 'success', '可以开始采集', '可以继续使用原关注范围，也可以先修改关注范围。点击“开始采集”后才接收新的文字，原消息和采集位置会保留。'],
+      stopped: ['采集已停止，可以继续', 'waiting', '等待开始', '原消息和采集位置仍在。确认原账号的读取范围已核验后，点击“开始采集”继续；需要重新核验时可点击“重新检测微信”。'],
+      explicit_read_only: ['当前是离线只读模式', 'neutral', '仅查看已保存内容', '这个入口明确选择了离线只读，不检测微信、不开始采集，也不能修改关注范围。你可以查看本机已保存消息；需要连接微信时请使用标准启动入口。'],
+      cleanup_required: ['等待上一轮采集结束', 'waiting', '暂不能开始', '上一轮采集尚未确认退出。请保留原窗口和资料，等待其正常结束后重新检测；不要删除锁、配置或检查点，也不要同时启动另一轮采集。']
+    };
+    return copies[value.state] || ['等待本机连接状态', 'waiting', '等待检查', '请等待本机服务返回实际连接状态。'];
+  }
+
+  function renderWindows(setup, active, isWorking) {
+    const value = connection() || {}, facts = value.checks || {}, copy = windowsCopy(value), phase = collectorStage(value), collectorAlive = collectorRunning(value), ready = collectorReady(value);
+    $('windows-connection-card').hidden = false;
+    $('windows-sidebar-steps').hidden = false;
+    $('setup-steps').hidden = true;
+    $('mac-account-card').hidden = true;
+    $('initialization-card').hidden = true;
+    $('setup-error').hidden = true;
+    document.querySelector('.connect-heading h1').textContent = '连接微信，开始关注。';
+    document.querySelector('.connect-heading p').textContent = '按实际连接状态继续操作，原消息、配置和采集位置保留。';
+    $('windows-connection-title').textContent = value.state === 'connected' && phase === null && (state.busy === 'start' || setup?.stage === 'starting' && setup?.scope_switching !== true) ? '正在准备所选范围的采集' : copy[0];
+    $('windows-connection-state').textContent = copy[2];
+    $('windows-connection-state').className = 'tag tag-' + copy[1];
+    $('windows-connection-description').textContent = typeof value.description === 'string' && value.description.trim() ? value.description.slice(0, 1500) : '先检测微信程序，再核验原账号的本机读取范围；程序存在不代表已完成登录或网络在线。';
+    $('windows-next-step').textContent = copy[3];
+    const keys = ['process_running', 'account_verified', 'reader_ready', 'scope_selected', 'collecting'];
+    const selectedCount = count(setup?.active_scope?.count);
+    const details = {
+      process_running: facts.process_running === true ? ['进程已找到', '已找到这台电脑上的微信程序'] : facts.process_running === false ? ['未找到', '请打开本机微信后重新检测'] : ['尚未检查', '等待本机进程检查结果'],
+      account_verified: facts.account_verified === true ? ['读取已核验', '与这份资料对应的原账号一致'] : value.state === 'wrong_account' ? ['账号不匹配', '请切回原账号再重新检测'] : ['尚未核验', '由你完成登录后，再核验读取范围'],
+      reader_ready: facts.reader_ready === true ? ['配置可用', '复用原有读取配置和检查点'] : value.reason === 'windows_reader_configuration_unavailable' ? ['检查未通过', '请确认所选完整资料目录'] : ['待核验', '保留原资料目录，等待配置核验'],
+      scope_selected: facts.scope_selected === true ? ['已有范围', selectedCount === null ? '已保存你选择的关注范围' : '已保存 ' + selectedCount + ' 个关注会话'] : ['待选择', '读取就绪后选择私聊和群聊'],
+      collecting: collectorAlive && phase === 'starting' ? ['准备中', '等待本轮采集状态确认'] : collectorAlive && phase === 'paused' ? ['已暂停', '等待后台、解锁等读取条件'] : collectorAlive && phase === 'stale' ? ['等待心跳', '不将状态未知当作已经停止'] : collectorAlive && phase === 'error' ? ['需要处理', '保留进度，查看实际状态原因'] : collectorAlive && ['stopping', 'stopped'].includes(phase) ? ['正在结束', '等待本轮进程正常退出'] : facts.collecting === true ? [phase === null ? '进程运行中' : '正在采集', '查看工作台中的实际采集阶段'] : value.state === 'checking_account' ? ['尚未开始', '账号和配置核验通过后再开始'] : ['未在采集', value.state === 'explicit_read_only' ? '离线只读，不接收新的消息' : '点击“开始采集”后才继续接收']
+    };
+    let current = keys.find(key => facts[key] !== true);
+    for (const key of keys) {
+      const item = document.querySelector('[data-windows-check="' + key + '"]');
+      item.querySelector('.windows-check-state').textContent = details[key][0];
+      item.querySelector('.windows-check-detail').textContent = details[key][1];
+      item.classList.toggle('is-complete', facts[key] === true);
+      item.classList.toggle('is-current', key === current && value.state !== 'explicit_read_only');
+      const sidebar = document.querySelector('[data-windows-sidebar-step="' + key + '"]');
+      sidebar.classList.toggle('is-complete', facts[key] === true);
+      if (key === current) sidebar.setAttribute('aria-current', 'step'); else sidebar.removeAttribute('aria-current');
+    }
+    const recheck = $('windows-recheck'), start = $('windows-start');
+    recheck.hidden = value.state === 'explicit_read_only';
+    recheck.disabled = !active || Boolean(state.busy) || !connectionAction('recheck');
+    recheck.classList.toggle('button-primary', value.can_start !== true);
+    recheck.textContent = state.busy === 'recheck' || value.state === 'checking_account' ? '正在检测微信' : '重新检测微信';
+    recheck.classList.toggle('is-loading', state.busy === 'recheck' || value.state === 'checking_account');
+    recheck.setAttribute('aria-busy', String(state.busy === 'recheck' || value.state === 'checking_account'));
+    start.hidden = collectorAlive || !value.can_start && !['connected', 'stopped'].includes(value.state);
+    start.disabled = !active || collectorAlive || Boolean(state.busy) || !connectionAction('start');
+    start.textContent = state.busy === 'start' ? '正在开始采集' : '开始采集';
+    start.classList.toggle('is-loading', state.busy === 'start');
+    start.setAttribute('aria-busy', String(state.busy === 'start'));
+    $('windows-offline').hidden = value.can_read_saved !== true || collectorAlive;
+    $('windows-open-workspace').hidden = !ready;
+    $('windows-open-workspace').textContent = phase === 'paused' ? '查看工作台（采集暂停）' : '进入工作台';
+    $('windows-offline').disabled = $('windows-open-workspace').disabled = !active || setup?.scope_switching === true;
+    $('windows-saved-note').textContent = value.can_read_saved === true ? collectorAlive ? phase === 'starting' ? '正在等待本轮采集状态，不沿用旧一轮的停止或就绪记录。原数据、配置和采集位置保留。' : '采集进程仍在运行，当前阶段请以上方本轮状态为准。账号读取核验不代表网络在线或已有新来信。' : '现在可以离线查看已保存的消息；这不表示正在采集。原消息、模型配置和检查点保留。' : '原资料保留在本机。读取范围未核验时不会显示其他账号的消息，也不会重建原基线。';
+    $('windows-connection-reason').textContent = /^[a-z0-9_]{1,100}$/.test(value.reason || '') ? '状态原因：' + value.reason : '暂无其他状态原因。';
+    $('scope-capability-note').hidden = !active || Boolean(state.generation);
+    $('scope-manager').hidden = !state.generation;
+    $('active-scope-label').textContent = typeof setup?.active_scope?.label === 'string' ? setup.active_scope.label : '尚未读取关注范围';
+    const scope = setup?.active_scope;
+    $('active-scope-count').textContent = scope && selectedCount !== null ? selectedCount + ' 个会话 · ' + (count(scope.private_count) || 0) + ' 个私聊 · ' + (count(scope.group_count) || 0) + ' 个群聊' : '完成原账号读取核验后，可以查看和修改关注范围。';
+    $('scope-manager-description').textContent = collectorAlive ? '查看和搜索名称时，当前采集进程保持运行。确认启用新的范围后才会切换。' : '可以保留原关注范围。修改范围会独立保存消息、AI 历史和采集位置，原范围仍可切回。';
+    const canManage = active && value.can_manage === true && value.can_modify_scope === true && !isWorking;
+    $('manage-conversations').disabled = !canManage;
+    $('manage-conversations').textContent = setup?.catalog?.state === 'loading' ? '正在读取会话名称' : state.editing ? '查看会话选择' : '修改关注范围';
+    $('manage-conversations').classList.toggle('is-loading', setup?.catalog?.state === 'loading');
+    $('scope-manage-help').hidden = canManage;
+    $('scope-manage-help').textContent = value.state === 'explicit_read_only' ? '离线只读模式不能修改关注范围。原范围与已保存消息保持不变。' : value.state === 'cleanup_required' ? '上一轮采集尚未确认停止，暂不能修改范围。请先按上方说明处理。' : isWorking ? '当前步骤完成后才能修改范围，请等待上方实际状态更新。' : '需要先完成原账号及读取配置核验，才能加载和修改会话。请使用上方“重新检测微信”继续。';
+    $('open-workspace').disabled = !active || !canOpenWorkspace() || setup?.scope_switching === true;
+    $('open-workspace').textContent = collectorAlive ? ready ? phase === 'paused' ? '查看工作台（采集暂停）' : '返回当前工作台' : '等待本轮采集状态' : '查看已保存消息（离线）';
+    $('selection-card').hidden = !state.editing || !state.generation || value.can_modify_scope !== true || setup?.scope_switching === true;
+    $('selection-limit').textContent = '可选 1–' + scopeLimit() + ' 个会话';
+    $('starting-card').hidden = setup?.scope_switching !== true;
+    $('starting-title').textContent = '正在切换关注范围';
+    $('starting-description').textContent = '正在停止上一范围并恢复所选范围，各自的消息和采集位置分别保留。';
+    progress(); renderSelection(); renderProfiles();
+  }
+
   function render() {
     const setup = state.setup, stage = setup?.stage, initialization = setup?.initialization || {}, active = state.connected, action = initialization.state === 'needs_user_action' ? actionCopy[initialization.action] : null, isWorking = working();
     $('connection-notice').hidden = !state.error;
@@ -130,6 +248,12 @@
     $('connection-description').textContent = fileMode ? '这个页面需要本机连接服务。请运行 ChatLens 启动器，使用它自动打开的页面。' : expired ? '请回到本机 ChatLens 启动器，重新打开它提供的连接页面。' : scopeChanged ? '旧选择已清除，正在重新读取当前关注范围。不会重试之前的切换操作。' : '页面保留当前范围的选择。请确认本机启动器仍在运行，然后重新连接。';
     $('retry-connection').disabled = expired || fileMode;
     $('retry-connection').textContent = expired || fileMode ? '请从启动器重新打开' : '重新连接';
+    if (windows()) { renderWindows(setup, active, isWorking); return; }
+    $('windows-connection-card').hidden = true;
+    $('windows-sidebar-steps').hidden = true;
+    $('setup-steps').hidden = false;
+    $('mac-account-card').hidden = false;
+    $('scope-manage-help').hidden = true;
     $('account-title').textContent = setup?.account?.detected ? setup.account.display_name?.trim() || '当前登录微信已识别' : setup ? '等待本机微信登录' : '正在识别当前登录的微信';
     $('account-description').textContent = setup?.account?.detected ? '仅在当前登录的微信中选择需要关注的沟通。' : '请在这台电脑打开微信并完成登录，页面会自动检查。';
     const stageCopy = { needs_initialization: isWorking ? '正在初始化' : action ? '等待本人操作' : '需要首次连接', ready_to_select: '可以选择会话', starting: '正在切换范围', running: '工作台已就绪', error: '需要处理' };
@@ -191,7 +315,7 @@
           checkbox.addEventListener('change', () => { if (!canSelect() || generation !== state.generation) return; if (checkbox.checked && state.selected.size >= scopeLimit()) { checkbox.checked = false; $('setup-announcer').textContent = '最多选择 ' + scopeLimit() + ' 个会话。'; return; } if (checkbox.checked) state.selected.set(row.id, row); else state.selected.delete(row.id); renderSelection(); $('setup-announcer').textContent = '已选择 ' + state.selected.size + ' 个会话。'; });
           list.append(label);
         }
-        if (!rows.length) list.append(pickerEmpty(loading ? '正在读取会话名称' : state.listError ? '暂时无法读取会话' : '没有匹配的' + (type === 'group' ? '群聊' : '私聊'), loading ? '只读取当前账号的会话名称，当前采集保持运行。' : state.listError ? '请重新读取，当前范围内的选择会保留。' : '试试其他名称，或清空搜索。'));
+        if (!rows.length) list.append(pickerEmpty(loading ? '正在读取会话名称' : state.listError ? '暂时无法读取会话' : '没有匹配的' + (type === 'group' ? '群聊' : '私聊'), loading ? windows() ? '只读取当前账号的会话名称，不改变已保存消息。' : '只读取当前账号的会话名称，当前采集保持运行。' : state.listError ? '请重新读取，当前范围内的选择会保留。' : '试试其他名称，或清空搜索。'));
         renderedLists.set(type, signature);
         if (focused) [...list.querySelectorAll('.picker-checkbox')].find(checkbox => checkbox.dataset.pickerId === focused)?.focus({ preventScroll: true });
       }
@@ -212,9 +336,9 @@
   function renderProfiles() {
     const rows = Array.isArray(state.setup?.profiles) ? state.setup.profiles.filter(row => typeof row?.id === 'string' && typeof row.label === 'string' && count(row.count) !== null) : [];
     $('profiles-card').hidden = !state.generation || !rows.length;
-    const signature = JSON.stringify([state.generation, rows, state.connected, working()]); if (signature === profilesSignature) return; profilesSignature = signature;
+    const signature = JSON.stringify([state.generation, rows, state.connected, working(), connection()?.can_modify_scope]); if (signature === profilesSignature) return; profilesSignature = signature;
     const list = $('saved-profiles'); list.replaceChildren();
-    for (const profile of rows) { const generation = state.generation, row = node('article', 'scope-profile' + (profile.active ? ' is-active' : '')); const copy = node('div'); copy.append(node('strong', '', profile.label), node('p', '', profile.count + ' 个会话 · ' + (count(profile.private_count) || 0) + ' 个私聊 · ' + (count(profile.group_count) || 0) + ' 个群聊')); const button = node('button', 'button', profile.active ? '当前使用' : '切回此范围'); button.type = 'button'; button.dataset.profileId = profile.id; button.disabled = profile.active || !state.connected || working(); button.addEventListener('click', () => { if (generation === state.generation) mutate('profile', profile.id); }); row.append(copy, button); list.append(row); }
+    for (const profile of rows) { const generation = state.generation, row = node('article', 'scope-profile' + (profile.active ? ' is-active' : '')); const copy = node('div'); copy.append(node('strong', '', profile.label), node('p', '', profile.count + ' 个会话 · ' + (count(profile.private_count) || 0) + ' 个私聊 · ' + (count(profile.group_count) || 0) + ' 个群聊')); const button = node('button', 'button', profile.active ? '当前使用' : '切回此范围'); button.type = 'button'; button.dataset.profileId = profile.id; button.disabled = profile.active || !state.connected || working() || windows() && connection()?.can_modify_scope !== true; button.addEventListener('click', () => { if (generation === state.generation) mutate('profile', profile.id); }); row.append(copy, button); list.append(row); }
   }
 
   async function loadConversations() {
@@ -239,10 +363,13 @@
   }
   async function mutate(kind, profileId) {
     if (!state.connected || !state.generation || working()) return;
+    if (['recheck', 'start'].includes(kind) && (!windows() || !connectionAction(kind))) return;
+    if (['select', 'profile', 'catalog'].includes(kind) && windows() && connection()?.can_modify_scope !== true) return;
     if (kind === 'select' && (!canSelect() || !state.selectionSeeded || state.selected.size < 1 || state.selected.size > scopeLimit() || state.pickerGeneration !== state.generation || state.listLoading || state.listError)) return;
     if (kind === 'profile' && !state.setup?.profiles?.some(row => row.id === profileId && row.active !== true)) return;
     const epoch = state.epoch, generation = state.generation;
-    if (kind === 'select' || kind === 'profile') state.enterWorkspace = true;
+    if (kind === 'select' || kind === 'profile' || kind === 'start') state.enterWorkspace = true;
+    if (kind === 'recheck') { state.enterWorkspace = false; state.stayOnSetup = true; }
     if (kind === 'catalog') state.editing = true;
     state.busy = kind; state.setupRequest++; render();
     try {
@@ -254,7 +381,7 @@
     finally { if (epoch === state.epoch) { state.busy = null; render(); if (canSelect() && state.loadedGeneration !== state.generation && !state.listLoading) loadConversations(); schedule(state.epoch); } }
   }
   function beginSelection() {
-    if (!state.connected || !state.generation || working()) return;
+    if (!state.connected || !state.generation || working() || windows() && connection()?.can_modify_scope !== true) return;
     if (!catalogReady()) { mutate('catalog'); return; }
     state.editing = true;
     render();
@@ -264,6 +391,8 @@
 
   $('initialize-button').addEventListener('click', () => mutate('initialize')); $('retry-initialization').addEventListener('click', () => mutate('initialize'));
   $('start-selected').addEventListener('click', () => mutate('select')); $('manage-conversations').addEventListener('click', beginSelection); $('open-workspace').addEventListener('click', openWorkspace);
+  $('windows-recheck').addEventListener('click', () => mutate('recheck')); $('windows-start').addEventListener('click', () => mutate('start'));
+  $('windows-offline').addEventListener('click', openWorkspace); $('windows-open-workspace').addEventListener('click', openWorkspace);
   $('retry-connection').addEventListener('click', connect); $('check-status').addEventListener('click', () => poll()); $('retry-conversations').addEventListener('click', loadConversations);
   for (const type of ['private', 'group']) $(type + '-list').addEventListener('keydown', event => { if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return; const rows = [...$(type + '-list').querySelectorAll('.picker-checkbox:not(:disabled)')]; if (!rows.length) return; const current = rows.indexOf(document.activeElement), next = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : (current + (['ArrowUp', 'ArrowLeft'].includes(event.key) ? -1 : 1) + rows.length) % rows.length; event.preventDefault(); rows[next].focus(); });
   $('setup-conversation-search').addEventListener('input', () => { clearTimeout(searchTimer); state.listRequest++; state.rows = []; state.listLoading = true; state.listError = false; renderSelection(); searchTimer = setTimeout(loadConversations, 250); });

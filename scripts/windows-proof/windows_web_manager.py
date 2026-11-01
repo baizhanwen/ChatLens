@@ -101,11 +101,23 @@ def load_contact_catalog(manager):
 class WindowsWebManager:
     def __init__(self, data_dir, package, output, *, pid=None, creation_time=None, read_only=False,
                  start_collector=None, stop_collector=None, catalog_loader=None, account_probe=None,
-                 clock=time.monotonic):
+                 clock=time.monotonic, wait_for_wechat=False, process_detector=None, account_probe_factory=None):
         self.legacy_data = Path(data_dir)
         self.package, self.output = Path(package), Path(output)
         self.private = self.legacy_data / 'private'
         self.pid, self.creation_time, self.read_only = pid, creation_time, bool(read_only)
+        self.wait_for_wechat = bool(wait_for_wechat)
+        if self.read_only and self.wait_for_wechat:
+            raise ValueError('windows_wait_and_explicit_read_only_conflict')
+        self.process_detector = process_detector
+        self.account_probe_factory = account_probe_factory
+        self.provided_account_probe = account_probe
+        self.process_state = 'unavailable'
+        self.process_reason = 'windows_process_not_checked'
+        self.last_process_at = float('-inf')
+        self.connection_state = 'explicit_read_only' if self.read_only else 'checking_account'
+        self.collection_requested = not self.read_only and not self.wait_for_wechat
+        self.reader_config_ready = False
         self.start_collector, self.stop_collector = start_collector, stop_collector
         self.catalog_loader = catalog_loader or load_contact_catalog
         self.account_probe = account_probe
@@ -122,6 +134,7 @@ class WindowsWebManager:
         self.account_identity = None
         self.scope = self.data_dir = None
         self.children_started, self.last_child_exit, self.cleanup_confirmed = 0, None, True
+        self.child_started_at = None
         self.cloud_request_attempts = self.model_request_attempts = 0
         self.runtime_lock = None
 
@@ -213,8 +226,16 @@ class WindowsWebManager:
         self.active_config = {'conversations': normalize_conversations(self.scope['config'])}
         self.account_identity = source_account_identity(self.scope)
         self._verify_previous_child()
+        if self.wait_for_wechat:
+            if self.process_detector is None:
+                from windows_process_detection import WindowsProcessDetector
+                self.process_detector = WindowsProcessDetector(self.scope['exe_path'])
+            self.active_scope_id = self._active_pointer()
+            self._tick_connection(force=True)
+            return
         if not self.read_only:
             prepare_session(self.legacy_data)  # Validate only; never reset an existing checkpoint.
+            self.reader_config_ready = True
             if self.account_probe is None:
                 from windows_account_probe import WindowsAccountProbe
                 self.account_probe = WindowsAccountProbe(self.pid, self.creation_time,
@@ -223,6 +244,145 @@ class WindowsWebManager:
                 return
         identifier = self._active_pointer()
         self._activate(identifier, initial=True)
+
+    def _open_saved(self, identifier):
+        """Open only the user's chosen, already-saved local scope; no keys/source."""
+        self._manifest(identifier)
+        target = self._profile_data(identifier)
+        scope = read_private_json(target / 'private/scope.json')
+        if source_account_identity(scope) != self.account_identity:
+            raise ValueError('windows_scope_source_account_mismatch')
+        if identifier != 'legacy' and scope_fingerprint(scope['config']['conversations']) != identifier:
+            raise ValueError('windows_scope_profile_config_mismatch')
+        provider = CollectorWebData(target)
+        provider.status()
+        self.active_scope_id, self.data_dir = identifier, target
+        self.active_config = {'conversations': normalize_conversations(scope['config'])}
+        self.provider = provider
+        self._refresh_selected()
+
+    def _disconnect_waiting(self, state, reason, description, *, allow_saved=False):
+        changed = self.connection_state != state or self.child is not None or self.account_matched
+        if changed:
+            self.scope_generation = secrets.token_hex(16)
+            self.switching = True
+            self._stop_active()
+            self.contacts, self.catalog = [], {}
+            self.catalog_ready = self.catalog_loading = False
+            self.commands, self.queued = SimpleQueue(), False
+        self.account_matched = False
+        self.reader_config_ready = False
+        self.account_blocked = not allow_saved
+        self.stage, self.reason = 'needs_connection', reason
+        self.connection_state, self.description = state, description
+        self.switching = not self.cleanup_confirmed
+        if allow_saved and self.provider is None and self.cleanup_confirmed:
+            self._open_saved(self.active_scope_id)
+
+    def _tick_connection(self, *, force=False):
+        """Process metadata is only a candidate; account handles establish login."""
+        if not self.wait_for_wechat or self.read_only:
+            return self.account_matched
+        if not force and self.clock() - self.last_process_at < 3:
+            return self.account_matched
+        self.last_process_at = self.clock()
+        try:
+            result = self.process_detector()
+            state = result.get('state') if isinstance(result, dict) else None
+            pid = result.get('pid') if isinstance(result, dict) else None
+            birth = result.get('creation_time') if isinstance(result, dict) else None
+            if state not in ('ready', 'not_running', 'ambiguous', 'unavailable'):
+                raise ValueError
+            if state == 'ready' and (type(pid) is not int or not 0 < pid <= 0xffffffff
+                                     or type(birth) is not int or not 0 < birth < 2**64):
+                raise ValueError
+            reason = result.get('reason')
+            self.process_reason = reason if reason in {
+                'windows_process_not_running', 'windows_process_candidate_ready',
+                'windows_process_candidates_ambiguous', 'windows_process_detection_unavailable',
+                'windows_process_executable_unavailable', 'windows_process_version_unsupported',
+                'windows_process_architecture_unsupported', 'windows_process_path_unavailable',
+                'windows_process_access_unavailable', 'windows_process_version_unavailable',
+                'windows_process_multiple_candidates', 'windows_process_snapshot_unavailable',
+                'windows_process_snapshot_deadline'} else (
+                    'windows_process_not_running' if state == 'not_running' else
+                    'windows_process_candidates_ambiguous' if state == 'ambiguous' else
+                    'windows_process_candidate_ready' if state == 'ready' else 'windows_process_detection_unavailable')
+        except Exception:
+            state, pid, birth = 'unavailable', None, None
+            self.process_reason = 'windows_process_detection_unavailable'
+        self.process_state = state
+        if state != 'ready':
+            self.pid = self.creation_time = None
+            self.account_probe = self.provided_account_probe
+            self.account_probe_reason = 'windows_account_not_checked'
+            if state == 'not_running':
+                self._disconnect_waiting('waiting_for_wechat', self.process_reason,
+                    '尚未检测到原路径的微信。请打开微信并完成登录，再点击重新检测；也可以只浏览本机已保存消息。', allow_saved=True)
+            else:
+                messages = {
+                    'windows_process_path_unavailable': '原微信程序路径暂不可访问。请确认程序未被移动，恢复原程序后重新检测。',
+                    'windows_process_access_unavailable': '微信程序的只读身份信息暂不可访问。请保持原微信运行并检查当前用户权限后重新检测。',
+                    'windows_process_version_unavailable': '暂时无法核对微信版本。请保持原微信运行，稍后重新检测。',
+                    'windows_process_version_unsupported': '检测到的微信版本尚不在本包验证范围内。当前不会采集，请使用此前已验证的版本或反馈此固定状态。',
+                    'windows_process_architecture_unsupported': '微信程序架构与此 x64 测试包不符，当前不会启动采集。',
+                    'windows_process_snapshot_deadline': '本次程序信息检测超时，尚未确认微信状态。请稍后重新检测。',
+                    'windows_process_snapshot_unavailable': '暂时无法获取程序元信息，尚未确认微信状态。请稍后重新检测。'}
+                self._disconnect_waiting('account_unverified', self.process_reason,
+                    messages.get(self.process_reason, '暂时不能唯一确认微信程序。请只保留原账号对应的微信，完成登录后重新检测。'))
+            return False
+        if (pid, birth) != (self.pid, self.creation_time):
+            self._disconnect_waiting('checking_account', None, '已找到微信程序，正在核对登录账号；程序运行并不代表已经登录。')
+            self.pid, self.creation_time = pid, birth
+            self.account_probe = None
+        if self.account_probe is None:
+            factory = self.account_probe_factory
+            if factory is None and self.provided_account_probe is not None:
+                self.account_probe = self.provided_account_probe
+            else:
+                if factory is None:
+                    from windows_account_probe import WindowsAccountProbe
+                    factory = WindowsAccountProbe
+                self.account_probe = factory(pid, birth, self.scope['exe_path'], self.scope['db_root'])
+        if not self._verify_account(force=True):
+            self.connection_state = ('wrong_account' if self.account_probe_reason == 'windows_account_changed_or_ambiguous'
+                                     else 'account_unverified')
+            self.stage = 'needs_connection'
+            self.description = ('当前活动微信资料与所选本机资料不一致，已隔离旧范围。请登录原账号，或关闭入口后选择另一账号自己的资料目录。'
+                if self.connection_state == 'wrong_account' else
+                '已找到微信程序，但尚未核验原账号登录。请在微信中完成登录后重新检测；若已登录，请保持微信运行并检查账号核验权限。')
+            return False
+        if self.account_blocked:
+            # Returning to this account creates a fresh domain as well. A page
+            # opened while the account was unverified cannot later read it.
+            self.scope_generation = secrets.token_hex(16)
+            self.contacts, self.catalog = [], {}
+            self.catalog_ready = self.catalog_loading = False
+            self.commands = SimpleQueue()
+        self.account_blocked = False
+        self.switching = False
+        self.connection_state, self.reason = 'connected', None
+        if not self.reader_config_ready:
+            try:
+                prepare_session(self._profile_data(self.active_scope_id))
+                self.reader_config_ready = True
+            except Exception:
+                self.connection_state, self.stage = 'account_unverified', 'needs_connection'
+                self.reason = 'windows_reader_configuration_unavailable'
+                self.description = '原账号读取已核验，但已有读取配置未能通过检查。原数据未改动，请确认选择的是此前测试成功的完整 collector-data。'
+                return False
+        if self.provider is None:
+            self._open_saved(self.active_scope_id)
+        if self.collection_requested and self.child is None:
+            self._activate(self.active_scope_id)
+        elif self.child is None:
+            self.stage = 'ready_to_start'
+            self.description = '原账号读取已核验。点击开始采集，将继续原关注范围和已保存的采集位置。'
+        elif self.child.poll() is not None:
+            self.collection_requested = False
+            self.connection_state, self.stage = 'stopped', 'ready_to_start'
+            self.description = '本轮采集已经结束，已保存消息仍可查看。可以重新检测后点击开始采集。'
+        return True
 
     def _acquire_runtime(self):
         path = self.private / 'web-manager-lock.json'
@@ -299,6 +459,9 @@ class WindowsWebManager:
                 self.contacts, self.catalog, self.commands = [], {}, SimpleQueue()
                 self._stop_active()
             self.stage, self.reason = 'error', 'windows_active_account_not_verified'
+            if self.wait_for_wechat:
+                self.connection_state = ('wrong_account' if self.account_probe_reason == 'windows_account_changed_or_ambiguous'
+                                         else 'account_unverified')
             self.description = '无法确认当前微信仍是此资料对应的账号，已停止采集并隔离旧页面。请登录原账号，或关闭后选择另一账号自己的资料目录。'
             return False
         return True
@@ -396,6 +559,7 @@ class WindowsWebManager:
             raise ValueError('windows_scope_profile_config_mismatch')
         if not self.read_only:
             prepare_session(target)
+            self.reader_config_ready = True
         self.active_scope_id, self.data_dir = identifier, target
         self.active_config = {'conversations': normalize_conversations(scope['config'])}
         self.switching, self.queued, self.account_blocked = False, False, False
@@ -411,7 +575,9 @@ class WindowsWebManager:
             self.cleanup_confirmed = False
             self.child = self.start_collector(target, child_output)
             self.child_output = child_output
+            self.child_started_at = self.clock()
             self.cleanup_confirmed = True
+            self.last_child_exit = None
             self.children_started += 1
             self._record_child('running', child_output)
             atomic_private(self.private / 'active-scope.json', {'schema_version': 1,
@@ -439,14 +605,81 @@ class WindowsWebManager:
         for row in self.contacts:
             row['selected'] = self.catalog.get(row['id'], {}).get('chat_id') in selected
 
+    def _owned_collector_status(self):
+        """Only this run's heartbeat can establish actual reader readiness."""
+        child = self.child
+        if child is None or child.poll() is not None:
+            code = child.poll() if child is not None else self.last_child_exit
+            return {'collector_running': False, 'collector_stage': 'error' if code not in (None, 0) else 'stopped',
+                    'heartbeat_at': None, 'reason': 'collector_child_failed' if code not in (None, 0) else 'collector_not_started'}
+        from collector_supervisor import read_heartbeat
+        heartbeat = read_heartbeat(self.child_output / 'status.json') if self.child_output is not None else None
+        if heartbeat is None:
+            age = self.clock() - self.child_started_at if self.child_started_at is not None else 0
+            stage = 'stale' if age > 15 else 'starting'
+            return {'collector_running': True, 'collector_stage': stage, 'heartbeat_at': None,
+                    'reason': 'collector_heartbeat_stale' if stage == 'stale' else 'collector_heartbeat_pending'}
+        try:
+            recorded = datetime.fromisoformat(heartbeat['recorded_at_utc'])
+            if recorded.tzinfo is None or recorded.utcoffset() is None:
+                raise ValueError
+            age = (datetime.now(timezone.utc) - recorded.astimezone(timezone.utc)).total_seconds()
+            if not -5 <= age <= 15:
+                raise ValueError
+        except (ValueError, TypeError, OverflowError):
+            return {'collector_running': True, 'collector_stage': 'stale', 'heartbeat_at': None,
+                    'reason': 'collector_heartbeat_stale'}
+        return {'collector_running': True, 'collector_stage': heartbeat['stage'],
+                'heartbeat_at': recorded.astimezone(timezone.utc).isoformat(), 'reason': None}
+
     def setup(self):
         with self.lock:
             profiles = self._saved_profiles() if self.scope and not self.account_blocked else []
             detected = not self.account_blocked
+            owned = self._owned_collector_status() if self.wait_for_wechat else None
+            collector_running = bool(self.child is not None and self.child.poll() is None)
+            collecting = bool(not self.closed and self.account_matched and collector_running
+                              and (owned is None or owned['collector_stage'] == 'collecting'))
+            can_manage = bool(not self.closed and not self.read_only and self.account_matched and not self.account_blocked
+                              and self.reader_config_ready and self.cleanup_confirmed and not self.switching and not self.queued)
+            can_start = bool(can_manage and not collector_running)
+            can_recheck = bool(not self.closed and not self.read_only and self.cleanup_confirmed and not self.queued)
+            connection_state = ('cleanup_required' if not self.cleanup_confirmed else
+                                'explicit_read_only' if self.read_only else
+                                self.connection_state if self.wait_for_wechat else
+                                'wrong_account' if self.account_blocked and self.account_probe_reason == 'windows_account_changed_or_ambiguous' else
+                                'account_unverified' if self.account_blocked else
+                                'stopped' if self.child is not None and self.child.poll() is not None else 'connected')
+            connection = {'state': connection_state,
+                'reason': self.account_probe_reason if self.account_blocked else self.reason,
+                'description': ('当前为显式离线只读模式，不检测微信或启动采集。需要连接时请关闭此入口并以连接模式启动。'
+                                if self.read_only else self.description),
+                'actions': (['recheck'] if can_recheck else []) + (['start'] if can_start else []),
+                'can_recheck': can_recheck, 'can_start': can_start, 'can_manage': can_manage,
+                'can_read_saved': bool(self.provider is not None and not self.account_blocked and not self.switching),
+                'can_modify_scope': can_manage,
+                'checks': {'process_running': (self.process_state == 'ready' if self.wait_for_wechat else
+                                               bool(self.pid and self.creation_time) if not self.read_only else None),
+                    'account_verified': bool(self.account_matched and not self.read_only and not self.account_blocked),
+                    'reader_ready': bool(self.reader_config_ready and self.account_matched and not self.read_only and not self.account_blocked),
+                    'scope_selected': bool(self.active_config.get('conversations')), 'collecting': collecting}}
+            if owned is not None:
+                connection.update(collector_running=owned['collector_running'], collector_stage=owned['collector_stage'])
+                if owned['collector_running']:
+                    descriptions = {
+                        'starting': '账号读取已核验，采集进程正在初始化；收到当前运行的就绪心跳后才会显示采集就绪。',
+                        'paused': '采集进程暂时暂停，已保存的采集位置保持。请让微信回到后台并解锁屏幕，或查看采集状态等待恢复。',
+                        'stale': '当前采集心跳未及时更新，暂不能确认仍在接收新消息。原消息和采集位置保持，请查看采集状态。',
+                        'stopping': '本轮采集正在正常停止，正在保存位置；请等待结束。',
+                        'stopped': '本轮采集已经保存位置，正在等待监督进程退出；请稍候。',
+                        'error': '本轮采集报告错误，原消息和采集位置保持。请等待进程结束后重新检测。'}
+                    if owned['collector_stage'] in descriptions:
+                        connection['description'] = descriptions[owned['collector_stage']]
             return {'stage': self.stage, 'reason': self.reason, 'platform': 'windows', 'read_only': self.read_only,
-                'account': {'detected': detected, 'display_name': None},
-                'checks': {'wechat_running': self.account_matched and not self.read_only,
-                           'access_ready': detected, 'reader_ready': detected and not self.read_only},
+                'connection': connection,
+                'account': {'detected': self.account_matched if self.wait_for_wechat else detected, 'display_name': None},
+                'checks': {'wechat_running': self.process_state == 'ready' if self.wait_for_wechat else self.account_matched and not self.read_only,
+                           'access_ready': detected, 'reader_ready': detected and not self.read_only and self.reader_config_ready},
                 'progress': {'phase': 'baseline' if self.stage == 'starting' else None, 'completed': None, 'total': None, 'elapsed_seconds': 0},
                 'initialization': {'state': 'working' if self.queued or self.stage == 'starting' else 'idle',
                                    'action': 'none', 'description': self.description},
@@ -454,6 +687,31 @@ class WindowsWebManager:
                 **self.public_scope_context(), 'catalog': {'state': 'loading' if self.catalog_loading else 'ready' if self.catalog_ready else 'idle'},
                 'active_scope': next((row for row in profiles if row['active']), None),
                 'profiles': profiles, 'workspace_path': '/'}
+
+    def request_recheck(self, expected_generation=None):
+        with self.lock:
+            self._check_generation(expected_generation)
+            if self.read_only or self.closed or not self.cleanup_confirmed:
+                raise ValueError('windows_connection_recheck_unavailable')
+            if not self.queued:
+                self.queued = True
+                self.connection_state = 'checking_account'
+                self.description = '正在重新检测微信程序和原账号登录，检测完成后会显示下一步。'
+                self.commands.put(('recheck', None))
+            return self.setup()
+
+    def request_start(self, expected_generation=None):
+        with self.lock:
+            self._check_generation(expected_generation)
+            if (self.read_only or self.closed or not self.cleanup_confirmed or self.queued or self.switching
+                    or not self.account_matched or self.account_blocked or not self.reader_config_ready
+                    or self.wait_for_wechat and self.child is not None and self.child.poll() is None):
+                raise ValueError('windows_connection_start_unavailable')
+            self._begin_switch()
+            self.connection_state = 'checking_account'
+            self.description = '正在再次核验账号并恢复原采集位置；不会重新建立旧消息基线。'
+            self.commands.put(('start', None))
+            return self.setup()
 
     def request_initialize(self, expected_generation=None):
         with self.lock:
@@ -463,7 +721,9 @@ class WindowsWebManager:
     def request_catalog(self, expected_generation=None):
         with self.lock:
             self._check_generation(expected_generation)
-            if self.read_only or self.switching or not self._verify_account(force=True):
+            if (self.read_only or self.switching or self.wait_for_wechat and (
+                    self.account_blocked or not self.account_matched or not self.reader_config_ready)
+                    or not self._verify_account(force=True)):
                 raise ValueError('windows_scope_catalog_not_ready')
             if not self.catalog_loading:
                 self.catalog_loading = True
@@ -514,6 +774,8 @@ class WindowsWebManager:
             self._check_generation(expected_generation)
             if self.queued or self.switching or not self.cleanup_confirmed or not any(row['id'] == identifier for row in self._saved_profiles()):
                 raise ValueError('windows_scope_profile_not_ready')
+            if self.wait_for_wechat and (self.account_blocked or not self.account_matched or not self.reader_config_ready):
+                raise ValueError('windows_scope_account_not_ready')
             if not self.read_only and not self._verify_account(force=True):
                 raise ValueError('windows_scope_account_not_ready')
             self._begin_switch()
@@ -547,17 +809,40 @@ class WindowsWebManager:
                 self.stage, self.reason = 'error', 'windows_scope_collector_stop_not_confirmed'
                 return
             try:
-                if not self.read_only:
+                try:
+                    command, value = self.commands.get_nowait()
+                except Empty:
+                    command = None
+                if self.wait_for_wechat:
+                    connected = self._tick_connection(force=command is not None)
+                    if command == 'recheck':
+                        self.queued = False
+                        return
+                    if command == 'start':
+                        self.queued = False
+                        if connected:
+                            self.collection_requested = True
+                            self._activate(self.active_scope_id)
+                        return
+                    if not connected:
+                        return
+                elif not self.read_only:
                     if not self._verify_account(force=self.queued):
                         return
                     if self.account_blocked:
                         self.scope_generation = secrets.token_hex(16)
                         self._activate(self._active_pointer())
                         return
-                try:
-                    command, value = self.commands.get_nowait()
-                except Empty:
-                    command = None
+                if command == 'recheck':
+                    self.queued = False
+                    if self.account_matched:
+                        self.description = '原账号已核验，可以继续当前范围或开始采集。'
+                    return
+                if command == 'start':
+                    self.queued = False
+                    self.collection_requested = True
+                    self._activate(self.active_scope_id)
+                    return
                 if command == 'catalog':
                     try:
                         self._load_contacts()
@@ -566,6 +851,7 @@ class WindowsWebManager:
                         self.reason = 'windows_scope_catalog_unavailable'
                         self.description = '会话名称暂不可用，原关注范围继续保留；请确认微信账号与读取权限后重试。'
                 elif command == 'select':
+                    self.collection_requested = True
                     self._activate(value[0], value[1], value[2])
                 elif command == 'profile':
                     self._activate(value)
@@ -599,6 +885,12 @@ class WindowsWebManager:
             result = self._current_provider(expected_generation).status()
             if self.read_only:
                 result.update(state='stopped', reason='web_read_only_mode', stale=False)
+            elif self.wait_for_wechat and (self.child is None or not self.account_matched):
+                result.update(state='stopped', reason=self.reason or 'collector_not_started', stale=False)
+            elif self.wait_for_wechat:
+                owned = self._owned_collector_status()
+                result.update(state=owned['collector_stage'], reason=owned['reason'],
+                              heartbeat_at=owned['heartbeat_at'], stale=owned['collector_stage'] == 'stale')
             elif self.child is not None and self.child.poll() is not None:
                 code = self.child.poll()
                 result.update(state='stopped' if code == 0 else 'error',

@@ -23,7 +23,7 @@ import ai_provider
 import ai_service
 from ai_web_server import attach_ai_routes
 from collector_private import ensure_private_dir, read_private_json, write_private_json_new
-from collector_service import prepare_session
+from collector_service import Heartbeat, prepare_session
 from collector_web_meta import WebMetadata
 from continuous_store import CollectorStore
 from wechat_identity import establish_identity
@@ -66,6 +66,7 @@ class SyntheticChild:
     def __init__(self, runtime, data_dir, output):
         self.runtime, self.data_dir, self.output = runtime, Path(data_dir), Path(output)
         self.output.mkdir()
+        self.public_heartbeat = Heartbeat(self.output)
         self.returncode, self.closed, self.polls = None, False, 0
         self.scope, _, _, _, _, binding = prepare_session(self.data_dir)
         self.config = self.scope['config']
@@ -105,8 +106,10 @@ class SyntheticChild:
         self.cursors = after
         self.heartbeat()
 
-    def heartbeat(self, stage='collecting'):
+    def heartbeat(self, stage=None):
+        stage = stage or getattr(self, 'desired_stage', 'collecting')
         self.metadata.status(stage, self.store.stats()['total_messages'], 0, self.store.resumed)
+        self.public_heartbeat.emit(stage, self.store.stats()['total_messages'], 0, self.store.resumed)
 
     def seed(self):
         for row in self.config['conversations']:
@@ -125,7 +128,7 @@ class SyntheticChild:
 
 
 class SyntheticWindowsRuntime:
-    def __init__(self):
+    def __init__(self, *, wait_for_wechat=False, read_only=False):
         self.temporary = tempfile.TemporaryDirectory(prefix='chatlens-synthetic-windows-multi-')
         self.root = Path(self.temporary.name).resolve()
         self.data, self.source = self.root / 'collector-data', self.root / 'synthetic-account/db_storage'
@@ -160,11 +163,22 @@ class SyntheticWindowsRuntime:
             return service
         self.stack.enter_context(patch.object(ai_service, 'AiAssistant', side_effect=assistant))
         self.account_state = 'matched'
+        self.process_state = 'not_running' if wait_for_wechat else 'ready'
+        self.process_pid, self.process_birth = 12, 34
+        self.account_reason = 'windows_account_open_database_matched'
         self.manager = WindowsWebManager(self.data, ROOT / 'scripts/windows-proof', self.root / 'output',
-            pid=12, creation_time=34, start_collector=self.start_child, stop_collector=self.stop_child,
+            pid=None if read_only else 12, creation_time=None if read_only else 34,
+            read_only=read_only, wait_for_wechat=wait_for_wechat,
+            process_detector=lambda: {'state':self.process_state,
+                'pid':self.process_pid if self.process_state=='ready' else None,
+                'creation_time':self.process_birth if self.process_state=='ready' else None,
+                'reason':'windows_process_not_running' if self.process_state=='not_running' else 'windows_process_candidate_ready'},
+            start_collector=self.start_child, stop_collector=self.stop_child,
             catalog_loader=lambda _: self.choices,
             account_probe=lambda: {'state': self.account_state, 'matched': self.account_state == 'matched',
-                'reason': 'windows_account_synthetic'})
+                'reason': self.account_reason if self.account_state=='matched' else
+                          'windows_account_changed_or_ambiguous' if self.account_state=='mismatch' else
+                          'windows_account_open_database_unavailable'})
         self.manager.output.mkdir()
         self.jobs, self.stopping = Queue(), threading.Event()
         self.owner = threading.Thread(target=self.loop, daemon=True)
@@ -251,8 +265,33 @@ class SyntheticWindowsRuntime:
                 self.manager.last_probe_at = float('-inf')
                 self.manager.tick()
             self.own(change)
+        elif name == 'process':
+            def process():
+                self.process_state = value['state']
+                self.process_pid, self.process_birth = value.get('pid',12), value.get('creation_time',34)
+                self.manager.last_process_at = float('-inf')
+                self.manager.tick()
+            self.own(process)
+        elif name == 'account_mode':
+            def account_mode():
+                self.account_state = value['state']
+                self.manager.last_process_at = self.manager.last_probe_at = float('-inf')
+                self.manager.tick()
+            self.own(account_mode)
+        elif name == 'end_child':
+            self.own(lambda: self.manager.child.close())
+            self.own(lambda: setattr(self.manager,'last_process_at',float('-inf')))
+            self.own(self.manager.tick)
+        elif name == 'collector_phase':
+            def phase():
+                self.manager.child.desired_stage = value['stage']
+                self.manager.child.heartbeat()
+            self.own(phase)
+        elif name == 'connection':
+            return self.own(self.manager.setup)
         return {'provider_calls':len(self.provider.calls),'raw_identity_leaks':self.provider.raw_identity_leaks,
             'account_state':self.account_state,'legacy_unchanged':self.snapshot('legacy') == self.old_snapshot,
+            'children_started':self.manager.children_started,
             **self.manager.public_scope_context()}
 
     def close(self):
@@ -267,7 +306,8 @@ class SyntheticWindowsRuntime:
 def main():
     from web_ai_fixture import install_loopback_guard
     guard = install_loopback_guard()
-    runtime = SyntheticWindowsRuntime()
+    runtime = SyntheticWindowsRuntime(wait_for_wechat='--wait-for-wechat' in sys.argv,
+                                      read_only='--read-only' in sys.argv)
     print(json.dumps({'ready':True,'launch_url':runtime.server.launch_url,'network_guard':guard}),flush=True)
     try:
         for line in sys.stdin:

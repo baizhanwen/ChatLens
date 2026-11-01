@@ -1,11 +1,13 @@
 """Windows scope-owner contracts with real local stores and synthetic sources."""
 from contextlib import redirect_stdout
 import hashlib
+import http.client
 import io
 import json
 from pathlib import Path
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -19,6 +21,7 @@ from conversation_scope import alias_for
 from web_data import WebDataError
 from windows_web_manager import WindowsWebManager, atomic_private, scope_fingerprint
 import web_runtime
+from windows_web_server import make_windows_server
 
 
 class Child:
@@ -92,6 +95,7 @@ class WindowsManagerTests(unittest.TestCase):
         binding = collector_service.prepare_session(target)[-1]
         child = Child(CollectorStore(target / 'private/store', binding))
         self.children.append(child)
+        collector_service.Heartbeat(output).emit('collecting',child.store.stats()['total_messages'],0,True)
         return child
 
     def stop_child(self, child, output):
@@ -344,6 +348,277 @@ class WindowsManagerTests(unittest.TestCase):
         self.assertEqual(result['saved_scope_count'],0)
         self.assertNotIn(str(self.root),json.dumps(result))
         self.assertFalse(result['collector_child_started'])
+
+    def waiting_manager(self):
+        self.process_result={'state':'not_running','pid':None,'creation_time':None,'reason':'windows_process_not_running'}
+        self.probe_result={'state':'unknown','matched':False,'reason':'windows_account_open_database_unavailable'}
+        return self.manager(wait_for_wechat=True,pid=None,creation_time=None,account_probe=None,
+            process_detector=lambda:dict(self.process_result),
+            account_probe_factory=lambda *_:lambda:dict(self.probe_result))
+
+    def detect_process(self, manager, *, logged_in=False, pid=222, birth=333):
+        self.process_result={'state':'ready','pid':pid,'creation_time':birth,'reason':'windows_process_candidate_ready'}
+        self.probe_result=({'state':'matched','matched':True,'reason':'windows_account_open_database_matched'} if logged_in else
+                           {'state':'unknown','matched':False,'reason':'windows_account_open_database_unavailable'})
+        self.clock_value+=4
+        manager.tick()
+
+    def test_waiting_startup_then_login_and_start_without_restarting_runtime(self):
+        paths=[self.data/'private'/name for name in ('scope.json','keys.json')]
+        original={path:path.read_bytes() for path in paths}
+        old_readonly=self.manager(read_only=True,pid=None,creation_time=None)
+        self.assertEqual(old_readonly.setup()['connection']['state'],'explicit_read_only')
+        old_readonly.close()
+        manager=self.waiting_manager()
+        offline=manager.setup()['connection']
+        self.assertFalse(manager.read_only)
+        self.assertEqual(offline['state'],'waiting_for_wechat')
+        self.assertTrue(offline['can_read_saved'])
+        self.assertFalse(offline['checks']['process_running'])
+        self.assertFalse(offline['can_modify_scope'])
+        self.assertEqual(manager.children_started,0)
+        self.assertEqual(manager.status()['state'],'stopped')
+        self.detect_process(manager,logged_in=False)
+        unverified=manager.setup()['connection']
+        self.assertTrue(unverified['checks']['process_running'])
+        self.assertFalse(unverified['checks']['account_verified'])
+        self.assertEqual(unverified['state'],'account_unverified')
+        self.assertEqual(manager.children_started,0)
+        self.assertEqual(manager.list_conversations()['conversations'],[])
+        with self.assertRaises(ValueError):manager.request_catalog(expected_generation=manager.scope_generation)
+        self.probe_result={'state':'matched','matched':True,'reason':'windows_account_open_database_matched'}
+        manager.request_recheck(expected_generation=manager.scope_generation)
+        self.assertEqual(manager.setup()['connection']['state'],'checking_account')
+        manager.tick()
+        ready=manager.setup()['connection']
+        self.assertEqual(ready['state'],'connected')
+        self.assertTrue(ready['can_start']);self.assertTrue(ready['can_modify_scope'])
+        self.assertFalse(ready['checks']['collecting'])
+        self.assertEqual(manager.children_started,0)
+        generation=manager.scope_generation
+        manager.request_start(expected_generation=generation);manager.tick()
+        self.assertNotEqual(manager.scope_generation,generation)
+        self.assertTrue(manager.setup()['connection']['checks']['collecting'])
+        self.assertEqual(manager.children_started,1)
+        self.assertEqual(len(manager.messages('private_test')['messages']),1)
+        self.assertEqual(original,{path:path.read_bytes() for path in paths})
+
+    def test_running_disconnect_and_new_process_restore_original_account_and_nonce(self):
+        manager=self.waiting_manager();self.detect_process(manager,logged_in=True)
+        manager.request_start(expected_generation=manager.scope_generation);manager.tick()
+        baseline=manager.child.store.snapshot()['baseline_completed_at']
+        generation=manager.scope_generation;first=manager.child
+        self.process_result={'state':'not_running','pid':None,'creation_time':None,'reason':'windows_process_not_running'}
+        self.clock_value+=4;manager.tick()
+        self.assertEqual(first.poll(),0)
+        self.assertFalse(manager.setup()['connection']['checks']['collecting'])
+        self.assertEqual(manager.setup()['connection']['state'],'waiting_for_wechat')
+        self.assertTrue(manager.setup()['connection']['can_read_saved'])
+        self.assertNotEqual(manager.scope_generation,generation)
+        self.detect_process(manager,logged_in=True,pid=444,birth=555)
+        self.assertTrue(manager.setup()['connection']['checks']['collecting'])
+        self.assertEqual((manager.pid,manager.creation_time),(444,555))
+        self.assertEqual(manager.child.store.snapshot()['baseline_completed_at'],baseline)
+        self.assertEqual(manager.children_started,2)
+        with self.assertRaises(WebDataError):manager.messages('private_test',expected_generation=generation)
+
+    def test_waiting_wrong_account_hides_saved_domain_and_never_starts(self):
+        manager=self.waiting_manager()
+        self.process_result={'state':'ready','pid':222,'creation_time':333,'reason':'windows_process_candidate_ready'}
+        self.probe_result={'state':'mismatch','matched':False,'reason':'windows_account_changed_or_ambiguous'}
+        self.clock_value+=4;manager.tick()
+        connection=manager.setup()['connection']
+        self.assertEqual(connection['state'],'wrong_account')
+        self.assertFalse(connection['can_read_saved'])
+        self.assertFalse(connection['can_start'])
+        self.assertEqual(manager.setup()['profiles'],[])
+        self.assertEqual(manager.children_started,0)
+        blocked_generation=manager.scope_generation
+        with self.assertRaises(ValueError):manager.restore_profile('legacy',expected_generation=blocked_generation)
+        self.probe_result={'state':'matched','matched':True,'reason':'windows_account_open_database_matched'}
+        self.clock_value+=4;manager.tick()
+        self.assertNotEqual(manager.scope_generation,blocked_generation)
+        with self.assertRaises(WebDataError):manager.messages('private_test',expected_generation=blocked_generation)
+
+    def test_explicit_readonly_cannot_recheck_start_or_turn_into_waiting_mode(self):
+        manager=self.manager(read_only=True,pid=None,creation_time=None,
+            process_detector=lambda:self.fail('explicit readonly must not detect process'))
+        connection=manager.setup()['connection']
+        self.assertEqual(connection['state'],'explicit_read_only')
+        self.assertEqual(connection['actions'],[])
+        with self.assertRaises(ValueError):manager.request_recheck(expected_generation=manager.scope_generation)
+        with self.assertRaises(ValueError):manager.request_start(expected_generation=manager.scope_generation)
+        with self.assertRaisesRegex(ValueError,'explicit_read_only_conflict'):
+            WindowsWebManager(self.data,self.package,self.output,read_only=True,wait_for_wechat=True)
+
+    def test_waiting_http_recheck_and_start_require_scope_origin_and_login_proof(self):
+        manager=self.waiting_manager();static=self.package/'web';static.mkdir()
+        (static/'index.html').write_text('<!doctype html>synthetic')
+        (static/'connect.html').write_text('<!doctype html>synthetic connect')
+        server=make_windows_server(manager,static)
+        worker=threading.Thread(target=server.serve_forever,kwargs={'poll_interval':.01},daemon=True);worker.start()
+        try:
+            def request(method,path,value=None,**extra):
+                headers={'Cookie':'chatlens_session='+server.token,'X-ChatLens-Scope':manager.scope_generation,
+                         'Origin':server.base_url,'Content-Type':'application/json'}
+                headers.update(extra)
+                connection=http.client.HTTPConnection(*server.server_address,timeout=2)
+                connection.request(method,path,body=None if value is None else json.dumps(value),headers=headers)
+                response=connection.getresponse();result=json.loads(response.read());status=response.status;connection.close()
+                return status,result
+            self.assertIn('/connect.html#token=',server.launch_url)
+            self.assertEqual(request('POST','/api/setup/recheck',{},Origin='https://invalid.example')[0],403)
+            self.assertEqual(request('POST','/api/setup/recheck',{},**{'X-ChatLens-Scope':'stale'})[0],409)
+            self.assertEqual(request('POST','/api/setup/recheck',{'unexpected':True})[0],400)
+            self.assertEqual(request('POST','/api/setup/start',{})[0],503)
+            self.assertEqual(request('POST','/api/setup/recheck',{})[0],200)
+            manager.tick()
+            self.assertEqual(request('GET','/api/setup')[1]['connection']['state'],'waiting_for_wechat')
+            self.detect_process(manager,logged_in=True)
+            old=manager.scope_generation
+            self.assertEqual(request('POST','/api/setup/start',{})[0],200)
+            manager.tick()
+            self.assertEqual(request('GET','/api/messages?conversation=private_test',**{'X-ChatLens-Scope':old})[0],409)
+            self.assertEqual(request('GET','/api/messages?conversation=private_test')[0],200)
+            self.assertTrue(request('GET','/api/setup')[1]['connection']['checks']['collecting'])
+        finally:
+            server.shutdown();server.server_close();worker.join(timeout=2)
+
+    def test_production_waiting_runtime_starts_after_login_with_newly_detected_pid(self):
+        static=self.package/'web';static.mkdir()
+        (static/'index.html').write_text('<!doctype html>Synthetic')
+        (static/'connect.html').write_text('<!doctype html>Synthetic connect')
+        self.process_result={'state':'not_running','pid':None,'creation_time':None,'reason':'windows_process_not_running'}
+        self.probe_result={'state':'unknown','matched':False,'reason':'windows_account_open_database_unavailable'}
+        owner=[];commands=[];opened=[];steps=[]
+        def factory(data,package,output,**options):
+            options['process_detector']=lambda:dict(self.process_result)
+            options['account_probe_factory']=lambda *_:lambda:dict(self.probe_result)
+            options['clock']=lambda:self.clock_value
+            manager=WindowsWebManager(data,package,output,**options)
+            owner.append(manager);self.managers.append(manager)
+            return manager
+        def child(command,**options):
+            commands.append(command)
+            return self.start_child(Path(command[command.index('--data-dir')+1]),Path(command[command.index('--output')+1]))
+        def progress(shutdown):
+            manager=owner[0];steps.append(manager.setup()['connection']['state'])
+            if len(steps)==1:
+                self.assertEqual(steps[-1],'waiting_for_wechat')
+                self.process_result={'state':'ready','pid':777,'creation_time':888,'reason':'windows_process_candidate_ready'}
+                self.clock_value+=4
+            elif len(steps)==2:
+                self.assertEqual(steps[-1],'account_unverified')
+                self.assertEqual(commands,[])
+                self.probe_result={'state':'matched','matched':True,'reason':'windows_account_open_database_matched'}
+                manager.request_recheck(expected_generation=manager.scope_generation)
+            elif len(steps)==3:
+                self.assertEqual(steps[-1],'connected')
+                self.assertEqual(commands,[])
+                manager.request_start(expected_generation=manager.scope_generation)
+            else:
+                self.assertTrue(manager.setup()['connection']['checks']['collecting'])
+                shutdown.set()
+        with patch.object(web_runtime,'stop_collection',side_effect=self.stop_child),redirect_stdout(io.StringIO()):
+            result=web_runtime.run(self.data,self.root/'wait-runtime',package=self.package,
+                no_open=False,open_browser=lambda url:opened.append(url) or True,popen_factory=child,
+                wait=progress,manage_scopes=True,wait_for_wechat=True,manager_factory=factory)
+        self.assertEqual(result['status'],'通过',result)
+        self.assertTrue(result['wait_for_wechat'])
+        self.assertFalse(result['read_only'])
+        self.assertIn('/connect.html#token=',opened[0])
+        self.assertEqual(commands[0][commands[0].index('--pid')+1],'777')
+        self.assertEqual(commands[0][commands[0].index('--creation-time')+1],'888')
+        self.assertEqual(len(commands),1)
+        self.assertEqual(result['cloud_calls'],0)
+        self.assertTrue(result['server_closed'])
+        self.assertNotIn(str(self.root),json.dumps(result))
+        self.assertTrue(result['reader_readiness_verified'])
+        self.assertEqual(result['collector_stage_before_close'],'collecting')
+        self.assertEqual(result['collection_setup_status'],'通过')
+
+    def test_wait_runtime_final_report_requires_readiness_before_close(self):
+        static=self.package/'web';static.mkdir()
+        (static/'index.html').write_text('<!doctype html>Synthetic')
+        (static/'connect.html').write_text('<!doctype html>Synthetic connect')
+        for phase,expected in [('starting',False),('absent',False),('paused',True)]:
+            with self.subTest(phase=phase):
+                owners=[]
+                def factory(data,package,output,**options):
+                    options['process_detector']=lambda:{'state':'ready','pid':777,'creation_time':888,'reason':'windows_process_candidate_ready'}
+                    options['account_probe_factory']=lambda *_:lambda:{'state':'matched','matched':True,'reason':'windows_account_open_database_matched'}
+                    options['clock']=lambda:self.clock_value
+                    manager=WindowsWebManager(data,package,output,**options)
+                    owners.append(manager);self.managers.append(manager)
+                    return manager
+                def child(command,**options):
+                    output=Path(command[command.index('--output')+1])
+                    value=self.start_child(Path(command[command.index('--data-dir')+1]),output)
+                    if phase=='absent':(output/'status.json').unlink()
+                    else:collector_service.Heartbeat(output).emit(phase,1,0,True)
+                    return value
+                def progress(shutdown):
+                    manager=owners[0]
+                    if manager.child is None:manager.request_start(expected_generation=manager.scope_generation)
+                    else:shutdown.set()
+                with patch.object(web_runtime,'stop_collection',side_effect=self.stop_child),redirect_stdout(io.StringIO()):
+                    result=web_runtime.run(self.data,self.root/('report-'+phase),package=self.package,
+                        no_open=True,popen_factory=child,wait=progress,manage_scopes=True,wait_for_wechat=True,manager_factory=factory)
+                self.assertEqual(result['status'],'通过',result)
+                self.assertEqual(result['reader_readiness_verified'],expected)
+                self.assertEqual(result['collector_stage_before_close'],'starting' if phase=='absent' else phase)
+                self.assertEqual(result['collection_setup_status'],'通过' if expected else '未验证')
+
+    def start_waiting_collection(self):
+        manager=self.waiting_manager();self.detect_process(manager,logged_in=True)
+        manager.request_start(expected_generation=manager.scope_generation);manager.tick()
+        self.assertTrue(manager.setup()['connection']['checks']['collecting'])
+        return manager
+
+    def test_owned_starting_heartbeat_does_not_report_collecting_from_saved_metadata(self):
+        manager=self.start_waiting_collection()
+        collector_service.Heartbeat(manager.child_output).emit('starting',0)
+        with manager.provider._open() as (_,checkpoint):binding=checkpoint['binding_digest']
+        WebMetadata(manager.data_dir/'private',binding,'2026-11-01T00:00:00+00:00').status('stopped',1,0,True)
+        connection=manager.setup()['connection']
+        self.assertTrue(connection['collector_running'])
+        self.assertEqual(connection['collector_stage'],'starting')
+        self.assertFalse(connection['checks']['collecting'])
+        self.assertFalse(connection['can_start'])
+        self.assertEqual(manager.status()['state'],'starting')
+        collector_service.Heartbeat(manager.child_output).emit('collecting',1,0,True)
+        self.assertTrue(manager.setup()['connection']['checks']['collecting'])
+        self.assertEqual(manager.status()['state'],'collecting')
+
+    def test_owned_paused_heartbeat_cannot_start_a_second_collector(self):
+        manager=self.start_waiting_collection();child=manager.child
+        collector_service.Heartbeat(manager.child_output).emit('paused',1,0,True)
+        connection=manager.setup()['connection']
+        self.assertTrue(connection['collector_running'])
+        self.assertEqual(connection['collector_stage'],'paused')
+        self.assertFalse(connection['checks']['collecting'])
+        self.assertFalse(connection['can_start'])
+        with self.assertRaises(ValueError):manager.request_start(expected_generation=manager.scope_generation)
+        self.assertIs(manager.child,child)
+        self.assertEqual(manager.status()['state'],'paused')
+        self.assertEqual(manager.children_started,1)
+
+    def test_only_fresh_current_owned_heartbeat_establishes_collection_readiness(self):
+        manager=self.start_waiting_collection()
+        own=manager.child_output/'status.json';own.unlink()
+        unrelated=self.output/'synthetic-old-run';unrelated.mkdir()
+        collector_service.Heartbeat(unrelated).emit('collecting',99,0,True)
+        self.assertEqual(manager.setup()['connection']['collector_stage'],'starting')
+        self.assertFalse(manager.setup()['connection']['checks']['collecting'])
+        collector_service.Heartbeat(manager.child_output).emit('collecting',1,0,True)
+        document=json.loads(own.read_text());document['recorded_at_utc']='2000-01-01T00:00:00+00:00'
+        collector_service.write_public(own,document)
+        self.assertEqual(manager.setup()['connection']['collector_stage'],'stale')
+        self.assertFalse(manager.setup()['connection']['checks']['collecting'])
+        self.assertFalse(manager.setup()['connection']['can_start'])
+        self.assertEqual(manager.status()['state'],'stale')
+        document['recorded_at_utc']='2999-01-01T00:00:00+00:00';collector_service.write_public(own,document)
+        self.assertEqual(manager.status()['state'],'stale')
 
 
 if __name__=='__main__': unittest.main()

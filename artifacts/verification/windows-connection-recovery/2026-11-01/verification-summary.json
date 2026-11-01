@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-01",
+  "status": "通过",
+  "scope": "Windows r3 recoverable connection guide and real owned collector status",
+  "reported_r2_usage_issue": "Windows displayed collection stopped, with no clear login/use guide or usable scope management",
+  "code_reproduced_cause": "No matching main window at startup permanently selected read-only; there was no same-service retry/start path",
+  "exact_user_machine_filter_trigger": "未验证",
+  "python": {
+    "passed_tests": 664,
+    "elapsed_seconds": 27.146,
+    "manager_tests_included": 29,
+    "process_detector_mock_tests_included": 8,
+    "evidence": "python-unittest.txt"
+  },
+  "browser": {
+    "windows-connection": {
+      "status": "通过",
+      "passed_checks": 15,
+      "report": "windows-connection/browser-qa.json"
+    },
+    "windows-multi": {
+      "status": "通过",
+      "passed_checks": 14,
+      "report": "windows-multi/browser-qa.json"
+    },
+    "ai-regression": {
+      "status": "通过",
+      "passed_checks": 33,
+      "report": "ai-regression/browser-qa.json"
+    },
+    "mac-regression": {
+      "status": "通过",
+      "passed_checks": 14,
+      "report": "mac-regression/browser-qa.json"
+    }
+  },
+  "browser_passed_checks": 76,
+  "browser_source_hashes_match_final": true,
+  "package": {
+    "package_name": "ChatLens-Windows-Web-20261101-r3.zip",
+    "bytes": 15632545,
+    "sha256": "e8a75d9c91526fb639355da85213300472e90c826cde628d59e596c5f66dd63b",
+    "archive_files": 94,
+    "source_and_runtime_bytes_match": true,
+    "previous_packages_unchanged": [
+      {
+        "file": "ChatLens-Windows-Web-20261101.zip",
+        "bytes": 15514607,
+        "sha256": "b7d5f8899327a95a8bc7da192d82059e7aa68a0542041875b653dc3cc6fbb188"
+      },
+      {
+        "file": "ChatLens-Windows-Collector-20261101.zip",
+        "bytes": 15470275,
+        "sha256": "075aebd5b88d4f3db821084daafd6184eef9bea6cf38c3d23bb4f1727fde9f6d"
+      },
+      {
+        "file": "ChatLens-Windows-Web-20261101-r2.zip",
+        "bytes": 15615794,
+        "sha256": "0a74637781551b7cd52faae39fe6b9ec6042b05001188966788df70ea6649469"
+      }
+    ]
+  },
+  "verification_features": [
+    "same-service waiting/login/recheck/start/restart",
+    "process candidate separate from account proof",
+    "new PID rebinds original authorized source",
+    "account mismatch/stale request isolation",
+    "strict offline mode explained",
+    "owned heartbeat establishes starting/collecting/paused/stale",
+    "no duplicate start while original child is alive",
+    "old synthetic messages/configuration/checkpoint preserved"
+  ],
+  "latest_package_tests": {
+    "passed_tests": 8,
+    "scope": "post-freeze manifest metadata and package source whitelist"
+  },
+  "boundaries": {
+    "native_windows_sdk_and_ps_startup": "未验证",
+    "actual_windows_r3_login_to_new_message": "未验证",
+    "actual_windows_multi_selection_and_stop_recovery": "未验证",
+    "physical_phone_and_long_duration": "未验证",
+    "real_chat_model_credentials_or_user_configuration_accessed": false,
+    "real_cloud_model_called": false,
+    "historical_zips_overwritten": false,
+    "new_third_party_runtime_dependencies": false
+  },
+  "source_sha256": {
+    "apps/web/README.md": "ef86fae4b37d56bb8f4b355194cc31bad213a8f832b5fbdc9b5db56f387d9e3d",
+    "apps/web/app.js": "8ef9813047886d413b0c1a1ae3153e6b31160d81b67afcaa81d422d2d0d70699",
+    "apps/web/connect.css": "39fdc8f36df3c2caf72f95c7edaaa616e6cdaabdb9ecfa472d199cbbafcef4fe",
+    "apps/web/connect.html": "7362fad457c8d619e3ad53c5ea362b78f5987ef00cb2656a64ea957d792cc44e",
+    "apps/web/connect.js": "a9aef9f81c6c30aafb30aeebc6ba32683229b42f87af7268332b3e558383c908",
+    "apps/web/index.html": "28df561c50d5226b7f0c9d71d25a69f05ebca5492a7e4a049efe7d9097572b6e",
+    "apps/web/styles.css": "1a96f1b4d4e0430eb9fb7040039b72155be64099541d0eabe8c713ca1464c5a3",
+    "scripts/build_windows_web_package.py": "382ba3ca66db9bb95dba0cf78a9ac1e8fdcf261a28ae6c1ce845e8a7d1904681",
+    "scripts/web-windows-connection-smoke.cjs": "81f581481f083b2173c588752f662987353f9ce1354532d35aa3d59cfc3f9ba2",
+    "scripts/web-windows-multi-smoke.cjs": "83d4eca08323d2df76c5197593cf1efc4a98205456aca554f4c09db6a7775b53",
+    "scripts/windows-proof/README-WEB.txt": "9d1de7b7d8c674c0e97f7097a7756ced615cb2f113c5a36394a15cd9f5f2af49",
+    "scripts/windows-proof/Start-ChatLens.cmd": "1e24b3c9f4c75eda3c430c61e17c83e7ee6f10b3351ed5933979de25c6174fa9",
+    "scripts/windows-proof/Start-Web.ps1": "9e92d696f227122d2f4fd503ad4d8f39843df9fd6612085b3b5de99f1002e8a6",
+    "scripts/windows-proof/web_runtime.py": "c18f32bc54fa8d2ecddce7e8998233f752593e8eaad1c23e65630e803811ea90",
+    "scripts/windows-proof/windows_process_detection.py": "22eb98d76789f730546b2068b187d0f4feff334a9d89560ea7dc54c408c8c49b",
+    "scripts/windows-proof/windows_web_manager.py": "1efc9175550923ee857f61f6146150d628e0ca017f23f9ea80955c2a9ea34430",
+    "scripts/windows-proof/windows_web_server.py": "2851c2dd66069d19329d421ab4888d9831662ccca3c31c68f863701116582f60",
+    "tests/test_windows_process_detection.py": "bc9df776963739d43cd5ef3e4ab0f09a7e1f558cead371027064ad8e20fe4915",
+    "tests/test_windows_web_manager.py": "6015bb29bf2bc45a1e48b61072aca2647e7a60d651c859312844a5e499627a07",
+    "tests/test_windows_web_package.py": "103241c64b993dfbf803c76ffe15faa04025a6703226c709f9bb5a25d7dd104b",
+    "tests/web_windows_multi_fixture.py": "936274fa8b894769f3e0b385072d850eea3e2335cf37185e2f775c3d10f79ebc"
+  },
+  "publication_review": {
+    "status": "通过",
+    "review": "final-release-review.json",
+    "independent_package": "independent-package-review.json",
+    "historical_commits_reviewed": 19,
+    "final_synthetic_png_ocr_count": 43,
+    "sensitive_findings": 0,
+    "remote_writes_performed_during_review": false
+  }
+}

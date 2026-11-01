@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "scope": "independent r3 pre-publication history, source and archive review; source review does not replace Windows execution",
+  "history": {
+    "commit_count": 19,
+    "unique_blobs": 699,
+    "unique_blob_bytes": 35110678,
+    "binary_blobs": 196,
+    "sensitive_findings": []
+  },
+  "working_tree": {
+    "tracked_and_unignored_files": 572,
+    "text_files": 340,
+    "sensitive_findings": []
+  },
+  "final_synthetic_screenshots": {
+    "status": "通过",
+    "images": 43,
+    "successful_local_vision_zh_hans_and_english_ocr": 43,
+    "credential_account_phone_authenticated_url_or_controlled_contact_findings": 0,
+    "real_chat_screenshots_reviewed": false
+  },
+  "browser_evidence": {
+    "final_frozen_sets": [
+      {
+        "set": "windows-connection-frozen-20261101",
+        "passed_checks": 15,
+        "source_hashes_match": true
+      },
+      {
+        "set": "windows-r3-multi-frozen-20261101",
+        "passed_checks": 14,
+        "source_hashes_match": true
+      },
+      {
+        "set": "windows-r3-ai-final-20261101",
+        "passed_checks": 33,
+        "source_hashes_match": true
+      },
+      {
+        "set": "windows-r3-mac-multi-final-20261101",
+        "passed_checks": 14,
+        "source_hashes_match": true
+      }
+    ],
+    "total_checks": 76,
+    "all_declared_source_hashes_match": true
+  },
+  "source_review": {
+    "status": "通过",
+    "reviewed_source_sha256": {
+      "scripts/windows-proof/windows_process_detection.py": "22eb98d76789f730546b2068b187d0f4feff334a9d89560ea7dc54c408c8c49b",
+      "scripts/windows-proof/windows_account_probe.py": "883f7d61b022599217f5185a236c8f455c7f639f3cdabd21bc90735ad21d711b",
+      "scripts/windows-proof/windows_web_manager.py": "1efc9175550923ee857f61f6146150d628e0ca017f23f9ea80955c2a9ea34430",
+      "scripts/windows-proof/windows_web_server.py": "2851c2dd66069d19329d421ab4888d9831662ccca3c31c68f863701116582f60",
+      "scripts/windows-proof/web_runtime.py": "c18f32bc54fa8d2ecddce7e8998233f752593e8eaad1c23e65630e803811ea90",
+      "apps/web/connect.js": "a9aef9f81c6c30aafb30aeebc6ba32683229b42f87af7268332b3e558383c908",
+      "apps/web/app.js": "8ef9813047886d413b0c1a1ae3153e6b31160d81b67afcaa81d422d2d0d70699"
+    },
+    "readonly_native_detector": "Toolhelp process table plus executable path/version/architecture/birth metadata; no window titles, memory reads or login claim",
+    "account_proof_separate_from_process_and_network": "PSS must identify the original account DB root; neither process presence nor DB-root proof is a network-online or new-message claim",
+    "retry_and_restart": "Same-page queued recheck/start; new PID and process birth require a fresh original-account proof; never-enabled collection waits for explicit start",
+    "data_and_scope_isolation": "Original scope/config/keys/baseline retained; profiles and assistant history remain independent; nonce rotates on account/scope transitions",
+    "owned_collector_lifecycle": "Pre-launch durable intent, retained handle on unconfirmed stop, retry blocking and previous-supervisor cleanup journal preserved",
+    "owned_readiness": "Only the current unique child_output status.json with strict schema and fresh aware timestamp can establish collecting/paused readiness; old web-status does not do so",
+    "duplicate_start_prevention": "Live starting/paused/stale collector cannot trigger another start; readiness and process liveness are separate",
+    "public_report_readiness": "Readiness captured before close; only collecting/paused owned stage can establish setup readiness, initial starting/stale remains unverified",
+    "redaction": "Only normalized state, static reason, booleans and counts leave source/manager; no raw path, account ID, key or auth nonce in public diagnostics",
+    "remaining_definite_blockers": []
+  },
+  "package_review": {
+    "schema_version": 1,
+    "status": "通过",
+    "scope": "independent offline Windows r3 archive review; no Windows or private data execution",
+    "package_name": "ChatLens-Windows-Web-20261101-r3.zip",
+    "package_bytes": 15632545,
+    "package_sha256": "e8a75d9c91526fb639355da85213300472e90c826cde628d59e596c5f66dd63b",
+    "archive_files": 94,
+    "public_source_files_byte_compared": 37,
+    "all_payload_bytes_match_source_or_fixed_upstream": true,
+    "manifest_and_crc_verified": true,
+    "safe_unique_names_and_no_private_payload": true,
+    "windows_text_encoding_and_line_endings_verified": true,
+    "pinned_upstream": [
+      {
+        "artifact_name": "python-3.14.10-embed-amd64.zip",
+        "sha256": "90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159",
+        "status": "通过"
+      },
+      {
+        "artifact_name": "sqlcipher3-0.6.4-cp314-cp314-win_amd64.whl",
+        "sha256": "33a4bb79d5bffbdcc1443ff7fd10556ad781fd4986a710c0c577b817b06e11ac",
+        "status": "通过"
+      },
+      {
+        "artifact_name": "zstandard-0.25.0-cp314-cp314-win_amd64.whl",
+        "sha256": "c19bcdd826e95671065f8692b5a4aa95c52dc7a02a4c5a0cac46deb879a017a2",
+        "status": "通过"
+      }
+    ],
+    "runtime_pth_only_declared_modification": true,
+    "compiled_payload_x64_machine_verified": 36,
+    "python_local_import_closure_verified": true,
+    "license_files_present_and_original": [
+      "runtime/LICENSE.txt",
+      "runtime/sqlcipher3-0.6.4.dist-info/licenses/LICENSE",
+      "runtime/zstandard-0.25.0.dist-info/licenses/LICENSE",
+      "THIRD-PARTY-SELECTED-NOTICES.txt"
+    ],
+    "old_web_and_collector_packages_unchanged": true,
+    "strong_secret_credential_or_user_material_findings": [],
+    "real_windows_api_execution": "未验证",
+    "real_wechat_new_multi_scope_execution": "未验证",
+    "real_cloud_model_calls": 0,
+    "private_source_material_read": false,
+    "current_application_license": "UNLICENSED; no new application license granted by this review",
+    "prior_release_packages_verified_unchanged": [
+      {
+        "package_name": "ChatLens-Windows-Web-20261101.zip",
+        "sha256": "b7d5f8899327a95a8bc7da192d82059e7aa68a0542041875b653dc3cc6fbb188"
+      },
+      {
+        "package_name": "ChatLens-Windows-Collector-20261101.zip",
+        "sha256": "075aebd5b88d4f3db821084daafd6184eef9bea6cf38c3d23bb4f1727fde9f6d"
+      },
+      {
+        "package_name": "ChatLens-Windows-Web-20261101-r2.zip",
+        "sha256": "0a74637781551b7cd52faae39fe6b9ec6042b05001188966788df70ea6649469"
+      }
+    ]
+  },
+  "primary_sdk_sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/tlhelp32/ns-tlhelp32-processentry32w",
+    "https://learn.microsoft.com/en-us/windows/win32/api/tlhelp32/nf-tlhelp32-createtoolhelp32snapshot",
+    "https://learn.microsoft.com/en-us/windows/win32/api/winver/nf-winver-verqueryvaluew",
+    "https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/ns-processsnapshot-pss_handle_entry",
+    "https://learn.microsoft.com/en-us/windows/win32/api/processsnapshot/ne-processsnapshot-pss_capture_flags"
+  ],
+  "boundaries": {
+    "real_windows_sdk_execution": "未验证",
+    "user_windows_connection_recheck_and_new_multi_chat_execution": "未验证",
+    "network_login_status_verified": false,
+    "new_real_message_arrival_verified": false,
+    "long_running_stability": "未验证",
+    "private_source_accessed": false,
+    "real_cloud_model_called": false,
+    "release_uploaded_by_reviewer": false,
+    "application_license_changed": false
+  },
+  "application_license": "Existing UNLICENSED designation retained; review grants no new application license"
+}

@@ -41,6 +41,26 @@
 .connect-task p { font-size: 11px; color: var(--text-secondary); margin: 4px 0 0; }
 .connect-elapsed { margin-left: auto; font: 12px var(--font-mono); color: var(--text-secondary); white-space: nowrap; }
 .connect-spinner { width: 17px; height: 17px; border: 1.5px solid var(--border); border-top-color: var(--text-label); border-radius: 50%; flex: 0 0 17px; animation: setup-spin 1.1s linear infinite; }
+.windows-connection-card { padding: 25px 28px; }
+.windows-connection-card .card-heading { align-items: flex-start; gap: 16px; }
+.windows-connection-card h2 { font-size: 23px; font-weight: 600; margin: 10px 0 0; line-height: 1.6; }
+.windows-connection-card > p { font-size: 13px; line-height: 1.9; color: var(--text-secondary); margin: 12px 0 0; overflow-wrap: anywhere; }
+.windows-connection-checks { list-style: none; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 10px; padding: 0; margin: 24px 0; }
+.windows-connection-checks li { min-width: 0; padding: 14px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--page-bg); }
+.windows-connection-checks .step-number { margin-bottom: 11px; }
+.windows-connection-checks strong { font-size: 12px; font-weight: 600; display: block; }
+.windows-check-detail { display: block; margin-top: 6px; font-size: 10px; color: var(--text-secondary); line-height: 1.8; overflow-wrap: anywhere; }
+.windows-check-state { display: block; color: var(--text-label); font-size: 10px; margin-top: 10px; }
+.windows-connection-checks li.is-complete { background: var(--accent-bg); }
+.windows-connection-checks li.is-complete .step-number { background: var(--button-bg); border-color: var(--button-bg); color: var(--button-text); }
+.windows-connection-checks li.is-current { border-color: var(--focus); }
+.windows-next-step { padding: 18px 20px; border: 1px solid var(--border); border-radius: 9px; background: var(--sidebar-bg); }
+.windows-next-step > p { margin: 8px 0 0; color: var(--text-input); font-size: 13px; line-height: 1.9; overflow-wrap: anywhere; }
+.windows-next-step .connect-actions { margin-top: 16px; gap: 10px; }
+.windows-saved-note { margin-top: 16px !important; font-size: 11px !important; }
+.windows-usage { padding-left: 20px; font-size: 12px; color: var(--text-label); line-height: 1.9; }
+.windows-usage li + li { margin-top: 7px; }
+.scope-manage-help { margin: 12px 0 0; font-size: 12px; line-height: 1.8; color: var(--text-label); }
 @keyframes setup-spin { to { transform: rotate(360deg); } }
 .connect-action-note { margin-top: 20px; padding: 19px 21px; background: var(--accent-bg); border: 1px solid var(--border); border-radius: 10px; }
 .connect-action-note h3 { font-size: 15px; font-weight: 600; margin: 9px 0 7px; }
@@ -145,5 +165,17 @@
   .scope-profile > div { flex: 1 1 100%; }
   .connect-notice { align-items: stretch; flex-direction: column; padding: 16px; gap: 12px; }
   .connect-footer-note { text-align: left; font-size: 10px; }
+  .windows-connection-card { padding: 20px; }
+  .windows-connection-card h2 { font-size: 21px; }
+  .windows-connection-card .card-heading { flex-wrap: wrap; gap: 10px; }
+  .windows-connection-checks { grid-template-columns: 1fr; gap: 8px; margin: 20px 0; }
+  .windows-connection-checks li { display: flex; align-items: center; gap: 12px; padding: 12px; }
+  .windows-connection-checks .step-number { margin-bottom: 0; }
+  .windows-connection-checks li > div { min-width: 0; flex: 1; }
+  .windows-check-detail { margin-top: 3px; }
+  .windows-check-state { margin: 0; flex: 0 0 auto; max-width: 76px; text-align: right; overflow-wrap: anywhere; }
+  .windows-next-step { padding: 16px; }
+  .windows-next-step > p { font-size: 12px; }
+  .windows-next-step .button { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .connect-spinner { animation: none; } }

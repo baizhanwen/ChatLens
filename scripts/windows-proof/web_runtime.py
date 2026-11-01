@@ -84,12 +84,15 @@ def stop_collection(child, child_output, *, grace=20, clock=time.monotonic, slee
 
 def run(data_dir, output, *, package, pid=None, creation_time=None, read_only=False,
         no_open=False, popen_factory=subprocess.Popen, open_browser=webbrowser.open,
-        wait=None, server_factory=make_server, manage_scopes=False, manager_factory=None):
+        wait=None, server_factory=make_server, manage_scopes=False, manager_factory=None, wait_for_wechat=False):
     """The CLI fixes package/runtime paths; test seams use synthetic data only."""
     if manage_scopes:
         return run_managed(data_dir, output, package=package, pid=pid, creation_time=creation_time,
                            read_only=read_only, no_open=no_open, popen_factory=popen_factory,
-                           open_browser=open_browser, wait=wait, manager_factory=manager_factory)
+                           open_browser=open_browser, wait=wait, manager_factory=manager_factory,
+                           wait_for_wechat=wait_for_wechat)
+    if wait_for_wechat:
+        raise ValueError('windows_wait_requires_scope_manager')
     data_dir, output, package = Path(data_dir), Path(output), Path(package)
     if output.exists() or output.is_symlink():
         raise ValueError('web_output_already_exists')
@@ -198,7 +201,7 @@ def run(data_dir, output, *, package, pid=None, creation_time=None, read_only=Fa
 
 def run_managed(data_dir, output, *, package, pid=None, creation_time=None, read_only=False,
                 no_open=False, popen_factory=subprocess.Popen, open_browser=webbrowser.open,
-                wait=None, manager_factory=None):
+                wait=None, manager_factory=None, wait_for_wechat=False):
     """Production multi-scope owner; old single-scope callers remain compatible."""
     from windows_web_manager import WindowsWebManager
     from windows_web_server import make_windows_server
@@ -211,7 +214,11 @@ def run_managed(data_dir, output, *, package, pid=None, creation_time=None, read
     ensure_private_dir(data_dir / 'private' / 'store')
     if read_only and (pid is not None or creation_time is not None):
         raise ValueError('web_read_only_process_conflict')
-    if not read_only and (type(pid) is not int or pid <= 0 or type(creation_time) is not int or creation_time <= 0):
+    if read_only and wait_for_wechat:
+        raise ValueError('windows_wait_and_explicit_read_only_conflict')
+    identity_supplied = pid is not None or creation_time is not None
+    if not read_only and (not wait_for_wechat or identity_supplied) and (
+            type(pid) is not int or pid <= 0 or type(creation_time) is not int or creation_time <= 0):
         raise ValueError('web_collector_identity_required')
     CollectorWebData(data_dir).status()  # Existing legacy data is required, never re-baselined here.
     output.mkdir()
@@ -223,7 +230,7 @@ def run_managed(data_dir, output, *, package, pid=None, creation_time=None, read
               'web_live_end_to_end_status': '未验证', 'messages_sent_by_tool': 0, 'cloud_calls': 0,
               'source_database_records_modified': False, 'private_data_copied_into_package': False,
               'scope_limit': 50, 'account_isolation': 'source_root_and_verified_active_account',
-              'old_data_and_configuration_preserved': True}
+              'old_data_and_configuration_preserved': True, 'wait_for_wechat': bool(wait_for_wechat)}
     server = worker = manager = None
     shutdown = threading.Event()
     def start_collector(target, child_output):
@@ -233,12 +240,12 @@ def run_managed(data_dir, output, *, package, pid=None, creation_time=None, read
             options['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP
         else:
             options['start_new_session'] = True
-        command = owned_command(package, target, child_output, pid, creation_time) + ['--verify-active-account']
+        command = owned_command(package, target, child_output, manager.pid, manager.creation_time) + ['--verify-active-account']
         return popen_factory(command, **options)
     try:
         manager = (manager_factory or WindowsWebManager)(data_dir, package, output, pid=pid,
             creation_time=creation_time, read_only=read_only, start_collector=start_collector,
-            stop_collector=stop_collection)
+            stop_collector=stop_collection, wait_for_wechat=wait_for_wechat)
         manager.start()
         server = make_windows_server(manager, package / 'web', port=0)
         parent = Path(__file__).resolve().parent.parent
@@ -271,6 +278,16 @@ def run_managed(data_dir, output, *, package, pid=None, creation_time=None, read
         report['status'], report['reason'] = '失败', safe_code(error)
     finally:
         if manager is not None:
+            reader_readiness_verified = False
+            if manager.wait_for_wechat:
+                try:
+                    with manager.lock:
+                        owned = manager._owned_collector_status()
+                    report['collector_stage_before_close'] = owned['collector_stage']
+                    reader_readiness_verified = bool(owned['collector_running'] and owned['collector_stage'] in ('collecting', 'paused'))
+                except Exception:
+                    report['collector_stage_before_close'] = 'unavailable'
+                report['reader_readiness_verified'] = reader_readiness_verified
             try:
                 manager.close()
             except Exception:
@@ -284,15 +301,22 @@ def run_managed(data_dir, output, *, package, pid=None, creation_time=None, read
             report['manager_final_reason'] = manager.reason
             report['account_verified'] = bool(manager.account_matched and not manager.read_only and not manager.account_blocked)
             report['account_probe_reason'] = manager.account_probe_reason
+            report['process_state'] = manager.process_state
+            report['process_reason'] = manager.process_reason
+            report['connection_state'] = manager.connection_state
+            report['collection_requested'] = manager.collection_requested
             report['selected_conversation_count'] = len(manager.active_config.get('conversations', []))
             try:
                 report['saved_scope_count'] = len(manager.setup().get('profiles', []))
             except Exception:
                 report['saved_scope_count'] = None
             report['collection_setup_status'] = (
-                '未验证' if manager.read_only or manager.account_blocked else
+                '未验证' if manager.read_only or manager.account_blocked or manager.wait_for_wechat and (
+                    not manager.children_started or manager.connection_state in (
+                        'waiting_for_wechat', 'checking_account', 'account_unverified', 'wrong_account')) else
                 '失败' if manager.reason or not manager.cleanup_confirmed or manager.last_child_exit not in (None, 0) else
-                '通过' if manager.children_started and manager.stage == 'running' else '未验证')
+                '通过' if manager.children_started and manager.stage == 'running'
+                         and (not manager.wait_for_wechat or reader_readiness_verified) else '未验证')
             if not manager.cleanup_confirmed:
                 report['status'], report['reason'] = '失败', 'web_collector_stop_not_confirmed'
             elif manager.last_child_exit is not None and manager.last_child_exit != 0:
@@ -322,6 +346,7 @@ def main():
     parser.add_argument('--read-only', action='store_true')
     parser.add_argument('--no-open', action='store_true')
     parser.add_argument('--manage-scopes', action='store_true')
+    parser.add_argument('--wait-for-wechat', action='store_true')
     args = parser.parse_args()
     package = Path(__file__).resolve().parent
     if sys.platform != 'win32' or Path(sys.executable).resolve() != (package / 'runtime/python.exe').resolve():
@@ -329,7 +354,8 @@ def main():
         return 2
     try:
         result = run(args.data_dir, args.output, package=package, pid=args.pid, creation_time=args.creation_time,
-                     read_only=args.read_only, no_open=args.no_open, manage_scopes=args.manage_scopes)
+                     read_only=args.read_only, no_open=args.no_open, manage_scopes=args.manage_scopes,
+                     wait_for_wechat=args.wait_for_wechat)
     except Exception:
         print('reason=web_runtime_start_or_report_failed', flush=True)
         return 2

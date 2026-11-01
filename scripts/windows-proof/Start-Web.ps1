@@ -104,7 +104,7 @@ function Verify-Payload {
         if (-not [string]::Equals($digest, [string]$entry.sha256, [StringComparison]::OrdinalIgnoreCase)) { Stop-Check 'manifest_payload_hash_mismatch' }
         $names[$lower] = $true
     }
-    foreach ($required in @('runtime/python.exe', 'runtime/python314.dll', 'runtime/python314.zip', 'runtime/python314._pth', 'runtime/_sqlite3.pyd', 'runtime/sqlite3.dll', 'runtime/sqlcipher3/_sqlite3.cp314-win_amd64.pyd', 'runtime/zstandard/backend_c.cp314-win_amd64.pyd', 'collector_service.py', 'collector_supervisor.py', 'collector_private.py', 'continuous_reader.py', 'continuous_store.py', 'conversation_scope.py', 'wechat_identity.py', 'windows_selected_engine.py', 'windows_selected_native.py', 'windows_selected_supervisor.py', 'windows_keyproof_core.py', 'windows_keyproof_platform.py', 'Start-Web.ps1', 'Start-ChatLens.cmd', 'README-WEB.txt', 'web_runtime.py', 'web_server.py', 'windows_web_manager.py', 'windows_web_server.py', 'windows_account_probe.py', 'web_data.py', 'collector_web_meta.py', 'ai_knowledge.py', 'ai_provider.py', 'ai_query.py', 'ai_statistics.py', 'ai_service.py', 'ai_web_server.py', 'web/index.html', 'web/app.js', 'web/styles.css', 'web/connect.html', 'web/connect.js', 'web/connect.css', 'web/assets/chatlens-mark.svg', 'THIRD-PARTY-SELECTED-NOTICES.txt')) {
+    foreach ($required in @('runtime/python.exe', 'runtime/python314.dll', 'runtime/python314.zip', 'runtime/python314._pth', 'runtime/_sqlite3.pyd', 'runtime/sqlite3.dll', 'runtime/sqlcipher3/_sqlite3.cp314-win_amd64.pyd', 'runtime/zstandard/backend_c.cp314-win_amd64.pyd', 'collector_service.py', 'collector_supervisor.py', 'collector_private.py', 'continuous_reader.py', 'continuous_store.py', 'conversation_scope.py', 'wechat_identity.py', 'windows_selected_engine.py', 'windows_selected_native.py', 'windows_selected_supervisor.py', 'windows_keyproof_core.py', 'windows_keyproof_platform.py', 'Start-Web.ps1', 'Start-ChatLens.cmd', 'README-WEB.txt', 'web_runtime.py', 'web_server.py', 'windows_web_manager.py', 'windows_web_server.py', 'windows_account_probe.py', 'windows_process_detection.py', 'web_data.py', 'collector_web_meta.py', 'ai_knowledge.py', 'ai_provider.py', 'ai_query.py', 'ai_statistics.py', 'ai_service.py', 'ai_web_server.py', 'web/index.html', 'web/app.js', 'web/styles.css', 'web/connect.html', 'web/connect.js', 'web/connect.css', 'web/assets/chatlens-mark.svg', 'THIRD-PARTY-SELECTED-NOTICES.txt')) {
         if (-not $names.ContainsKey($required.ToLowerInvariant())) { Stop-Check 'manifest_required_payload_missing' }
     }
     # Enumerate payload only; never descend into local reports or private collector data.
@@ -161,7 +161,7 @@ try {
     if ($scope.schema_version -ne 1) { Stop-Check 'web_scope_schema_unsupported' }
     $expectedExe = [string]$scope.exe_path
     $scope = $null
-    # Read-only browsing remains available if the previous client is absent.
+    # Best-effort window metadata only. The Python readiness guide independently rechecks the process and account.
     $script:FailureReason = 'web_current_main_process_revalidation_failed'
     $candidates = @()
     if ((Local-File $expectedExe) -and [IO.Path]::GetFileName($expectedExe) -match '^(Weixin|WeChat)\.exe$') {
@@ -182,19 +182,6 @@ try {
             } catch { continue }
         }
     }
-    $selected = 0
-    if ($candidates.Count -gt 1) {
-        Write-Host '找到多个符合原程序路径和已测版本的主窗口，请选择此前测试的微信。'
-        for ($index = 0; $index -lt $candidates.Count; $index++) {
-            Write-Host ('候选 ' + ($index + 1) + '：PID=' + $candidates[$index].Id)
-        }
-        $answer = Read-Host '输入候选编号，留空取消'
-        $choice = 0
-        if (-not [int]::TryParse($answer, [ref]$choice) -or $choice -lt 1 -or $choice -gt $candidates.Count) {
-            Stop-Check 'web_current_main_process_selection_cancelled_or_invalid'
-        }
-        $selected = $choice - 1
-    }
     $resultsRoot = Join-Path $packageRoot 'results'
     $existingResults = Get-Item -LiteralPath $resultsRoot -Force -ErrorAction SilentlyContinue
     if ($null -ne $existingResults) {
@@ -204,18 +191,25 @@ try {
     $outputDirectory = Join-Path $resultsRoot ($stamp + '-web')
     $runtime = Join-Path $packageRoot 'runtime\python.exe'
     $core = Join-Path $packageRoot 'web_runtime.py'
-    $runtimeArguments = @('-I', '-S', '-B', '-X', 'utf8', $core, '--data-dir', $dataDirectory, '--output', $outputDirectory, '--manage-scopes')
-    if ($candidates.Count -eq 0) {
-        Write-Host '未找到原路径、已测版本的已登录微信。本次仅展示已保存消息；启动微信后重开可继续采集。'
-        $runtimeArguments += '--read-only'
+    $runtimeArguments = @('-I', '-S', '-B', '-X', 'utf8', $core, '--data-dir', $dataDirectory, '--output', $outputDirectory, '--manage-scopes', '--wait-for-wechat')
+    if ($candidates.Count -eq 1) {
+        try {
+            $process = $candidates[0]
+            $processNumber = [int]$process.Id
+            $creationTime = [long]$process.StartTime.ToFileTimeUtc()
+            if ($creationTime -le 0) { throw [InvalidOperationException]::new('process_metadata_unavailable') }
+            $runtimeArguments += @('--pid', $processNumber.ToString([Globalization.CultureInfo]::InvariantCulture),
+                                   '--creation-time', $creationTime.ToString([Globalization.CultureInfo]::InvariantCulture))
+            Write-Host '发现符合原路径和版本的微信窗口；窗口存在不代表已登录，将在网页核验当前账号。'
+        } catch {
+            Write-Host '启动时的微信窗口信息已变化，将在网页重新检测；不会锁定为只读模式。'
+        }
+    } elseif ($candidates.Count -gt 1) {
+        Write-Host '检测到多个微信窗口，将在网页按原账号重新核验；不会自动切换到其他账号。'
     } else {
-        $process = $candidates[$selected]
-        $processNumber = [int]$process.Id
-        $creationTime = [long]$process.StartTime.ToFileTimeUtc()
-        if ($creationTime -le 0) { Stop-Check 'web_process_creation_time_unavailable' }
-        $runtimeArguments += @('--pid', $processNumber.ToString([Globalization.CultureInfo]::InvariantCulture),
-                               '--creation-time', $creationTime.ToString([Globalization.CultureInfo]::InvariantCulture))
+        Write-Host '暂未检测到匹配的微信窗口，现在打开接入引导。登录原账号后可在网页重新检测，无需重启本工具。'
     }
+    Write-Host '网页核验微信与账号后，请点击开始采集；未就绪时会显示原因与重试入口。'
     $script:FailureReason = 'fixed_runtime_web_start_failed'
     $savedPreference = $ErrorActionPreference
     try {
