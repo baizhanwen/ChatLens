@@ -1,0 +1,25 @@
+{
+  "status": "passed",
+  "scope": "synthetic_onboarding_manager_actual_macos_http_wrapper",
+  "real_wechat_or_initialization_performed": false,
+  "checks": [
+    "real_http_bootstrap_automatic_account_no_name_guess",
+    "explicit_exit_and_login_user_actions_no_automatic_client_exit",
+    "one_private_one_group_single_selection_and_literal_names",
+    "keyboard_selection_and_poll_preserves_focused_row",
+    "metadata_search_retains_selected_scope_and_empty_error_retry",
+    "stale_search_response_does_not_replace_latest_query",
+    "390px_selection_long_names_and_user_action_fit",
+    "actual_error_stage_keeps_explicit_retry_and_reselects_scope",
+    "select_post_enters_starting_disables_reselection_no_fake_progress",
+    "running_redirects_same_origin_workspace",
+    "401_requires_launcher_and_file_mode_is_explicit"
+  ],
+  "source_sha256": {
+    "apps/web/connect.html": "c62df7548c5dec72430f60fbcc01e5a292e3e6703407d445c9ee02dbc899a372",
+    "apps/web/connect.js": "bfcd9333e1b9ee398803ebf964c9db675bdb07059a245f0c1701b69e360bd2e3",
+    "apps/web/connect.css": "f9f2e68900ec41c77d254dfd3f7241bb4880781082fc3a1d2362ab4c8b3c343e"
+  },
+  "page_errors": 0,
+  "external_requests": 0
+}

@@ -147,6 +147,41 @@ class ContinuousReaderTests(unittest.TestCase):
         with sqlite3.connect(self.state / DB_NAME) as connection:
             return connection.execute('SELECT alias,source_local_id,sender_id,body FROM messages ORDER BY alias,source_local_id').fetchall()
 
+    def test_explicit_single_mac_shard_baseline_poll_and_restart(self):
+        relative = 'message/message_1.db'
+        self.writers.pop(relative).close()
+        (self.root / relative).unlink()
+        storage = self.storage()
+        reader = reader_module.ContinuousReader(self.driver, self.root, self.keys, self.config, storage,
+                                                 lambda: BACKGROUND, shards=('message/message_0.db',))
+        self.readers.append(reader)
+        self.assertEqual(set(storage.snapshot()['cursors']), {'message/message_0.db'})
+        self.insert(PEER, 2, 'SYNTHETIC_MAC_SINGLE_SHARD_NEW')
+        self.writer.commit()
+        self.assertEqual(reader.poll()['new_messages'], 1)
+        reader.close(); storage.close()
+        storage = self.storage()
+        restored = reader_module.ContinuousReader(self.driver, self.root, self.keys, self.config, storage,
+                                                   lambda: BACKGROUND, shards=('message/message_0.db',))
+        self.readers.append(restored)
+        self.assertTrue(restored.resumed)
+        self.assertEqual(restored.poll()['new_messages'], 0)
+        self.assertEqual(storage.stats()['total_messages'], 1)
+        self.assertEqual(self.driver.old_reads, [])
+        self.assertEqual(self.driver.forbidden_reads, [])
+
+    def test_invalid_explicit_shards_and_uninitialized_subset_fail_without_baseline(self):
+        storage = self.storage()
+        for shards in ((), ('message/message_0.db',) * 2, ('../message_0.db',),
+                       ('message/message_8.db',), ('message/message_0.db', [])):
+            with self.subTest(shards=shards), self.assertRaises(reader_module.EngineError):
+                reader_module.ContinuousReader(self.driver, self.root, self.keys, self.config, storage,
+                                                lambda: BACKGROUND, shards=shards)
+        with self.assertRaisesRegex(reader_module.EngineError, 'shard_set_changed'):
+            reader_module.ContinuousReader(self.driver, self.root, self.keys, self.config, storage,
+                                            lambda: BACKGROUND, shards=('message/message_0.db',))
+        self.assertFalse(storage.snapshot()['initialized'])
+
     def test_live_stop_resume_catches_paused_messages_without_old_bodies_or_replays(self):
         reader, storage = self.reader()
         baseline = reader.baseline_completed_at

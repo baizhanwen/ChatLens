@@ -4,7 +4,9 @@
 
 新版 Web 已实现本机数据接入，保留已确认的暖白、鼠尾草绿与深森林绿界面及利明智耀标识。Windows 用户解压 `ChatLens-Windows-Web-20261101.zip`，双击 **`Start-ChatLens.cmd`**，选择此前测试成功的整个 **`collector-data`** 文件夹；自动打开的本机 HTTP 页面展示原选定会话、已保存文字、采集心跳及后续新消息。复用原检查点，不重建基线；微信不在线时可以只读浏览已有内容。运行无需安装 Python、Node、Codex 或模型服务，依赖已在包内固定。操作与验收边界见 [本机 Web 工作台](docs/本机Web工作台.md)。
 
-直接打开 [apps/web/index.html](apps/web/index.html) 的 `file://` 模式仍是虚构前端预览；HTTP 模式连接失败不会回退为虚构数据。只读 API、停止清理、合成加密源与本机 HTTP 浏览器联调分别测试，新 Windows Web 包的真实消息展示仍需独立实机核对，不能由旧采集成功代替。Mac 新持续采集／Web 启动器尚未接入验收；后面的原 Electron 说明和既有客户端专项记录分别保留。界面说明见 [前端 README](apps/web/README.md)，设计变量见 [统一规范](docs/前端设计规范.md)。
+Mac 入口为根目录 [Start-ChatLens.command](Start-ChatLens.command)，使用本项目已准备的隔离环境。启动后自动检测当前登录的微信账号，首次在本机初始化读取能力，然后在网页选择一个私聊和一个群聊；无需客户找账号目录、旧测试配置或密钥文件。每个账号的读取能力、选择范围与新消息检查点分别保存在私有目录。客户另一台 Mac 的依赖安装、终端权限及完整初始化仍需独立验收，不能把这台开发机概括为免依赖分发。步骤和实测边界见 [Mac Web 指南](docs/本机MacWeb.md)。
+
+直接打开 [apps/web/index.html](apps/web/index.html) 的 `file://` 模式仍是虚构前端预览；HTTP 模式连接失败不会回退为虚构数据。只读 API、停止清理、合成加密源与本机 HTTP 浏览器联调分别测试，新 Windows Web 包的真实消息展示仍需独立实机核对，不能由旧采集成功代替。后面的原 Electron 说明和既有客户端专项记录分别保留。界面说明见 [前端 README](apps/web/README.md)，设计变量见 [统一规范](docs/前端设计规范.md)。
 
 本地优先的微信／QQ视觉聊天工作台。提供按需视觉采集、显式关注模式、历史导入、演示回放、原文检索、摘要、待办、客户与沟通分析、检索问答和本地报告导出。
 
@@ -30,6 +32,7 @@
 | Windows 选定会话测试依赖 | 第四包自带 Python 3.14.10 官方 x64 embeddable、`sqlcipher3==0.6.4` 普通 cp314 Windows x64 wheel、`zstandard==0.25.0` cp314 wheel。与第三包分开，版本匹配；不安装全局环境。原始摘要固定在清单，Windows 实际加载先做私有虚构 DB／WAL 验证 |
 | Windows 持续采集依赖 | 新包复用上述固定 Python／SQLCipher／zstandard，目标私有消息库使用 Python 标准库 `sqlite3`，官方 `_sqlite3.pyd`、`sqlite3.dll` 与标准库包已核对入包。进程／私有 ACL 用 Windows 系统 API，单实例锁用 `msvcrt`；不安装其他 Python、Node、Codex、服务或开机自启 |
 | 本机 Web 服务 | 使用同一便携 Python 的标准库 `http.server`／`sqlite3`，只绑定 `127.0.0.1` 随机端口，通过当前运行的随机会话凭据和 HttpOnly Cookie 访问；界面为原生 HTML／CSS／JS，无 npm 或前端构建运行依赖。名称元信息只查询原会话和已采消息中的发送人，不读取其他会话正文 |
+| Mac Web 与首次初始化 | 运行使用项目隔离 Python 3.12.14／SQLCipher／zstandard 和只取元信息的 Swift 探针；当前账号由唯一微信进程及其已打开库文件检测，不凭旧账号目录猜测。首次初始化另用 Apple 系统 Python 3.9.6、Xcode 的 LLDB Python 模块、ditto／codesign，仅处理私有临时副本，账号及所需消息分库／联系人库范围显式绑定；本人完成退出和登录。Node／Codex／云端模型不是读取依赖；当前尚未打包这些 Mac 运行时给另一台机器 |
 | Apple 开发工具 | 当前 Mac 初始化使用 LLDB 及其 Python 绑定；复制和临时签名使用系统 `ditto`、`codesign`。原生状态探针由 Swift 编译。独立用户需检测相应工具并按官方方式准备，不能假定随 Python 自动提供 |
 | `sqlcipher3-wheels==0.5.7` | 在隔离环境中安装二进制 wheel，以 SQLCipher 只读打开加密消息库及 WAL |
 | `zstandard==0.25.0` | 在隔离环境中解码压缩的文字正文 |

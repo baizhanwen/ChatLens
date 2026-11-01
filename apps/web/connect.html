@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#FAFBF9">
+  <meta name="description" content="利明智耀 ChatLens · 连接当前登录的微信，选择需要关注的沟通。">
+  <title>连接微信 · ChatLens · 利明智耀</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/chatlens-mark.svg">
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./connect.css">
+  <script src="./connect.js" defer></script>
+</head>
+<body class="connect-page">
+  <div class="app-shell">
+    <aside class="app-sidebar connect-sidebar" aria-label="微信接入步骤">
+      <a class="brand" href="./connect.html" aria-label="利明智耀 ChatLens 接入页"><img src="./assets/chatlens-mark.svg" alt="利明智耀品牌标识"><span><strong>利明智耀</strong><span>ChatLens 工作台</span></span></a>
+      <div class="sidebar-group-label">开始使用</div>
+      <ol class="connect-steps" id="setup-steps">
+        <li data-step="account" aria-current="step"><span class="step-number">1</span><div><strong>识别当前微信</strong><span>自动检测本机登录状态</span></div></li>
+        <li data-step="initialize"><span class="step-number">2</span><div><strong>准备读取能力</strong><span>在本机完成首次连接</span></div></li>
+        <li data-step="select"><span class="step-number">3</span><div><strong>选择关注会话</strong><span>由你决定阅读范围</span></div></li>
+      </ol>
+      <div class="sidebar-bottom"><div class="sidebar-local"><span class="status-dot"></span><div>本机连接<span>聊天数据保存在这台电脑</span></div></div><div class="sidebar-version"><span>让沟通，照见下一步。</span><span>CHATLENS · LOCAL WORKSPACE</span></div></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar connect-topbar"><div class="connect-mobile-brand"><img src="./assets/chatlens-mark.svg" alt=""><strong>利明智耀</strong></div><nav class="breadcrumb" aria-label="面包屑"><span>工作台</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"></path></svg><strong>连接微信</strong></nav><div class="topbar-actions"><span class="preview-label"><span class="status-dot"></span>本机连接 · 由你选择</span><span class="user-avatar" aria-label="本机工作台">LM</span></div></header>
+      <main class="page-content connect-content">
+        <div class="connect-notice" id="connection-notice" role="alert" hidden><div><strong id="connection-title">暂时无法连接本机服务</strong><p id="connection-description"></p></div><button class="button" id="retry-connection" type="button">重新连接</button></div>
+        <div class="page-heading connect-heading"><div><span class="eyebrow">CONNECT YOUR CONVERSATIONS</span><h1>从你关心的沟通开始。</h1><p>自动识别当前登录的微信，再选择你想关注的私聊与群聊。</p></div><span class="tag tag-neutral">仅在本机连接</span></div>
+
+        <section class="card account-card" aria-labelledby="account-title">
+          <div class="account-heading"><span class="connect-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-3.8-.9L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5Z"></path><path d="M8 10h8M8 14h5"></path></svg></span><div><span class="eyebrow">CURRENT ACCOUNT</span><h2 id="account-title">正在识别当前登录的微信</h2><p id="account-description">请保持本机微信已登录。</p></div><span class="tag tag-waiting" id="setup-stage">正在连接</span></div>
+          <dl class="connect-checks"><div><dt><span class="check-dot" id="wechat-check-dot"></span>微信运行</dt><dd id="wechat-check">检查中</dd></div><div><dt><span class="check-dot" id="access-check-dot"></span>本机文件访问</dt><dd id="access-check">检查中</dd></div><div><dt><span class="check-dot" id="reader-check-dot"></span>文字读取能力</dt><dd id="reader-check">检查中</dd></div></dl>
+        </section>
+
+        <section class="card initialization-card" id="initialization-card" aria-labelledby="initialization-title">
+          <span class="eyebrow">LOCAL CONNECTION</span><h2 id="initialization-title">准备本机读取能力</h2><p id="initialization-description">首次连接需要在这台电脑完成一次初始化。需要保存草稿、退出微信或确认登录时，页面会提示你亲自操作。</p>
+          <div class="connect-task" id="initialization-progress" role="status" hidden><span class="connect-spinner" aria-hidden="true"></span><div><strong id="progress-phase">正在检查本机状态</strong><p id="progress-count"></p></div><span id="progress-elapsed" class="connect-elapsed"></span></div>
+          <div class="connect-action-note" id="user-action-note" hidden><span class="eyebrow">需要你在本机操作</span><h3 id="user-action-title"></h3><p id="user-action-description"></p></div>
+          <div class="connect-actions"><button class="button button-primary" id="initialize-button" type="button" disabled>等待本机连接</button><span id="initialize-help">连接就绪后可以继续。</span></div>
+        </section>
+
+        <section class="card setup-error" id="setup-error" role="alert" hidden><span class="eyebrow">CONNECTION NEEDS ATTENTION</span><h2>这一步暂时没有完成</h2><p id="setup-error-description"></p><div class="connect-actions"><button class="button button-primary" id="retry-initialization" type="button">重新尝试初始化</button><button class="button" id="check-status" type="button">重新检查状态</button></div><details class="technical-details"><summary>查看状态详情</summary><p id="setup-reason"></p></details></section>
+
+        <section class="card selection-card" id="selection-card" aria-labelledby="selection-title" hidden>
+          <div class="card-heading"><div><span class="eyebrow">YOUR FOCUS</span><h2 id="selection-title">选择要关注的会话</h2></div><span class="tag tag-neutral">1 个私聊 + 1 个群聊</span></div>
+          <p class="selection-description">当前版本先支持一位私聊联系人和一个群聊。只从开始关注后收到的新文字建立记录。</p>
+          <label class="input-field search-field connect-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 4.5 4.5"></path></svg><input type="search" id="setup-conversation-search" placeholder="搜索联系人或群名称" aria-label="搜索联系人或群名称" maxlength="256" autocomplete="off"></label><p class="field-help">这里只查找会话名称，不读取聊天正文。</p>
+          <div class="connect-list-feedback" id="conversation-feedback" role="status" hidden><span id="conversation-feedback-text"></span><button class="text-button" id="retry-conversations" type="button" hidden>重新读取</button></div>
+          <div class="connect-picker"><section class="picker-column" aria-labelledby="private-list-title"><div class="picker-heading"><h3 id="private-list-title">私聊</h3><span id="private-result-count">—</span></div><div class="picker-list" id="private-list" role="radiogroup" aria-label="选择一位私聊联系人"></div><div class="picked-summary"><span>已选私聊</span><strong id="selected-private">尚未选择</strong></div></section><section class="picker-column" aria-labelledby="group-list-title"><div class="picker-heading"><h3 id="group-list-title">群聊</h3><span id="group-result-count">—</span></div><div class="picker-list" id="group-list" role="radiogroup" aria-label="选择一个群聊"></div><div class="picked-summary"><span>已选群聊</span><strong id="selected-group">尚未选择</strong></div></section></div>
+          <div class="selection-footer"><div><strong id="selection-count">已选择 0 / 2</strong><p>你选中的会话，才会进入工作台。</p></div><button class="button button-primary" id="start-selected" type="button" disabled>开始关注这些会话<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16m-6-6 6 6-6 6"></path></svg></button></div>
+        </section>
+
+        <section class="card starting-card" id="starting-card" role="status" hidden><span class="eyebrow">STARTING YOUR WORKSPACE</span><h2 id="starting-title">正在启动采集</h2><p id="starting-description">正在确认所选会话并建立新消息起点，请等待本机状态更新。</p><div class="connect-task"><span class="connect-spinner" aria-hidden="true"></span><div><strong id="starting-phase">等待本机采集就绪</strong><p id="starting-count"></p></div><span class="connect-elapsed" id="starting-elapsed"></span></div><button class="button button-primary" id="starting-button" type="button" disabled>正在启动采集</button></section>
+        <p class="connect-footer-note"><span class="status-dot"></span>聊天内容保存在本机。当前不调用云端模型，也不会代发消息。</p>
+      </main>
+    </div>
+  </div>
+  <div class="toast" id="setup-toast" role="status" aria-live="polite" hidden></div>
+  <div class="sr-only" id="setup-announcer" aria-live="polite" aria-atomic="true"></div>
+  <noscript><p>请启用浏览器 JavaScript，并从本机 ChatLens 启动器打开连接页面。</p></noscript>
+</body>
+</html>

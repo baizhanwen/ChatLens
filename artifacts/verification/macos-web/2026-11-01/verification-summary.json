@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "recorded_at_utc": "2026-11-01T05:01:07.910481+00:00",
+  "python_tests": {
+    "passed": 415,
+    "skipped": 0,
+    "elapsed_seconds": 19.151,
+    "test_log_sha256": "ed494430abd2305dd10fd7f1b28d8d08094c9204298245a09101418281e551d6"
+  },
+  "synthetic_connect_browser_checks": 11,
+  "actual_mac_current_account_and_real_web_display_status": "通过",
+  "actual_mac_normal_restart_status": "通过",
+  "fully_self_service_first_run_status": "未验证",
+  "current_service_left_running": true,
+  "source_sha256": {
+    "Start-ChatLens.command": "8f967cdbdb431cc3fb668791b7619cedadc3e06a6277229786fac619c697ebb6",
+    "README.md": "a9709cf4cc1eebf31be201100045bc3d7a0c3eb205a4791643147f4b50432d80",
+    "docs/本机MacWeb.md": "709efc6cfcbd3994902b0603a8f431ec0c0b496348350082f88985e6c794665d",
+    "scripts/native/macos_probe.swift": "a4440d9f42be0d71487d44c46df95b325ebd84146bdd9e9d16a394f010aad418",
+    "scripts/prepare_wechat_read_test.py": "05108d57f5c55dbfa8fdfe47c5eb75b87e6f3cb3b1aa68d93c20358b70d3e1c3",
+    "scripts/windows-proof/continuous_reader.py": "45cbdabc889af7e89ec0701b0243fc697ea8f234bb08044bc2b9de659adebea7",
+    "scripts/macos_active_account.py": "02b0aeecbfa50c379b0176ea0004fa4d96274bbc32110d4cc28a56e55558c28b",
+    "scripts/macos_capture_keys.py": "4feb9369de18fa732884ac1ace953c6e6a30f074921f7bd6bf706e4142b9bd92",
+    "scripts/macos_collector.py": "1e1fad735ccf21084e884abdb3ac0b4eebafc9d77390337e8df6429f98fd33b0",
+    "scripts/macos_reader_setup.py": "3d6dbee07226d19572129f3a20342d19dc8480bd8a17e03163a25af3536a9c2d",
+    "scripts/macos_web.py": "88e564197eaabe6320027af3156445d508fa121fa0ebc858ae3ca7e458b0ff24",
+    "scripts/macos_web_server.py": "14683539155dd41a9cedacace618cef41c0021645c2b495ee3185c673b0c904d",
+    "scripts/verify_live_web_metadata.cjs": "b8ba9859f8e79b75aa7d90a63445c2e6a3a7e9d962f3b1dc3bf87d47ecb5a825",
+    "apps/web/connect.html": "c62df7548c5dec72430f60fbcc01e5a292e3e6703407d445c9ee02dbc899a372",
+    "apps/web/connect.js": "bfcd9333e1b9ee398803ebf964c9db675bdb07059a245f0c1701b69e360bd2e3",
+    "apps/web/connect.css": "f9f2e68900ec41c77d254dfd3f7241bb4880781082fc3a1d2362ab4c8b3c343e",
+    "tests/test_continuous_reader.py": "a831f4dd99990f7c6e5851ce0f1d868d83ef43f0a2f2895e3731b62cbe6d335c",
+    "tests/test_macos_active_account.py": "ccf30b0a094d5ea028c1d2221184f23820c448f11a365522554de7eadd9fd397",
+    "tests/test_macos_collector.py": "ed4aab12da6b1dd8812452d9eef4325f608a4c82ffd00fc71a4a28b9f55aa3d0",
+    "tests/test_macos_prepare_scope.py": "daadb4f8d051258c2aec4071b92c6f5d03874a3278d95529d793717e79abcac7",
+    "tests/test_macos_reader_setup.py": "f50fa0251e6fc520c435c8b266e71bca45c939254c36bd2f897f38e2158da031",
+    "tests/test_macos_web_manager.py": "c0963fb031f61098c2d899cfb267691e2902541cbdc774ff655c2a6641371d9d",
+    "tests/test_macos_web_server.py": "5b4e4596bc0bf9edd651c9800ccdd03988e493df95be5fb50dc746b38627a8e3"
+  },
+  "boundaries": [
+    "Synthetic onboarding browser screenshots contain fictional names only.",
+    "Real browser evidence exports counts and booleans only, without chat screenshots or credentials.",
+    "User confirmed automatic arrivals; timed browser window did not capture an arrival increment.",
+    "Manual continuation was needed during first initialization before compatibility fixes.",
+    "Existing Windows delivery packages and historical reports remain unchanged."
+  ]
+}

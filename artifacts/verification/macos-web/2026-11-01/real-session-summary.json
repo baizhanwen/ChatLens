@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-11-01T05:01:07.908751+00:00",
+  "status": "通过",
+  "scope": "this_mac_current_account_two_selected_conversations_new_text_and_normal_restart",
+  "platform": {
+    "os": "macOS",
+    "version": "27.0",
+    "architecture": "arm64",
+    "wechat_version": "4.1.11"
+  },
+  "current_account_detection": {
+    "status": "通过",
+    "unique_active_root": true,
+    "old_test_account_not_reused": true,
+    "process_start_identity": "kernel_proc_pidinfo"
+  },
+  "reader_initialization": {
+    "status": "通过",
+    "validated_databases": 2,
+    "scope": "current_account_numeric_message_shards_and_contact_metadata",
+    "original_app_signature_unchanged": true,
+    "original_executable_unchanged": true,
+    "private_keys_exported": false,
+    "developer_continuation_needed_this_run": true,
+    "fully_self_service_first_run_status": "未验证"
+  },
+  "selected_scope": {
+    "selected_by_user_in_web": true,
+    "conversation_count": 2,
+    "kinds": [
+      "private",
+      "group"
+    ],
+    "initial_saved_messages": 0,
+    "observed_saved_messages": 2,
+    "messages_per_selected_conversation": [
+      1,
+      1
+    ],
+    "old_test_checkpoint_imported": false
+  },
+  "new_message_display": {
+    "user_confirmed_automatic_arrival": true,
+    "actual_store_and_http_saved_rows_verified": true,
+    "browser_loaded_both_real_conversations": true,
+    "timed_automatic_dom_increment_status": "未验证",
+    "strict_latency_status": "未验证",
+    "source_body_character_by_character_independent_comparison_status": "未验证"
+  },
+  "normal_stop_restart": {
+    "resumed_from_checkpoint": true,
+    "collection_state": "collecting",
+    "saved_before": 2,
+    "saved_after": 2,
+    "prior_messages_unchanged": true,
+    "baseline_unchanged": true,
+    "scope_binding_unchanged": true,
+    "duplicate_source_keys": 0
+  },
+  "private_material_in_evidence": false,
+  "cloud_calls": 0,
+  "messages_sent_by_tool": 0,
+  "cross_machine_installation_status": "未验证",
+  "terminal_double_click_full_disk_access_status": "未验证",
+  "stop_window_new_messages_status": "未验证",
+  "long_running_stability_status": "未验证"
+}

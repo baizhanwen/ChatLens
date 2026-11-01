@@ -16,6 +16,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import sys
 import time
@@ -72,20 +73,31 @@ def only_database_root():
     return roots[0]
 
 
-def selected_database_pages(database_scope="message"):
-    root = only_database_root()
+def selected_database_pages(database_scope="message", db_root=None):
+    root = only_database_root() if db_root is None else Path(db_root)
+    if (not root.is_absolute() or '..' in root.parts
+            or any(path.is_symlink() for path in (root, *root.parents)) or not root.is_dir()):
+        raise SafeTestError("selected_account_root_invalid")
     if database_scope == "message":
         paths = sorted((root / "message").glob("message_*.db"))
     elif database_scope == "contact_metadata_only":
         paths = [root / "contact/contact.db"]
         if not paths[0].is_file():
             raise SafeTestError("contact_metadata_database_missing")
+    elif database_scope == "message_and_contact" and db_root is not None:
+        paths = sorted((root / "message").glob("message_*.db"))
+        paths = [p for p in paths if re.fullmatch(r"message_[0-7]\.db", p.name)]
+        if not paths or len(paths) > 8:
+            raise SafeTestError("selected_account_shards_invalid")
+        paths.append(root / "contact/contact.db")
     else:
         raise SafeTestError("database_scope_not_allowlisted")
     if not paths:
         raise SafeTestError("message_database_missing")
     rows = []
     for path in paths:
+        if path.is_symlink() or not path.is_file() or path.stat().st_nlink != 1:
+            raise SafeTestError("selected_database_path_invalid")
         with path.open("rb") as source:
             page = source.read(4096)
         if len(page) == 4096 and not page.startswith(b"SQLite format 3\x00"):
@@ -104,12 +116,12 @@ def key_validates_page(key, page):
     return hmac.compare_digest(authentication, page[4032:4096])
 
 
-def prepare(app, state, database_scope="message"):
+def prepare(app, state, database_scope="message", db_root=None):
     state.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(state, 0o700)
     if (state / "manifest.json").exists() or (state / "WeChatProbe.app").exists():
         raise SafeTestError("test_copy_already_prepared")
-    pages = selected_database_pages(database_scope)
+    pages = selected_database_pages(database_scope, db_root)
     signature = original_signature(app)
     executable = app / "Contents/MacOS/WeChat"
     digest = hashlib.sha256(executable.read_bytes()).hexdigest()
@@ -119,6 +131,8 @@ def prepare(app, state, database_scope="message"):
         "prepared_at": datetime.now(timezone(timedelta(hours=8))).isoformat(),
         "selected_message_databases": len(pages),
         "database_scope": database_scope,
+        "db_root": str(db_root) if db_root is not None else None,
+        "root_identity": [db_root.stat().st_dev, db_root.stat().st_ino] if db_root is not None else None,
     })
     shadow = state / "WeChatProbe.app"
     run(["ditto", str(app), str(shadow)])
@@ -129,7 +143,7 @@ def prepare(app, state, database_scope="message"):
     emit("private_copy_prepared", selected_databases=len(pages), database_scope=database_scope, original_signature_unchanged=True)
 
 
-def capture(state, timeout, expected_app=None, expected_scope="message"):
+def capture(state, timeout, expected_app=None, expected_scope="message", db_root=None):
     import lldb
     if running_wechat():
         raise SafeTestError("quit_original_wechat_normally_before_capture")
@@ -138,6 +152,13 @@ def capture(state, timeout, expected_app=None, expected_scope="message"):
     database_scope = manifest.get("database_scope", "message")
     if database_scope != expected_scope:
         raise SafeTestError("capture_scope_does_not_match_prepared_scope")
+    if manifest.get("db_root") is not None:
+        recorded_root = Path(manifest["db_root"])
+        if db_root is not None and recorded_root != Path(db_root):
+            raise SafeTestError("capture_account_does_not_match_prepared_scope")
+        if [recorded_root.stat().st_dev, recorded_root.stat().st_ino] != manifest.get("root_identity"):
+            raise SafeTestError("capture_account_identity_changed")
+        db_root = recorded_root
     if expected_app is not None and original != expected_app.resolve(strict=True):
         raise SafeTestError("capture_app_does_not_match_prepared_original")
     if original_signature(original) != manifest["original_signature"]:
@@ -147,7 +168,7 @@ def capture(state, timeout, expected_app=None, expected_scope="message"):
     shadow = state / "WeChatProbe.app"
     if not shadow.is_dir():
         raise SafeTestError("prepared_private_copy_missing")
-    rows = selected_database_pages(database_scope)
+    rows = selected_database_pages(database_scope, db_root)
     salts = {page[:16] for _, page in rows}
     authentication_salts = {bytes(value ^ 0x3A for value in salt): salt for salt in salts}
     debugger = None
@@ -303,7 +324,8 @@ def main():
     parser.add_argument("phase", choices=["prepare", "capture"])
     parser.add_argument("--app", type=Path, default=Path.home() / "Desktop/WeChat.app")
     parser.add_argument("--state-dir", type=Path, required=True)
-    parser.add_argument("--database-scope", choices=["message", "contact_metadata_only"], default="message")
+    parser.add_argument("--database-scope", choices=["message", "contact_metadata_only", "message_and_contact"], default="message")
+    parser.add_argument("--db-root", type=Path)
     parser.add_argument("--timeout", type=int, default=180)
     args = parser.parse_args()
     if platform.system() != "Darwin" or platform.machine() != "arm64" or os.geteuid() == 0:
@@ -316,9 +338,9 @@ def main():
     if app == state or app in state.parents:
         parser.error("private state must be outside original application")
     if args.phase == "prepare":
-        prepare(app, state, args.database_scope)
+        prepare(app, state, args.database_scope, args.db_root)
         return 0
-    return capture(state, args.timeout, app, args.database_scope)
+    return capture(state, args.timeout, app, args.database_scope, args.db_root)
 
 
 if __name__ == "__main__":

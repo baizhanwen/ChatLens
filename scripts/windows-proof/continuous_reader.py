@@ -86,10 +86,17 @@ class ContinuousReader:
     both ends of a read. Unhealthy samples raise without advancing the state.
     """
 
-    def __init__(self, driver, db_root, keys, config, store, native_state_callback):
+    def __init__(self, driver, db_root, keys, config, store, native_state_callback, *, shards=None):
         self._connections = {}
+        self._shards = tuple(SHARDS if shards is None else shards)
+        if (not 1 <= len(self._shards) <= 8
+                or any(not isinstance(relative, str) or re.fullmatch(r'message/message_[0-7]\.db', relative) is None
+                       for relative in self._shards)
+                or len(set(self._shards)) != len(self._shards)):
+            raise EngineError('continuous_shard_configuration_invalid')
+        self._pair_body_budget = min(MAX_PAIR_BODY_BYTES, MAX_BATCH_BODY_BYTES // (len(self._shards) * len(ALIASES)))
         self._store, self._native = store, native_state_callback
-        self._root, self._keys = Path(db_root), {relative: _key(keys, relative) for relative in SHARDS}
+        self._root, self._keys = Path(db_root), {relative: _key(keys, relative) for relative in self._shards}
         self._chats = _config(config)
         self.resumed = False
         self.baseline_completed_at = None
@@ -101,11 +108,11 @@ class ContinuousReader:
             self.resumed = snapshot['initialized']
             if self.resumed:
                 self._validate_snapshot(snapshot, epochs)
-            for relative in SHARDS:
+            for relative in self._shards:
                 self._connections[relative] = _open(driver, self._root / relative, self._keys[relative])
             if not self.resumed:
                 before = self._sample()
-                cursors = {relative: {} for relative in SHARDS}
+                cursors = {relative: {} for relative in self._shards}
                 found = {alias: False for alias in ALIASES}
                 for relative, connection in self._connections.items():
                     for chat in self._chats:
@@ -174,10 +181,10 @@ class ContinuousReader:
             if len(entries) > 64:
                 raise EngineError('continuous_source_directory_entry_limit')
             names = {path.name for path in entries if re.fullmatch(r'message_[0-9]+\.db', path.name)}
-            if names != {Path(relative).name for relative in SHARDS}:
+            if names != {Path(relative).name for relative in self._shards}:
                 raise EngineError('continuous_source_shard_set_changed')
             result = {}
-            for relative in SHARDS:
+            for relative in self._shards:
                 path = self._root / relative
                 before = path.lstat()
                 if _unsafe(before) or not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
@@ -218,9 +225,9 @@ class ContinuousReader:
         if snapshot.get('epochs') != epochs:
             raise EngineError('continuous_source_epoch_changed')
         cursors = snapshot.get('cursors')
-        if not isinstance(cursors, dict) or set(cursors) != set(SHARDS):
+        if not isinstance(cursors, dict) or set(cursors) != set(self._shards):
             raise EngineError('continuous_checkpoint_invalid')
-        for relative in SHARDS:
+        for relative in self._shards:
             if not isinstance(cursors[relative], dict) or set(cursors[relative]) != set(ALIASES):
                 raise EngineError('continuous_checkpoint_invalid')
             for alias in ALIASES:
@@ -270,7 +277,7 @@ class ContinuousReader:
                                 raise EngineError('continuous_source_local_id_invalid')
                             body = _decode(value, compressed)
                             size = len(body.encode('utf-8'))
-                            if body_bytes + size > MAX_PAIR_BODY_BYTES:
+                            if body_bytes + size > min(self._pair_body_budget, MAX_PAIR_BODY_BYTES):
                                 capped = True
                                 break
                             sender = _sender(connection, sender_id)

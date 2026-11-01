@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "scope": "existing_local_web_dom_metadata_only",
+  "recorded_at_utc": "2026-11-01T04:56:58.811Z",
+  "status": "通过",
+  "collector_started_by_verifier": false,
+  "source_database_opened_by_verifier": false,
+  "chat_text_exported": false,
+  "personal_names_exported": false,
+  "message_ids_exported": false,
+  "session_credentials_exported": false,
+  "screenshots_or_traces_saved": false,
+  "fragment_removed": true,
+  "persistent_storage_entries": 0,
+  "http_only_session_cookie": true,
+  "conversation_count": 2,
+  "observation_ms": 61163,
+  "baseline_rendered_rows": [
+    1,
+    1
+  ],
+  "final_rendered_rows": [
+    1,
+    1
+  ],
+  "baseline_saved_counts": [
+    1,
+    1
+  ],
+  "final_saved_counts": [
+    1,
+    1
+  ],
+  "saved_count_increments": [
+    0,
+    0
+  ],
+  "new_rendered_rows": [
+    0,
+    0
+  ],
+  "new_messages_observed": false,
+  "new_dom_row_observation": "未验证",
+  "collection_running_observed": true,
+  "observed_states": [
+    "collecting"
+  ],
+  "final_state": "collecting",
+  "all_headers_present": true,
+  "all_row_ids_valid": true,
+  "duplicate_row_count": 0,
+  "embedded_message_element_count": 0,
+  "connection_notice_visible": false,
+  "horizontal_overflow": false,
+  "frontend_sources_unchanged": true,
+  "page_errors": 0,
+  "console_error_count": 0,
+  "external_requests": 0,
+  "api_requests": 188,
+  "api_errors": 0,
+  "navigation_errors": 0,
+  "reason": null
+}
