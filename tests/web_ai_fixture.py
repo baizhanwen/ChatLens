@@ -7,9 +7,11 @@ The launch fragment travels only through parent-process IPC, never evidence.
 from datetime import datetime, timezone
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import ipaddress
 import json
 import os
 from pathlib import Path
+import socket
 import sys
 import tempfile
 import threading
@@ -34,7 +36,45 @@ class SyntheticProvider(ThreadingHTTPServer):
     block_on_close = False
 
 
+def install_loopback_guard():
+    """Fail before DNS/connect for every non-loopback fixture request.
+
+    Saving a synthetic cloud target exercises the UI without granting this
+    process a way to contact it, even if a regression submits unexpectedly.
+    The audit hook remains confined to this short-lived fixture subprocess.
+    """
+    state = {'loopback_only': True, 'blocked_attempts': 0, 'self_test_passed': False}
+
+    def audit(event, arguments):
+        if event == 'socket.getaddrinfo':
+            host = arguments[0]
+        elif event == 'socket.connect':
+            address = arguments[1]
+            host = address[0] if isinstance(address, tuple) and len(address) >= 2 else None
+        else:
+            return
+        try:
+            permitted = ipaddress.ip_address(host).is_loopback
+        except (ValueError, TypeError):
+            permitted = False
+        if not permitted:
+            state['blocked_attempts'] += 1
+            raise PermissionError('synthetic_fixture_external_network_blocked')
+
+    sys.addaudithook(audit)
+    # The documentation-only address must be rejected by the audit hook before
+    # DNS or any socket connection; this does not send a network probe.
+    try:
+        socket.create_connection(('203.0.113.9', 443), timeout=.1)
+    except PermissionError:
+        state['self_test_passed'] = state['blocked_attempts'] == 1
+    if not state['self_test_passed']:
+        raise RuntimeError('synthetic_fixture_guard_failed')
+    return state
+
+
 def main():
+    network_guard = install_loopback_guard()
     (ROOT / '.build').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='synthetic-ai-web-', dir=ROOT / '.build') as temporary:
         data = Path(temporary).resolve()
@@ -132,7 +172,8 @@ def main():
         server_thread = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': .05}, daemon=True)
         server_thread.start()
         print(json.dumps({'ready': True, 'launch_url': server.launch_url,
-                          'synthetic_provider_url': 'http://127.0.0.1:%d/v1' % provider.server_address[1]}), flush=True)
+                          'synthetic_provider_url': 'http://127.0.0.1:%d/v1' % provider.server_address[1],
+                          'network_guard': network_guard}), flush=True)
         try:
             for line in sys.stdin:
                 request = json.loads(line)
@@ -148,7 +189,8 @@ def main():
                 elif command == 'exit':
                     print(json.dumps({'closed': True}), flush=True)
                     break
-                print(json.dumps({key: value for key, value in synthetic.items() if key != 'mode'}), flush=True)
+                print(json.dumps({**{key: value for key, value in synthetic.items() if key != 'mode'},
+                                  'network_guard': network_guard}), flush=True)
         finally:
             assistant.close()
             server.shutdown()

@@ -22,7 +22,7 @@ SOURCES = (
     'THIRD-PARTY-SELECTED-NOTICES.txt',
 )
 WEB_FILES = ('index.html', 'app.js', 'styles.css', 'assets/chatlens-mark.svg')
-AI_SOURCES = ('ai_knowledge.py', 'ai_provider.py', 'ai_service.py', 'ai_web_server.py')
+AI_SOURCES = ('ai_knowledge.py', 'ai_provider.py', 'ai_query.py', 'ai_statistics.py', 'ai_service.py', 'ai_web_server.py')
 
 
 def _public_bytes(path):

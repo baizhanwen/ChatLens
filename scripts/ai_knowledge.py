@@ -125,6 +125,13 @@ class KnowledgeIndex:
         if state['binding_digest'] != self._binding or (info.st_dev, info.st_ino) != self._identity:
             raise KnowledgeError('knowledge_store_binding_changed', 409)
 
+    def catalog(self):
+        """Selected display names for the local planner; never provider context."""
+        metadata = self.data._metadata('catalog.json')
+        with self.data._open() as (_, state):
+            self._check_binding(state)
+            return self.data._catalog(state['binding_digest'], metadata)
+
     def _scope(self, scope):
         if scope is None:
             return tuple(ALIASES)
@@ -196,7 +203,8 @@ class KnowledgeIndex:
         return {'kind': 'untrusted_chat_evidence', 'trust_note': TRUST_NOTE,
                 'messages': [self._provider(row, row['id']) for row in evidence]}
 
-    def snapshot(self, query, scope=None, time_range=None, *, limit=MAX_EVIDENCE, char_budget=MAX_CONTEXT_CHARS):
+    def snapshot(self, query, scope=None, time_range=None, *, limit=MAX_EVIDENCE, char_budget=MAX_CONTEXT_CHARS,
+                 fallback_recent=False, filters=None):
         try:
             valid = isinstance(query, str) and bool(query.strip()) and '\0' not in query and len(query) <= 6000 and len(query.encode('utf-8')) <= 24000
         except UnicodeError:
@@ -206,12 +214,29 @@ class KnowledgeIndex:
         if type(limit) is not int or not 1 <= limit <= MAX_EVIDENCE or type(char_budget) is not int or not 256 <= char_budget <= MAX_CONTEXT_CHARS:
             raise KnowledgeError('knowledge_budget_invalid', 400)
         aliases, (normalized_range, seconds) = self._scope(scope), self._range(time_range)
+        filters = {} if filters is None else filters
+        if not isinstance(filters, dict) or set(filters) - {'sender_ids', 'body_contains'}:
+            raise KnowledgeError('knowledge_filters_invalid', 400)
+        senders, contains = filters.get('sender_ids', []), filters.get('body_contains')
+        if (not isinstance(senders, list) or len(senders) > 256
+                or any(not isinstance(sender, str) or not sender or len(sender) > 256 or '\0' in sender for sender in senders)
+                or contains is not None and (not isinstance(contains, str) or not contains or len(contains) > 500 or '\0' in contains)):
+            raise KnowledgeError('knowledge_filters_invalid', 400)
         where, params = self._where(aliases, seconds)
         metadata = self.data._metadata('catalog.json')
         try:
             with self.data._open() as (connection, state):
                 self._check_binding(state)
                 catalog = self.data._catalog(state['binding_digest'], metadata)
+                if senders:
+                    known = {sender for alias in aliases for sender in catalog[alias]['sender_names']}
+                    if any(sender not in known for sender in senders):
+                        raise KnowledgeError('knowledge_sender_scope_invalid', 400)
+                    where += ' AND sender_id IN (%s)' % ','.join('?' for _ in senders)
+                    params.extend(senders)
+                if contains is not None:
+                    where += ' AND instr(body,?)>0'
+                    params.append(contains)
                 name_aliases, terms, terms_limited = _conversation_hints(query, aliases, catalog)
                 mode = 'lexical' if terms else 'recent'
                 match = ('(' + ' OR '.join('instr(lower(body),?)>0' for _ in terms) + ')') if terms else '1'
@@ -228,10 +253,22 @@ class KnowledgeIndex:
                 fallback = connection.execute('SELECT COUNT(*) FROM messages WHERE ' + where + ' AND NOT (' + VALID_SENT
                                               + ') AND julianday(observed_at) IS NOT NULL', params).fetchone()[0]
                 alias_where, alias_params = self._where(aliases, {'start': None, 'end': None})
+                if senders:
+                    alias_where += ' AND sender_id IN (%s)' % ','.join('?' for _ in senders)
+                    alias_params.extend(senders)
+                if contains is not None:
+                    alias_where += ' AND instr(body,?)>0'
+                    alias_params.append(contains)
                 unknown_time = connection.execute('SELECT COUNT(*) FROM messages WHERE ' + alias_where + ' AND ' + EVENT_TIME
                                                    + ' IS NULL', alias_params).fetchone()[0]
                 matched = connection.execute('SELECT COUNT(*) FROM messages WHERE ' + where + ' AND ' + match, params + match_params).fetchone()[0]
                 body_matched = matched if terms and not name_aliases else 0
+                used_fallback = bool(fallback_recent and terms and not name_aliases and not matched and available)
+                if used_fallback:
+                    # The model can interpret paraphrases against a bounded
+                    # recent context. Counts here are coverage, not statistics.
+                    match, match_params, terms = '1', [], []
+                    matched, mode = available, 'recent_fallback'
                 if terms and name_aliases:
                     lexical = '(' + ' OR '.join('instr(lower(body),?)>0' for _ in terms) + ')'
                     body_matched = connection.execute('SELECT COUNT(*) FROM messages WHERE ' + where + ' AND ' + match
@@ -330,9 +367,10 @@ class KnowledgeIndex:
         coverage.update(timestamp_fallback_count=fallback, unknown_time_count=unknown_time,
                         evidence_timestamp_fallback_count=sum(row['time_source'] == 'observed_at' for row in evidence),
                         match_sources=(['conversation_name'] if name_aliases else [])
-                                      + (['body'] if body_matched else ['recent'] if matched and mode == 'recent' else []),
+                                      + (['body'] if body_matched else ['recent'] if matched and mode in ('recent', 'recent_fallback') else []),
                         body_matched_count=body_matched,
-                        matched_conversation_ids=list(name_aliases), query_terms_limited=terms_limited)
+                        matched_conversation_ids=list(name_aliases), query_terms_limited=terms_limited,
+                        retrieval_fallback=used_fallback)
         provider_context = self._context(evidence)
         coverage['context_chars'] = len(_json(provider_context))
         return {'snapshot_id': secrets.token_urlsafe(18), 'evidence': evidence, 'groups': groups,

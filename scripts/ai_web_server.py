@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, urlsplit
 from ai_service import AiError
 from ai_provider import ProviderError
 from ai_knowledge import KnowledgeError
+from ai_query import QueryPlanError
 
 
 def pairs(rows):
@@ -58,6 +59,8 @@ def attach_ai_routes(server, get_service):
             except KnowledgeError as error:
                 self._json(error.status, {'error': {'code': 'ai_knowledge_unavailable',
                                                   'message': '当前知识库或原消息不可用，请重新检查范围。'}})
+            except QueryPlanError as error:
+                self._json(400, {'error': {'code': 'ai_query_plan_invalid', 'message': error.message}})
             except Exception:
                 self._json(503, {'error': {'code': 'ai_operation_failed', 'message': '本机 AI 服务暂不可用，请稍后重试。'}})
 
@@ -132,6 +135,7 @@ def attach_ai_routes(server, get_service):
                 return
             actions = {'/api/ai/config': lambda ai: ai.update_config(value),
                        '/api/ai/test': lambda ai: ai.test(value),
+                       '/api/ai/plan': lambda ai: ai.preview_plan(value),
                        '/api/ai/questions': lambda ai: ai.ask(value),
                        '/api/ai/threads': lambda ai: ai.new_thread()}
             if target.path in actions:

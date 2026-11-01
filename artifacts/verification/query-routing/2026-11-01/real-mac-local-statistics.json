@@ -1,0 +1,21 @@
+{
+  "status": "通过",
+  "scope": "current_selected_mac_workspace_local_query",
+  "query_class": "sender_statistics",
+  "plan_route": "local_stats",
+  "effective_time": "今天",
+  "response_kind": "statistics",
+  "matching_saved_message_count": 4,
+  "identifiable_sender_count": 2,
+  "valid_reference_count": 2,
+  "local_statistics_complete": true,
+  "direction_identity_verified": false,
+  "direction_limitation_explicit": true,
+  "real_model_call_performed": false,
+  "model_config_retained": true,
+  "baseline_retained": true,
+  "collector_state": "collecting",
+  "knowledge_message_count": 4,
+  "real_message_body_or_sender_names_printed": false,
+  "auth_values_printed": false
+}

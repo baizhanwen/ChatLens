@@ -173,14 +173,14 @@ class AiAssistantTests(unittest.TestCase):
         self.add('采购报价已确认。')
         self.add('项目交付周五确认。', 'group_test')
         self.provider.answer = 'SYNTHETIC_PRIOR_AI_ANSWER_MUST_NOT_FORWARD。[E1]'
-        first = self.ask_done(question='请查看报价')
+        first = self.ask_done(question='今天请查看报价')
         thread = first['thread_id']
         self.provider.answer = '本轮回答。[E1]'
         self.ask_done(question='SYNTHETIC_OTHER_SCOPE_USER_QUESTION', scope=['group_test'], thread_id=thread)
         self.ask_done(question='SYNTHETIC_OTHER_TIME_USER_QUESTION', time_range='today', thread_id=thread)
         self.ask_done(question='今天重点', thread_id=thread)
         context = json.loads(self.provider.calls[-1]['messages'][-1]['content'])
-        self.assertEqual(context['previous_user_questions_for_reference_only'], ['请查看报价'])
+        self.assertEqual(context['previous_user_questions_for_reference_only'], ['今天请查看报价'])
         sent = json.dumps(self.provider.calls[-1]['messages'], ensure_ascii=False)
         self.assertNotIn('SYNTHETIC_PRIOR_AI_ANSWER_MUST_NOT_FORWARD', sent)
         self.assertNotIn('SYNTHETIC_OTHER_SCOPE_USER_QUESTION', sent)

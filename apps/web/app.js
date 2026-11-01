@@ -24,7 +24,7 @@
   const preferences = { density: 'spacious', autoScroll: true };
   const pending = new Map();
   const scrollPositions = new Map();
-  const ai = { initialized: false, status: null, provider: null, statusError: false, statusAt: 0, statusRequest: 0, threadId: null, turns: [], threads: [], threadRequest: 0, job: null, jobTimer: null, jobRequest: 0, cancelledRequest: false, consentKey: null, scopeSignature: null, evidenceRequest: 0, testJob: null, testTimer: null, modelBusy: false, previewThreads: new Map() };
+  const ai = { initialized: false, status: null, provider: null, statusError: false, statusAt: 0, statusRequest: 0, threadId: null, turns: [], threads: [], threadRequest: 0, job: null, jobTimer: null, jobRequest: 0, cancelledRequest: false, consentKey: null, scopeSignature: null, evidenceRequest: 0, testJob: null, testTimer: null, modelBusy: false, plan: null, planSignature: null, planRequest: 0, planTimer: null, planBusy: false, planSubmitting: false, planError: null, previewThreads: new Map() };
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -965,9 +965,76 @@
   }
 
   function aiPost(route, body = {}) { return api(route, null, { method: 'POST', body }); }
-  function aiBusy() { return Boolean(ai.job || ai.testJob || ai.modelBusy || ai.threadLoading); }
+  function aiBusy() { return Boolean(ai.job || ai.testJob || ai.modelBusy || ai.threadLoading || ai.planSubmitting); }
   function aiScope() { const selected = $('ai-scope').value; return selected === 'all' ? conversations.map(row => row.id) : conversations.filter(row => row.id === selected).map(row => row.id); }
-  function aiScopeKey() { return (ai.provider?.target_fingerprint || '') + '|' + aiScope().sort().join(',') + '|' + $('ai-time-range').value; }
+  function aiPlanInput() { return { question: $('ai-question').value.trim(), scope: aiScope(), time_range: $('ai-time-range').value, ...(ai.threadId ? { thread_id: ai.threadId } : {}) }; }
+  function aiPlanSignature() { return JSON.stringify(aiPlanInput()); }
+  function currentAiPlan() { return ai.planSignature === aiPlanSignature() ? ai.plan : null; }
+  function aiScopeKey() {
+    const plan = currentAiPlan();
+    return JSON.stringify([ai.provider?.target_fingerprint || '', aiScope().sort(), $('ai-time-range').value, $('ai-question').value.trim().replace(/\s+/g, ' '), plan?.route || '', plan?.time_label || '', plan?.time_range?.start || '', plan?.scope || []]);
+  }
+  function cleanAiPlan(value) {
+    if (!value || !['local_stats', 'analysis', 'mixed', 'clarify'].includes(value.route) || typeof value.requires_model !== 'boolean' || !Array.isArray(value.scope) || !value.scope.every(id => typeof id === 'string') || typeof value.time_label !== 'string') return null;
+    if (value.requires_model !== ['analysis', 'mixed'].includes(value.route)) return null;
+    return { route: value.route, requires_model: value.requires_model, metric: typeof value.metric === 'string' ? value.metric : null, time_label: value.time_label, time_range: value.time_range && typeof value.time_range === 'object' ? value.time_range : {}, scope: [...value.scope], scope_label: typeof value.scope_label === 'string' ? value.scope_label : '', summary: typeof value.summary === 'string' ? value.summary : '', clarification: typeof value.clarification === 'string' ? value.clarification : null, warnings: Array.isArray(value.warnings) ? value.warnings.filter(row => typeof row === 'string') : [], source: 'local' };
+  }
+  function aiRouteLabel(plan) { return { local_stats: '本机统计', analysis: '模型分析', mixed: '统计与分析', clarify: '需要确认' }[plan?.route] || '核对提问范围'; }
+  function aiPlanScopeLabel(plan) {
+    if (plan.scope_label) return plan.scope_label;
+    const names = plan.scope.map(id => conversations.find(chat => chat.id === id)?.name).filter(Boolean);
+    return names.length === 1 ? names[0] : names.length ? names.length + ' 个关注会话' : '未匹配到会话';
+  }
+  function aiPlanDescription(plan) {
+    const summary = plan.summary || '';
+    return [...new Set([plan.time_label, aiPlanScopeLabel(plan)].filter(label => label && !summary.includes(label)).concat(summary).filter(Boolean))].join(' · ');
+  }
+  function renderAiPlan() {
+    const plan = currentAiPlan();
+    const visible = LIVE && Boolean($('ai-question').value.trim()) && (ai.planBusy || ai.planError || plan);
+    $('ai-plan-preview').hidden = !visible;
+    $('ai-plan-preview').classList.toggle('is-error', Boolean(ai.planError));
+    $('ai-plan-route').textContent = ai.planBusy ? '正在核对范围' : ai.planError ? '范围暂不可用' : aiRouteLabel(plan);
+    $('ai-plan-description').textContent = ai.planBusy ? '仅在本机查询，不会调用模型。' : ai.planError || (plan ? aiPlanDescription(plan) : '');
+    const explanation = [plan?.clarification, ...(plan?.warnings || [])].filter(Boolean).join(' ');
+    $('ai-plan-clarification').textContent = explanation;
+    $('ai-plan-clarification').hidden = !explanation;
+  }
+  function queueAiPlan() {
+    clearTimeout(ai.planTimer);
+    ai.consentKey = null;
+    ai.planRequest++;
+    ai.plan = null;
+    ai.planSignature = null;
+    ai.planBusy = false;
+    ai.planError = null;
+    renderAiControls();
+    if (!LIVE || !$('ai-question').value.trim() || !live.connected || !aiScope().length) return;
+    ai.planTimer = setTimeout(() => requestAiPlan().catch(() => {}), 350);
+  }
+  async function requestAiPlan() {
+    clearTimeout(ai.planTimer);
+    const payload = aiPlanInput();
+    const signature = JSON.stringify(payload);
+    const request = ++ai.planRequest;
+    ai.planBusy = true;
+    ai.planError = null;
+    renderAiControls();
+    try {
+      const result = await aiPost('/api/ai/plan', payload);
+      if (request !== ai.planRequest || signature !== aiPlanSignature()) return null;
+      const plan = cleanAiPlan(result?.plan);
+      if (!plan || plan.scope.some(id => !payload.scope.includes(id))) throw apiError('invalid_response');
+      ai.plan = plan;
+      ai.planSignature = signature;
+      return plan;
+    } catch (problem) {
+      if (request === ai.planRequest) { ai.plan = null; ai.planSignature = null; ai.planError = '暂时无法核对查询范围，请重试发送。'; }
+      throw problem;
+    } finally {
+      if (request === ai.planRequest) { ai.planBusy = false; renderAiControls(); }
+    }
+  }
   function aiTarget(provider = ai.provider) {
     if (!provider?.base_url || !provider?.model) return '未配置模型';
     try { return new URL(provider.base_url).host + ' · ' + provider.model; } catch { return '模型地址需要检查'; }
@@ -1036,30 +1103,33 @@
     const busy = aiBusy();
     const provider = ai.provider;
     const configured = provider?.configured === true;
+    const plan = currentAiPlan();
     $('ai-send').disabled = busy || (LIVE && (!live.connected || ai.status?.busy === true));
-    $('ai-send').querySelector('span').textContent = LIVE && !configured ? '配置模型' : '发送';
+    $('ai-send').querySelector('span').textContent = ai.planSubmitting ? '核对范围' : '发送';
+    $('ai-question').readOnly = ai.planSubmitting;
     $('ai-time-range').disabled = busy;
     $('ai-scope').disabled = busy;
     $('ai-new-thread').disabled = busy;
     $('ai-model-target').querySelector('span').textContent = LIVE ? configured ? provider.model : '未配置模型' : '虚构预览';
-    const cloud = LIVE && configured && !provider.is_local;
+    const cloud = LIVE && configured && !provider.is_local && plan?.requires_model === true;
     $('ai-cloud-consent').hidden = !cloud;
     $('ai-cloud-confirm').disabled = busy;
     $('ai-cloud-confirm').checked = cloud && ai.consentKey === aiScopeKey();
-    $('ai-cloud-confirm-label').textContent = '允许将本次所选范围内，与问题相关的文字片段发送至 ' + aiTarget() + '。';
+    $('ai-cloud-confirm-label').textContent = '允许将' + (plan ? plan.time_label + '、' + aiPlanScopeLabel(plan) : '本次所选范围') + '内与问题相关的文字片段发送至 ' + aiTarget() + '。';
     document.querySelectorAll('[data-ai-prompt]').forEach(button => { button.disabled = busy; });
     $('ai-runtime').hidden = !ai.job;
     if (ai.job) {
       const stage = ai.job.stage;
-      const stages = { submitting: '正在提交问题', retrieving: '正在检索原消息', generating: '正在生成回答', cancelling: '正在请求取消', connection_error: '任务连接暂时中断' };
+      const stages = { submitting: '正在提交问题', querying: '正在查询本机数据', retrieving: '正在检索原消息', generating: '正在生成回答', cancelling: '正在请求取消', connection_error: '任务连接暂时中断' };
       $('ai-stage-text').textContent = (LIVE ? '' : '虚构演示：') + (stages[stage] || '正在处理');
-      $('ai-stage-detail').textContent = stage === 'retrieving' ? '只检索你选择的会话与时间范围。' : stage === 'connection_error' ? '已显示内容保留，正在重新读取本机任务状态。' : ai.job.target || (LIVE ? aiTarget() : '没有真实模型请求');
+      $('ai-stage-detail').textContent = stage === 'querying' ? '直接查询本机已采文字，不调用模型。' : stage === 'retrieving' ? '只检索你选择的会话与时间范围。' : stage === 'connection_error' ? '已显示内容保留，正在重新读取本机任务状态。' : ai.job.target || (LIVE ? aiTarget() : '没有真实模型请求');
       $('ai-cancel').disabled = !ai.job.id || stage === 'cancelling';
       $('ai-cancel').textContent = stage === 'cancelling' ? '正在取消' : '取消';
     }
     const modelFact = document.querySelectorAll('.property-list dd')[3];
     if (modelFact && LIVE) modelFact.textContent = configured ? '主动提问时使用' : '尚未配置';
-    $('ai-bottom-note').textContent = LIVE ? '回答依据已采集文字。点击原消息证据，可以继续核对上下文。' : '虚构交互示例，不代表模型回答或真实采集结果。';
+    $('ai-bottom-note').textContent = LIVE ? '统计直接查询本机已采文字；分析使用你确认的模型。点击原消息证据核对上下文。' : '虚构交互示例，不代表模型回答或真实采集结果。';
+    renderAiPlan();
   }
 
   function evidenceButton(evidence, compact = false) {
@@ -1097,11 +1167,14 @@
     $('ai-welcome').hidden = ai.turns.length > 0;
     for (const turn of ai.turns) {
       const row = element('article', 'ai-turn ai-' + turn.role);
-      const label = turn.role === 'user' ? '你' : turn.role === 'system' ? '系统提示' : LIVE ? 'ChatLens' : 'ChatLens · 虚构回答示例';
+      const statistics = turn.response_kind === 'statistics' || turn.plan?.route === 'local_stats';
+      const label = turn.role === 'user' ? '你' : turn.role === 'system' ? '系统提示' : statistics ? '本机统计' : LIVE ? 'ChatLens' : 'ChatLens · 虚构回答示例';
       const header = element('div', 'ai-turn-header');
       header.append(element('strong', '', label));
-      if (turn.role === 'assistant' && turn.model) header.append(element('span', '', turn.model));
+      if (turn.role === 'assistant' && turn.plan?.requires_model) header.append(element('span', 'ai-route-label', aiRouteLabel(turn.plan)));
+      if (turn.role === 'assistant' && !statistics && turn.model) header.append(element('span', '', turn.model));
       row.append(header);
+      if (turn.role !== 'user' && turn.plan) row.append(element('p', 'ai-turn-plan', aiPlanDescription(turn.plan)));
       const content = element('div', 'ai-answer-text');
       appendAiText(content, turn.content || '', turn.evidence || []);
       row.append(content);
@@ -1123,6 +1196,8 @@
         }
       }
       if (turn.role !== 'user' && turn.status === 'cancelled') row.append(element('p', 'ai-turn-note', '已取消本次请求。'));
+      if (turn.role !== 'user' && turn.plan?.warnings?.length) row.append(element('p', 'ai-turn-note', turn.plan.warnings.join(' ')));
+      if (turn.role !== 'user' && turn.status === 'done' && turn.coverage?.retrieval_fallback === true) row.append(element('p', 'ai-turn-note ai-retrieval-note', '本轮使用所选范围内的近期片段理解问题，可能只覆盖部分消息。'));
       if (turn.status === 'error' || turn.status === 'connection_error') {
         const feedback = element('div', 'ai-turn-error');
         feedback.append(element('p', '', turn.error || '本次回答没有完成。'));
@@ -1202,7 +1277,8 @@
       const scopeSignature = $('ai-time-range').value + '|' + aiScope().sort().join(',');
       if (scopeSignature !== ai.scopeSignature) { ai.consentKey = null; $('ai-cloud-confirm').checked = false; }
       ai.scopeSignature = scopeSignature;
-      ai.turns = result.messages.filter(row => ['user', 'assistant', 'system'].includes(row.role) && typeof row.content === 'string').map(row => ({ ...row, status: 'done', evidence: cleanAiEvidence(row.evidence) }));
+      ai.turns = result.messages.filter(row => ['user', 'assistant', 'system'].includes(row.role) && typeof row.content === 'string').map(row => ({ ...row, status: 'done', evidence: cleanAiEvidence(row.evidence), plan: cleanAiPlan(row.plan) }));
+      queueAiPlan();
       navigate('overview');
       renderAiTurns({ bottom: true });
       renderAiThreads();
@@ -1228,6 +1304,7 @@
     ai.threadRequest++;
     renderAiTurns();
     renderAiThreads();
+    queueAiPlan();
     if (hadConversation) aiNotice('范围已更改，下次提问会开始新的对话。原对话仍可在左侧查看。');
   }
 
@@ -1242,6 +1319,7 @@
       if (request !== ai.threadRequest) return;
       ai.threadId = result.id;
       ai.turns = [];
+      queueAiPlan();
       aiNotice();
       renderAiTurns({ bottom: true });
       await refreshAiThreads();
@@ -1255,16 +1333,28 @@
     if (!question || aiBusy()) return;
     if (LIVE && !live.connected) { aiNotice('请先恢复与本机服务的连接。'); return; }
     if (LIVE && ai.status?.busy) { aiNotice('上一项请求仍在结束，请稍后再提问。'); return; }
-    if (LIVE && !ai.provider?.configured) { aiNotice('请先在设置中配置模型，再发送这个问题。'); navigate('settings'); return; }
-    if (LIVE && (!ai.status?.knowledge?.ready || ai.status.knowledge.message_count === 0)) { aiNotice('知识库中还没有可供查询的文字。请等待选定会话的新文字采集完成。'); return; }
     if (!aiScope().length) { aiNotice('请先启用需要关注的会话。'); return; }
-    if (LIVE && !ai.provider.is_local && ai.consentKey !== aiScopeKey()) { aiNotice('请先核对下方模型目标，并勾选允许发送本次范围的相关文字片段。'); $('ai-cloud-confirm').focus(); return; }
-    const user = { role: 'user', content: question, status: 'done' };
+    let plan = null;
+    if (LIVE) {
+      ai.planSubmitting = true;
+      renderAiControls();
+      try {
+        plan = await requestAiPlan();
+        if (!plan) { aiNotice('问题或范围已经变化，请确认后重新发送。'); return; }
+      } catch (problem) { aiNotice(aiErrorText(problem)); return; }
+      finally { ai.planSubmitting = false; renderAiControls(); }
+      if (plan.requires_model && !ai.provider?.configured) { aiNotice('这个问题需要模型分析，请先在设置中配置模型。问题草稿会保留。'); navigate('settings'); return; }
+      if (plan.requires_model && (!ai.status?.knowledge?.ready || ai.status.knowledge.message_count === 0)) { aiNotice('知识库中还没有可供分析的文字。请等待选定会话的新文字采集完成。'); return; }
+      if (plan.requires_model && !ai.provider.is_local && ai.consentKey !== aiScopeKey()) { aiNotice('请核对本轮实际范围与模型目标，再勾选允许发送相关文字片段。'); $('ai-cloud-confirm').focus(); return; }
+    }
+    const payload = aiPlanInput();
+    const user = { role: 'user', content: question, status: 'done', plan };
     ai.threadRequest++;
-    const answer = { role: 'assistant', content: '', status: 'working', evidence: [], question, model: LIVE ? aiTarget() : '没有真实模型请求' };
+    const target = LIVE ? plan.requires_model ? aiTarget() : aiRouteLabel(plan) : '没有真实模型请求';
+    const answer = { role: 'assistant', content: '', status: 'working', evidence: [], question, model: LIVE && !plan.requires_model ? null : target, plan };
     ai.turns.push(user, answer);
     const request = ++ai.jobRequest;
-    ai.job = { id: null, stage: 'submitting', turn: answer, target: LIVE ? aiTarget() : '没有真实模型请求' };
+    ai.job = { id: null, stage: 'submitting', turn: answer, target };
     aiNotice();
     renderAiTurns({ bottom: true });
     renderAiThreads();
@@ -1282,13 +1372,13 @@
       return;
     }
     try {
-      const result = await aiPost('/api/ai/questions', { question, scope: aiScope(), time_range: $('ai-time-range').value, ...(ai.threadId ? { thread_id: ai.threadId } : {}), target_fingerprint: ai.provider.target_fingerprint, ...(!ai.provider.is_local ? { confirmed_target: ai.consentKey === aiScopeKey() ? ai.provider.target_fingerprint : '' } : {}) });
+      const result = await aiPost('/api/ai/questions', { ...payload, ...(plan.requires_model ? { target_fingerprint: ai.provider.target_fingerprint, ...(!ai.provider.is_local ? { confirmed_target: ai.consentKey === aiScopeKey() ? ai.provider.target_fingerprint : '' } : {}) } : {}) });
       if (request !== ai.jobRequest || !ai.job) return;
       if (typeof result?.job_id !== 'string' || typeof result.thread_id !== 'string') throw apiError('invalid_response');
       ai.threadId = result.thread_id;
       ai.job.id = result.job_id;
-      ai.job.stage = 'retrieving';
-      if ($('ai-question').value.trim() === question) $('ai-question').value = '';
+      ai.job.stage = plan.requires_model ? 'retrieving' : 'querying';
+      if ($('ai-question').value.trim() === question) { $('ai-question').value = ''; queueAiPlan(); }
       renderAiControls();
       pollAiJob(request);
     } catch (problem) {
@@ -1324,9 +1414,12 @@
     try {
       const result = await api('/api/ai/jobs/' + encodeURIComponent(job.id));
       if (request !== ai.jobRequest || ai.job !== job) return;
-      if (!['retrieving', 'generating', 'done', 'error', 'cancelled'].includes(result?.stage)) throw apiError('invalid_response');
+      if (!['querying', 'retrieving', 'generating', 'done', 'error', 'cancelled'].includes(result?.stage)) throw apiError('invalid_response');
       const turn = job.turn;
+      const plan = cleanAiPlan(result.plan);
+      if (plan) turn.plan = plan;
       if (result.response_kind === 'system') { turn.role = 'system'; turn.model = null; }
+      if (result.response_kind === 'statistics') { turn.role = 'assistant'; turn.response_kind = 'statistics'; turn.model = null; }
       const changed = typeof result.answer === 'string' && turn.content !== result.answer;
       if (typeof result.answer === 'string') turn.content = result.answer;
       if (Array.isArray(result.evidence)) turn.evidence = cleanAiEvidence(result.evidence);
@@ -1562,6 +1655,7 @@
     ai.initialized = true;
     $('ai-form').addEventListener('submit', event => { event.preventDefault(); submitAiQuestion(); });
     $('ai-question').addEventListener('keydown', event => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); submitAiQuestion(); } });
+    $('ai-question').addEventListener('input', queueAiPlan);
     $('ai-scope').addEventListener('change', resetAiScope);
     $('ai-time-range').addEventListener('change', resetAiScope);
     $('ai-cloud-confirm').addEventListener('change', () => { ai.consentKey = $('ai-cloud-confirm').checked ? aiScopeKey() : null; });
@@ -1574,6 +1668,7 @@
       if (aiBusy()) return;
       if (button.dataset.aiPrompt === 'today' && $('ai-time-range').value !== 'today') { $('ai-time-range').value = 'today'; resetAiScope(); }
       $('ai-question').value = prompts[button.dataset.aiPrompt];
+      queueAiPlan();
       $('ai-question').focus();
     }));
     $('ai-knowledge-toggle').addEventListener('click', () => $('knowledge-dialog').showModal());

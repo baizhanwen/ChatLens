@@ -513,10 +513,10 @@ dialog p { font-size: 13px; line-height: 1.9; }
 .live-mode .stat-state { font-size: 22px; }
 
 /* Evidence-backed AI workspace. */
-.ai-sidebar-history { margin: 24px 12px 20px; }
+.ai-sidebar-history { margin: 24px 12px 20px; flex-shrink: 0; }
 .ai-sidebar-history .sidebar-group-label { margin: 0 0 9px; padding: 0; }
 #ai-thread-list { display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow-y: auto; }
-.ai-history-item { display: block; width: 100%; border: 0; border-radius: 6px; background: transparent; color: var(--text-secondary); padding: 8px 9px; text-align: left; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai-history-item { display: block; width: 100%; min-height: 32px; flex-shrink: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text-secondary); padding: 8px 9px; text-align: left; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ai-history-item:hover, .ai-history-item.active { background: var(--nav-selected-bg); color: var(--nav-selected-text); }
 .ai-history-empty { font-size: 10px; margin: 3px 0 0; color: var(--text-secondary); }
 .ai-view { display: flex; flex-direction: column; height: calc(100dvh - var(--topbar-height) - var(--content-y) * 2); min-height: 540px; max-width: 1000px; position: relative; margin: 0 auto; }
@@ -545,6 +545,8 @@ dialog p { font-size: 13px; line-height: 1.9; }
 .ai-turn-header { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; font-size: 12px; color: var(--text-label); }
 .ai-turn-header strong { font-weight: 600; }
 .ai-turn-header > span { font-size: 10px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.ai-turn-header > .ai-route-label { padding: 2px 7px; border: 1px solid var(--border); border-radius: 5px; color: var(--text-label); background: var(--accent-bg); }
+.ai-turn-plan { margin: -3px 0 13px; font-size: 11px; line-height: 1.8; color: var(--text-secondary); overflow-wrap: anywhere; }
 .ai-user { max-width: 83%; width: fit-content; margin-left: auto; background: var(--accent-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; }
 .ai-user .ai-turn-header { margin-bottom: 6px; }
 .ai-answer-text { font-size: 14px; line-height: 1.95; white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; }
@@ -579,6 +581,12 @@ dialog p { font-size: 13px; line-height: 1.9; }
 .ai-composer:focus-within { border-color: var(--focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 9%, transparent); }
 .ai-composer textarea { display: block; width: 100%; min-height: 58px; max-height: 140px; resize: vertical; border: 0; background: transparent; outline: 0; padding: 0; font: 14px/1.8 var(--font); color: var(--text-primary); }
 .ai-composer textarea::placeholder { color: var(--text-secondary); }
+.ai-plan-preview { margin-top: 11px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 7px; background: var(--sidebar-bg); color: var(--text-label); font-size: 11px; line-height: 1.8; }
+.ai-plan-preview > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 10px; min-width: 0; }
+.ai-plan-preview strong { flex-shrink: 0; font-weight: 600; }
+.ai-plan-preview span { min-width: 0; overflow-wrap: anywhere; }
+.ai-plan-preview p { margin: 4px 0 0; overflow-wrap: anywhere; }
+.ai-plan-preview.is-error { background: var(--failure-bg); color: var(--failure-text); }
 .ai-composer-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0 14px; }
 .ai-scope-tools { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .ai-scope-tools label { display: block; min-width: 0; }
@@ -717,10 +725,15 @@ dialog p { font-size: 13px; line-height: 1.9; }
   .sidebar-version { padding-top: 16px; }
   #ai-thread-list { max-height: 94px; }
   .ai-welcome { padding: 10px 0; }
-  .ai-welcome-mark { margin-bottom: 12px; }
+  .ai-welcome-mark { display: none; }
   .ai-welcome-mark img { width: 36px; height: 36px; }
   .ai-welcome .eyebrow { display: none; }
   .ai-welcome h2 { font-size: 30px; }
   .ai-quick-prompts { margin-top: 16px; margin-bottom: 10px; }
   .ai-prompt { padding: 10px 14px; }
+}
+@media (max-width: 640px) and (max-height: 900px) {
+  .ai-welcome { padding: 10px 0; }
+  .ai-welcome .eyebrow { display: none; }
+  .ai-welcome-mark { display: none; }
 }

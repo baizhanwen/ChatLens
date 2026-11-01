@@ -1,0 +1,44 @@
+{
+  "status": "通过",
+  "date": "2026-11-01",
+  "feature": "local query planning, exact statistics, analysis and mixed execution",
+  "python_tests": {
+    "status": "通过",
+    "passed": 540,
+    "command": "CHATLENS_TEST_EVIDENCE_DIR=.build/routing-full-tests-r2-20261101 .build/wechat-read-venv/bin/python -B -m unittest discover -s tests -q",
+    "elapsed_seconds": 22.495
+  },
+  "http_routing_tests": 4,
+  "http_tests_included_in_python_total": true,
+  "browser_checks": {
+    "ai": 29,
+    "preview": 24,
+    "live": 12
+  },
+  "total_browser_checks": 65,
+  "viewports": [
+    "1440x1000",
+    "988x776",
+    "390x844"
+  ],
+  "browser_runtime_errors": 0,
+  "external_browser_requests": 0,
+  "synthetic_provider_network": "literal loopback only, audit hook rejects non-local DNS/connect",
+  "real_cloud_model_called_this_round": false,
+  "new_dependencies": false,
+  "old_windows_archives_replaced": false,
+  "source_sha256": {
+    "scripts/ai_query.py": "06fafc50caddc0019383ff0c86d669b21eeb2355dbda399e96af57eefd3f6b9d",
+    "scripts/ai_statistics.py": "ae82eda5a8725da5cb558f7619577fac699c6c4f634c09dff7912eaf2421ab40",
+    "scripts/ai_knowledge.py": "ce63b935c8b2af7b9de3cb46d37215bd31e86f1b0a6dbfab108a0aed0eb9328b",
+    "scripts/ai_service.py": "8c76f1a2057cb47b42cebd3a32356dfc107a5b76b1db3a9452772984a7d9ae2b",
+    "scripts/ai_web_server.py": "f18451c9ae71c2c3c3ff90aa29169668789309e924c4f6c1c67b06dcce23cb2f",
+    "apps/web/index.html": "c5be73e6b25af2a9dcc99b2e8f780b95ab0959a6cbe08a13d80ae2f98abd316d",
+    "apps/web/app.js": "d75768f549a1d8d390ef75088f34a112f778627d4b481e98b6d83c8d44e4617f",
+    "apps/web/styles.css": "22d240f710663ffd34cde24a35c29b0fed19071a1512f5f556c5c1791048892c",
+    "tests/test_ai_query.py": "e0f0d67bc5fa0dab86669390e4dd24f60c60dcddf9766afac746893ec7dc56ba",
+    "tests/test_ai_statistics.py": "9c48e00013e62a46f4d5e23302fdd4ee46f59789b143fd6f2ac85d8979648ab8",
+    "tests/test_ai_routing.py": "cd762d27157ed78d2f1f4e005c2cecc23a2ffc76887d8536207ebb6040a4c424",
+    "tests/test_ai_routing_http.py": "4c338b00475c8ee965fa647d36d4b6beb3b0bdae3eba5305cd66d4faff2db271"
+  }
+}
