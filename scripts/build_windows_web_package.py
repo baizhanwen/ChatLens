@@ -12,7 +12,7 @@ from build_windows_selected_package import ARTIFACTS, CACHE_DIRECTORY, cached_ar
 
 PREFIX = 'ChatLens-Windows-Web'
 MANIFEST = 'WEB-MANIFEST.json'
-PACKAGE_REVISION = '20261101-r6'
+PACKAGE_REVISION = '20261101-r7'
 SOURCES = (
     'Start-Web.ps1', 'Start-ChatLens.cmd', 'README-WEB.txt',
     'web_runtime.py', 'web_server.py', 'windows_web_manager.py', 'windows_web_server.py',

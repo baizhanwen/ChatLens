@@ -67,12 +67,15 @@ async function main(){
    assert.equal(download.suggestedFilename(),'ChatLens-Windows-Connection-Diagnostics.json');
    const target=path.join(output,download.suggestedFilename());await download.saveAs(target);
    const raw=fs.readFileSync(target,'utf8'),value=JSON.parse(raw);
-   assert.deepEqual(Object.keys(value).sort(),['schema_version','kind','platform','connection_state','account_reason','checks','account_diagnostics','selected_conversation_count','collector_running','collector_stage'].sort());
+   assert.deepEqual(Object.keys(value).sort(),['schema_version','kind','platform','connection_state','account_reason','checks','account_diagnostics','selected_conversation_count','collector_running','collector_stage','catalog'].sort());
    assert.equal(value.kind,'chatlens_windows_connection_diagnostics');assert.equal(value.schema_version,1);
    assert.equal(value.connection_state,'account_unverified');assert.equal(value.account_reason,'windows_account_mapped_database_unavailable');
    assert.equal(value.account_diagnostics.handles_seen,0);assert.equal(value.account_diagnostics.file_type_handles,0);assert.equal(value.account_diagnostics.query_completed,true);
    assert.equal(value.account_diagnostics.mapped_file_query_used,true);assert.equal(value.account_diagnostics.mapped_verification_passes,2);assert.equal(value.account_diagnostics.mapped_regions_queried,160);assert.equal(value.account_diagnostics.mapped_data_regions_seen,12);assert.equal(value.account_diagnostics.mapped_name_query_failures,0);
    assert.equal(value.account_diagnostics.family_process_count,5);assert.equal(value.account_diagnostics.family_processes_completed,5);assert.equal(value.account_diagnostics.main_database_names_seen,0);assert.equal(value.account_diagnostics.helper_database_names_seen,0);
+   assert.deepEqual(Object.keys(value.catalog).sort(),['schema_version','state','phase','reason','elapsed_seconds','worker_active','databases_checked','tables_seen','contacts_seen','conversations_found'].sort());
+   assert.equal(value.catalog.schema_version,1);assert.equal(value.catalog.state,'idle');assert.equal(value.catalog.phase,'idle');assert.equal(value.catalog.reason,null);assert.equal(value.catalog.worker_active,false);
+   for(const key of ['elapsed_seconds','databases_checked','tables_seen','contacts_seen','conversations_found'])assert.equal(value.catalog[key],0);
    assert(value.checks.process_running);assert(!value.checks.account_verified);assert.equal(value.selected_conversation_count,2);
    assert(!/synthetic-peer|synthetic-group|scope_generation|creation_time|\\\\|\/Users\/|wxid_|enc_key|api_key|"pid"|"path"/.test(raw));
    assert.equal((await command({command:'state'})).children_started,0);assert.equal((await command({command:'state'})).legacy_unchanged,true);

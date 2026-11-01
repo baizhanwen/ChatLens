@@ -85,7 +85,7 @@ class WindowsWebPackageTests(unittest.TestCase):
             prefix = package.PREFIX + '/'
             entries = {name[len(prefix):]: archive.read(name) for name in archive.namelist()}
         manifest = json.loads(entries.pop(package.MANIFEST))
-        self.assertEqual(manifest['package_revision'], '20261101-r6')
+        self.assertEqual(manifest['package_revision'], '20261101-r7')
         self.assertIn('prefer exactly one visible, unowned main-window candidate', manifest['process_selection'])
         self.assertIn('cached fixed states', manifest['connection_diagnostics'])
         self.assertEqual(manifest['account_process_family']['maximum_members'], 16)

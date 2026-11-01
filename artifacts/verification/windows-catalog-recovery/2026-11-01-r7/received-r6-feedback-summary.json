@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "kind": "chatlens_received_r6_field_report_summary",
+  "source": "user_supplied_markdown_with_diagnostic_excerpt_not_independently_observed_native_execution",
+  "source_document_sha256": "184b647e8e04cee8207cb798970691b2e67d277b5c7a164d83b620544d680f64",
+  "platform": {
+    "system": "Windows 11 Home China",
+    "build": "26200",
+    "wechat_version": "4.1.15.56",
+    "architecture": "x64"
+  },
+  "package_revision": "20261101-r6",
+  "package_sha256": "b1c61e551e16000b317baa458d0a06a23dcc0f7901633c8d1bcda936943d25dd",
+  "reported_diagnostics": {
+    "connection_state": "connected",
+    "account_reason": "windows_account_mapped_database_matched",
+    "checks": {
+      "process_running": true,
+      "account_verified": true,
+      "reader_ready": true,
+      "scope_selected": true,
+      "collecting": true
+    },
+    "database_names_seen": 6,
+    "matching_root_paths": 6,
+    "mapped_regions_queried": 20118,
+    "mapped_data_regions_seen": 514,
+    "mapped_names_seen": 514,
+    "mapped_name_query_failures": 0,
+    "mapped_verification_passes": 2,
+    "family_process_count": 5,
+    "family_processes_completed": 5,
+    "collector_running": true,
+    "collector_stage": "collecting",
+    "selected_conversation_count": 2
+  },
+  "acceptance": {
+    "r6_account_verification_reported": "通过",
+    "r6_scope_picker_reported": "失败",
+    "r6_numbered_message_direction_and_recovery_sequence": "未验证",
+    "second_windows_machine": "待外部条件"
+  },
+  "confirmed_source_findings": [
+    "catalog_failure_returns_idle_without_explicit_picker_error",
+    "nonready_list_returns_empty_conversations",
+    "synchronous_catalog_io_holds_manager_lock",
+    "frontend_acceptSetup_already_attempts_auto_load_when_catalog_ready"
+  ],
+  "unconfirmed_root_cause": "contact_query_timeout_is_a_hypothesis_not_established_by_report",
+  "private_paths_names_messages_keys_or_config_included": false,
+  "raw_user_document_published": false
+}

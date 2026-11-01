@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "unit_test_count": 764,
+  "unit_test_seconds": 28.159,
+  "unit_manager_tests": 49,
+  "new_manager_tests": 18,
+  "fresh_browser_checks": 54,
+  "browser_sets": [
+    {
+      "kind": "windows-connection",
+      "passed_checks": 16,
+      "source_hashes_match": true,
+      "scope": "Windows waiting-login-to-collection production manager HTTP UI with explicit synthetic native/source adapters",
+      "runtime_errors": 0,
+      "external_requests": 0
+    },
+    {
+      "kind": "windows-multi",
+      "passed_checks": 14,
+      "source_hashes_match": true,
+      "scope": "actual_windows_manager_http_store_and_ai_with_explicit_synthetic_native_source_provider",
+      "runtime_errors": 0,
+      "external_requests": 0
+    },
+    {
+      "kind": "mac-multi",
+      "passed_checks": 14,
+      "source_hashes_match": true,
+      "scope": "actual_macos_manager_http_sqlite_ai_profiles_with_synthetic_source_and_provider",
+      "runtime_errors": 0,
+      "external_requests": 0
+    },
+    {
+      "kind": "picker-contract",
+      "passed_checks": 10,
+      "source_hashes_match": true,
+      "scope": "explicit_synthetic_http_picker_contracts_only",
+      "runtime_errors": 0,
+      "external_requests": 0
+    }
+  ],
+  "browser_sources_frozen": true,
+  "real_windows_api_executed": false,
+  "real_wechat_or_cloud_used": false,
+  "native_header_read_in_synthetic_sqlcipher_test": "explicitly_replaced_by_fixture_header_read",
+  "r6_native_account_status": "user_reported_pass_in_received_summary",
+  "r7_windows_directory_scope_direction_recovery_status": "未验证",
+  "second_windows_machine_status": "待外部条件",
+  "data_configuration_and_legacy_packages_unchanged": true,
+  "cooperative_catalog_budget_seconds": 30,
+  "hard_native_io_termination_claimed": false
+}

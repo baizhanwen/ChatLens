@@ -1,0 +1,541 @@
+[
+  {
+    "blob" : "229f8c8df01cc2e5e7d6eb4deec100c36e519f6019cae7edbcdb869bef4b94e4",
+    "findings" : {
+
+    },
+    "ocr_lines" : 60,
+    "repo_paths" : [
+      "synthetic\/windows-r7-connection-final2-20261101\/desktop-account-reading-unverified.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "aac77934fbb9b19a1abcf9d708243370b4cda77703b2c1192be1eadf8ca24ed6",
+    "findings" : {
+
+    },
+    "ocr_lines" : 53,
+    "repo_paths" : [
+      "synthetic\/windows-r7-connection-final2-20261101\/desktop-collecting-workspace.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "3e902d7f1cd99788f1035060af94c7fc3a0dbad5c596fa13cf96e589eef69c42",
+    "findings" : {
+
+    },
+    "ocr_lines" : 53,
+    "repo_paths" : [
+      "synthetic\/windows-r7-connection-final2-20261101\/desktop-offline-workspace.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "7c9034abd90b0af3b97afa552e7579d14189cd03ae37de971586614031043e01",
+    "findings" : {
+
+    },
+    "ocr_lines" : 67,
+    "repo_paths" : [
+      "synthetic\/windows-r7-connection-final2-20261101\/desktop-owned-paused.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "5bf34c589fa17e0ffe53ad62abf86f67cc7267acf151a307229615955f13b84a",
+    "findings" : {
+
+    },
+    "ocr_lines" : 65,
+    "repo_paths" : [
+      "synthetic\/windows-r7-connection-final2-20261101\/desktop-owned-starting.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "e4ff550de3185c159599614cf12e0a10d037b89521a9826d796f8a1037cdac6e",
+    "findings" : {
+
+    },
+    "ocr_lines" : 91,
+    "repo_paths" : [
+      "synthetic\/windows-r7-connection-final2-20261101\/desktop-ready-and-can-manage.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "916ea0b69bffcca921dffe95637570152d725d680044862d1e795434d91e86a6",
+    "findings" : {
+
+    },
+    "ocr_lines" : 66,
+    "repo_paths" : [
+      "synthetic\/windows-r7-connection-final2-20261101\/desktop-waiting-for-wechat.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "60fd168af3291a312896ef2a897bfbffad52febafeede62697a00ae5921b8da0",
+    "findings" : {
+
+    },
+    "ocr_lines" : 60,
+    "repo_paths" : [
+      "synthetic\/windows-r7-connection-final2-20261101\/desktop-wrong-account.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "b89b174a3aff5c8ddf8beaf32170fc0131b4d758fec354f62d69b8b948ee5f8a",
+    "findings" : {
+
+    },
+    "ocr_lines" : 49,
+    "repo_paths" : [
+      "synthetic\/windows-r7-connection-final2-20261101\/mobile-account-reading-unverified.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "c5aae6f553dd483e5054ccf8c9bf7b1a07f739fef75c3d6727a2cf64fa8f804a",
+    "findings" : {
+
+    },
+    "ocr_lines" : 50,
+    "repo_paths" : [
+      "synthetic\/windows-r7-connection-final2-20261101\/mobile-connected-scope-picker.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "f1dbf91405493bc0ba65a7cb56372927e244c70de36d719220d59ea0b61f9d9b",
+    "findings" : {
+
+    },
+    "ocr_lines" : 54,
+    "repo_paths" : [
+      "synthetic\/windows-r7-connection-final2-20261101\/mobile-explicit-read-only.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "86d6dbd7991041a5a97e6308ea075651a0cfec724ffa7d19d8b170b44f50cb3a",
+    "findings" : {
+
+    },
+    "ocr_lines" : 51,
+    "repo_paths" : [
+      "synthetic\/windows-r7-connection-final2-20261101\/mobile-waiting-guide.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "748fbd1319c06646cd5513b3e696619530cca0e85928d453a3bbced1d871d390",
+    "findings" : {
+
+    },
+    "ocr_lines" : 54,
+    "repo_paths" : [
+      "synthetic\/windows-r7-multi-final-20261101\/desktop-direction-statistics.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "7d66ab28b49b4cc5d2ef55f0e4e44cb82ac3707699e3b822190fd1bb4e5af178",
+    "findings" : {
+
+    },
+    "ocr_lines" : 103,
+    "repo_paths" : [
+      "synthetic\/windows-r7-multi-final-20261101\/desktop-five-message-directions.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "ef1ebe6b308fe3fd338efd8c668786ab44792943743331705a33f87fb5a650f9",
+    "findings" : {
+
+    },
+    "ocr_lines" : 97,
+    "repo_paths" : [
+      "synthetic\/windows-r7-multi-final-20261101\/desktop-five-selected.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "54550320d1591b2be9b3da281f5a2c1ebfc8ff72c0c84b2bc11a71c9d0e730df",
+    "findings" : {
+
+    },
+    "ocr_lines" : 53,
+    "repo_paths" : [
+      "synthetic\/windows-r7-multi-final-20261101\/desktop-independent-scope.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "215160fb83f858ab85945139e8753eb1c4b7f6ad5d4bcc7f469e1218da0ae40f",
+    "findings" : {
+
+    },
+    "ocr_lines" : 53,
+    "repo_paths" : [
+      "synthetic\/windows-r7-multi-final-20261101\/desktop-legacy-preserved.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "11f784bc827bc690a56504a9a9eaef7233970ab1a2d8ee58b22aad85f0b60d71",
+    "findings" : {
+
+    },
+    "ocr_lines" : 53,
+    "repo_paths" : [
+      "synthetic\/windows-r7-multi-final-20261101\/desktop-restored-legacy.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "894c9d3c01f38ba286f783099cc4af1d4b45d54f976d508371e4e57009f72632",
+    "findings" : {
+
+    },
+    "ocr_lines" : 59,
+    "repo_paths" : [
+      "synthetic\/windows-r7-multi-final-20261101\/desktop-settings-988.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "f4cda924db70fee2de4a9c3f7c9354e28d6486763565a12fbf2c409f9e17e180",
+    "findings" : {
+
+    },
+    "ocr_lines" : 46,
+    "repo_paths" : [
+      "synthetic\/windows-r7-multi-final-20261101\/mobile-scope-picker.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "f86c4be9f3517491a19ce3a93b0f4516cf5f63b4bad92a67275e63417ee93dea",
+    "findings" : {
+
+    },
+    "ocr_lines" : 39,
+    "repo_paths" : [
+      "synthetic\/windows-r7-multi-final-20261101\/mobile-settings.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "7e8ab6a57f4ef91d001bbd01d89d3f22cf93190c50165ab84b5a0239c3e77f85",
+    "findings" : {
+
+    },
+    "ocr_lines" : 41,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/desktop-ai-988.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "e7b1e9619dcd90ce48a0e06f3c6210953a3d38d2bc46e98f26f242449ed43191",
+    "findings" : {
+
+    },
+    "ocr_lines" : 43,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/desktop-ai-cloud-988.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "0e6cd139da3f2e2c50ebf0cf514aacf3e63677a6e54192dc6fedbd2f428fbccd",
+    "findings" : {
+
+    },
+    "ocr_lines" : 49,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/desktop-answer.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "a503c4838dfe82021c6067247d609b7f64bf83c24c4cd34e98f8caf7193985a0",
+    "findings" : {
+
+    },
+    "ocr_lines" : 59,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/desktop-direction-statistics.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "338d1b4e44ab8afa09e14fc970941d8bb91438a20f9e0a9229be794033ae8398",
+    "findings" : {
+
+    },
+    "ocr_lines" : 55,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/desktop-local-statistics.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "17efa23e4b8a30fdb02d2fb0db368f89bb64f3f199660a4161b3917442428684",
+    "findings" : {
+
+    },
+    "ocr_lines" : 87,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/desktop-message-directions.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "e331e580feaceeb425847ce857e998a22a0bb78e99fbed08101f44bde0b4707b",
+    "findings" : {
+
+    },
+    "ocr_lines" : 53,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/desktop-mixed-answer.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "5f43a56c5cc79eb37a40d78e9fb95a040cac094aeb9d01cecc2968cf03c0ae0c",
+    "findings" : {
+
+    },
+    "ocr_lines" : 55,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/desktop-settings-1440.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "da2811e8ee74c706dbffda3963a1aab19b0a668a55b7ba27244a3dd1a87a5b67",
+    "findings" : {
+
+    },
+    "ocr_lines" : 49,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/desktop-settings-988.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "dffd7b3c61dec6a2c143015156e2efa1897a08c65958a3b7874eb49d07cab200",
+    "findings" : {
+
+    },
+    "ocr_lines" : 48,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/desktop-unconfigured.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "0831e552336c871838a643cc95c84c644796048a3841c9fc0ea2634ac8ba2457",
+    "findings" : {
+
+    },
+    "ocr_lines" : 30,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/mobile-ai-cloud.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "54112967354e26a30dbbe47765d2d47c9cc1a0ff858a8d1cddf046102f7fe168",
+    "findings" : {
+
+    },
+    "ocr_lines" : 25,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/mobile-ai-empty.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "8247b8aeac91af469ddf4a5105e43842343e0d5c0590fd2ab0651dad1ac69e0a",
+    "findings" : {
+
+    },
+    "ocr_lines" : 30,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/mobile-message-directions.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "3683502917d4853b57b4affa56eff7189e7e6b8b2a162d779d05147e16333c49",
+    "findings" : {
+
+    },
+    "ocr_lines" : 20,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/mobile-messages.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "59a65db2a631c107af85d51f75ea4076659aafc9a1863a62d39478bd87ebfa21",
+    "findings" : {
+
+    },
+    "ocr_lines" : 31,
+    "repo_paths" : [
+      "synthetic\/windows-r4-ai-final-20261101\/mobile-settings.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "616976752046a9a6ba76fa685fd6951f08533e377d405115cec5b8a6baf377f8",
+    "findings" : {
+
+    },
+    "ocr_lines" : 101,
+    "repo_paths" : [
+      "synthetic\/windows-r7-mac-final-20261101\/desktop-five-profile-messages.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "803d9857a44c9ff2be98ccb8c70d9d10a170e8709fb959176008d5502f4611a2",
+    "findings" : {
+
+    },
+    "ocr_lines" : 45,
+    "repo_paths" : [
+      "synthetic\/windows-r7-mac-final-20261101\/desktop-five-profile-statistics.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "b056e99f7cadb68f41dcfbd76d59fdee1f5546d3650f26b1192071fc97c4ee56",
+    "findings" : {
+
+    },
+    "ocr_lines" : 71,
+    "repo_paths" : [
+      "synthetic\/windows-r7-mac-final-20261101\/desktop-five-selected.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "2146b83d87c3a283262ab8d6b28bf5b2602e156e65068074636866f2c1ddc700",
+    "findings" : {
+
+    },
+    "ocr_lines" : 47,
+    "repo_paths" : [
+      "synthetic\/windows-r7-mac-final-20261101\/desktop-new-scope-blank-ai.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "823387111088471f7f0255b5bee0cbdfdc5dd6dd797f296f7bb7a804504183dd",
+    "findings" : {
+
+    },
+    "ocr_lines" : 49,
+    "repo_paths" : [
+      "synthetic\/windows-r7-mac-final-20261101\/desktop-restored-profile.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "b8e11007725a35914dd66c58b741ff984616c3079e1109bcf3a9fff2fcb253cf",
+    "findings" : {
+
+    },
+    "ocr_lines" : 37,
+    "repo_paths" : [
+      "synthetic\/windows-r7-mac-final-20261101\/mobile-account-restored.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "c73af5cdd0b4077969b20f89d009ef55f31eeee850e9e30b808c7a228520adb0",
+    "findings" : {
+
+    },
+    "ocr_lines" : 34,
+    "repo_paths" : [
+      "synthetic\/windows-r7-mac-final-20261101\/mobile-scope-manager.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "d5eb1752c04fee1cac1d85fcc0a998da3a368533dfec3268758abcd458d37be6",
+    "findings" : {
+
+    },
+    "ocr_lines" : 54,
+    "repo_paths" : [
+      "synthetic\/windows-r7-mac-final-20261101\/mobile-scope-picker.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "a79a853a110e12217891584f44dfc6204a5fa42df4933db0911ef41564e4a470",
+    "findings" : {
+
+    },
+    "ocr_lines" : 78,
+    "repo_paths" : [
+      "synthetic\/windows-r7-picker-final-20261101\/synthetic-desktop-catalog-error.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "c78ff7a31d6850588b064aa16f96cc6929fc7152975a9481451cc3af538bc118",
+    "findings" : {
+
+    },
+    "ocr_lines" : 82,
+    "repo_paths" : [
+      "synthetic\/windows-r7-picker-final-20261101\/synthetic-desktop-catalog-loading.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "cfc6694e1deeca19afbac5d8e943a4ad463b705bd74b6d5ff930d7114936bbe5",
+    "findings" : {
+
+    },
+    "ocr_lines" : 55,
+    "repo_paths" : [
+      "synthetic\/windows-r7-picker-final-20261101\/synthetic-mobile-catalog-error.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "1f909627331135a96a9ef81c7a9a9247ecb8983377fb8e95930d2ba1937ed7f8",
+    "findings" : {
+
+    },
+    "ocr_lines" : 60,
+    "repo_paths" : [
+      "synthetic\/windows-r7-picker-final-20261101\/synthetic-mobile-catalog-loading.png"
+    ],
+    "status" : "read"
+  },
+  {
+    "blob" : "2a93825642348c1e13acca92fec818b4fc02744d552d6feb5d8ecb621e776132",
+    "findings" : {
+
+    },
+    "ocr_lines" : 58,
+    "repo_paths" : [
+      "synthetic\/windows-r7-picker-final-20261101\/synthetic-mobile-catalog-ready.png"
+    ],
+    "status" : "read"
+  }
+]

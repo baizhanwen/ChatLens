@@ -51,51 +51,195 @@ def source_account_identity(scope):
                                     separators=(',', ':')).encode()).hexdigest()
 
 
+CATALOG_SECONDS = 30
+CATALOG_LIMIT = 10000
+CATALOG_PHASES = {'idle', 'queued', 'validating_sources', 'opening_message', 'reading_message_tables',
+                  'opening_contacts', 'reading_contacts', 'preparing_choices', 'complete'}
+CATALOG_REASONS = {'windows_scope_catalog_timeout', 'windows_scope_catalog_cancelled',
+                   'windows_scope_catalog_limit', 'windows_scope_key_authentication_failed',
+                   'windows_scope_catalog_source_changed', 'windows_scope_catalog_unavailable'}
+CATALOG_COUNTS = ('databases_checked', 'tables_seen', 'contacts_seen', 'conversations_found')
+
+
+class CatalogReadError(ValueError):
+    """A fixed public code, never a driver exception or database path."""
+
+
+class CatalogRead:
+    """One cooperative, bounded read with an immutable source/domain snapshot.
+
+    The worker owns connections and closes them. Cancellation may call SQLite's
+    thread-safe interrupt(), but never closes a connection from another thread.
+    Native/open calls cannot be forcibly killed: a still-live worker prevents a
+    replacement task even after its deadline or cancellation has been reported.
+    """
+    def __init__(self, documents, generation, account_identity, *, clock=time.monotonic):
+        self.documents = documents
+        self.generation, self.account_identity = generation, account_identity
+        self.clock, self.started = clock, clock()
+        self.deadline = self.started + CATALOG_SECONDS
+        self.lock, self.cancelled = threading.Lock(), threading.Event()
+        self.cancel_reason = None
+        self.connections = set()
+        self.thread = None
+        self.result = None
+        self.error = None
+        self.phase = 'queued'
+        self.counts = dict.fromkeys(CATALOG_COUNTS, 0)
+
+    def _source_documents(self):
+        return self.documents
+
+    def stop_reason(self):
+        if self.cancelled.is_set():
+            return self.cancel_reason or 'windows_scope_catalog_cancelled'
+        if self.clock() >= self.deadline:
+            return 'windows_scope_catalog_timeout'
+        return None
+
+    def check(self):
+        reason = self.stop_reason()
+        if reason:
+            raise CatalogReadError(reason)
+
+    def update(self, phase, **counts):
+        self.check()
+        if phase not in CATALOG_PHASES or any(key not in CATALOG_COUNTS or type(value) is not int
+                or not 0 <= value <= CATALOG_LIMIT * 3 for key, value in counts.items()):
+            raise CatalogReadError('windows_scope_catalog_unavailable')
+        with self.lock:
+            self.phase = phase
+            self.counts.update(counts)
+
+    def cancel(self, reason='windows_scope_catalog_cancelled'):
+        with self.lock:
+            if not self.cancelled.is_set():
+                self.cancel_reason = reason
+            self.cancelled.set()
+            for connection in self.connections:
+                try:
+                    connection.interrupt()
+                except Exception:
+                    pass
+
+    def open(self, driver, path, key):
+        job = self
+        class ProgressDriver:
+            def connect(self, *args, **kwargs):
+                job.check()
+                connection = driver.connect(*args, **kwargs)
+                try:
+                    # Install before _open's PRAGMAs and first schema query, not
+                    # after expensive first-page decryption has already happened.
+                    connection.set_progress_handler(lambda: int(job.stop_reason() is not None), 1000)
+                    with job.lock:
+                        job.connections.add(connection)
+                    job.check()
+                    return connection
+                except Exception:
+                    with job.lock:
+                        job.connections.discard(connection)
+                    connection.close()
+                    raise
+        self.check()
+        connection = _open(ProgressDriver(), path, key)
+        self.check()
+        return connection
+
+    def release(self, connection):
+        with self.lock:
+            self.connections.discard(connection)
+        connection.close()
+
+    def finish(self):
+        with self.lock:
+            connections, self.connections = self.connections, set()
+        for connection in connections:
+            try:
+                connection.close()
+            except Exception:
+                pass
+
+    def snapshot(self):
+        with self.lock:
+            return {'schema_version': 1, 'phase': self.phase,
+                    'elapsed_seconds': min(86400, max(0, int(self.clock() - self.started))),
+                    'worker_active': bool(self.thread is not None and self.thread.is_alive()), **self.counts}
+
+
 def load_contact_catalog(manager):
-    """Enumerate contact names and source table names, never chat bodies."""
+    """Read bounded source/contact metadata only; no message-body SQL."""
     import sqlcipher3.dbapi2 as driver
     import windows_keyproof_core as proof
     import windows_keyproof_platform as platform
     scope, keys = manager._source_documents()
+    job = manager if isinstance(manager, CatalogRead) else CatalogRead((scope, keys), None, None)
     root, _, values, _ = validate_scope(scope, keys)
     tables = set()
-    for relative, value in values.items():
-        if not proof.page_authenticates(bytes.fromhex(value), platform.read_page(root / relative)):
-            raise ValueError('windows_scope_key_authentication_failed')
-        if not relative.startswith('message/'):
-            continue
-        connection = _open(driver, root / relative, value)
-        try:
-            deadline = time.monotonic() + 1.5
-            connection.set_progress_handler(lambda: int(time.monotonic() > deadline), 1000)
-            rows = connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name GLOB 'Msg_*' LIMIT 10001").fetchall()
-            if len(rows) > 10000:
-                raise ValueError('windows_scope_catalog_limit')
-            tables.update(row[0] for row in rows)
-        finally:
-            connection.close()
-    connection = _open(driver, root / 'contact/contact.db', values['contact/contact.db'])
     try:
-        deadline = time.monotonic() + 1.5
-        connection.set_progress_handler(lambda: int(time.monotonic() > deadline), 1000)
-        rows = connection.execute('SELECT username,substr(remark,1,256),substr(nick_name,1,256) FROM contact LIMIT 10001').fetchall()
-        if len(rows) > 10000:
-            raise ValueError('windows_scope_catalog_limit')
+        job.update('validating_sources')
+        checked = 0
+        for relative, value in values.items():
+            job.check()
+            if not proof.page_authenticates(bytes.fromhex(value), platform.read_page(root / relative)):
+                raise CatalogReadError('windows_scope_key_authentication_failed')
+            checked += 1
+            job.update('validating_sources', databases_checked=checked)
+        for relative, value in values.items():
+            if not relative.startswith('message/'):
+                continue
+            job.update('opening_message')
+            connection = job.open(driver, root / relative, value)
+            try:
+                job.update('reading_message_tables')
+                cursor = connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name GLOB 'Msg_*' LIMIT 10001")
+                total = 0
+                while True:
+                    job.check()
+                    rows = cursor.fetchmany(128)
+                    if not rows:
+                        break
+                    total += len(rows)
+                    if total > CATALOG_LIMIT:
+                        raise CatalogReadError('windows_scope_catalog_limit')
+                    tables.update(row[0] for row in rows)
+                    job.update('reading_message_tables', tables_seen=len(tables))
+            finally:
+                job.release(connection)
+        job.update('opening_contacts')
+        connection = job.open(driver, root / 'contact/contact.db', values['contact/contact.db'])
+        rows = []
+        try:
+            job.update('reading_contacts')
+            cursor = connection.execute('SELECT substr(username,1,257),substr(remark,1,256),substr(nick_name,1,256) FROM contact LIMIT 10001')
+            while True:
+                job.check()
+                batch = cursor.fetchmany(128)
+                if not batch:
+                    break
+                rows.extend(batch)
+                if len(rows) > CATALOG_LIMIT:
+                    raise CatalogReadError('windows_scope_catalog_limit')
+                job.update('reading_contacts', contacts_seen=len(rows))
+        finally:
+            job.release(connection)
+        result, seen = [], set()
+        job.update('preparing_choices')
+        for username, remark, nickname in rows:
+            job.check()
+            if not isinstance(username, str) or not ID.fullmatch(username) or username in seen:
+                continue
+            if 'Msg_' + hashlib.md5(username.encode()).hexdigest() not in tables:
+                continue
+            seen.add(username)
+            value = next((value.strip() for value in (remark, nickname) if isinstance(value, str) and value.strip()), '未命名会话')
+            name = ''.join(char for char in value if char >= ' ' and char != '\x7f')[:256] or '未命名会话'
+            result.append({'chat_id': username, 'name': name,
+                           'type': 'group' if username.endswith('@chatroom') else 'private'})
+        job.update('complete', conversations_found=len(result))
+        return result
     finally:
-        connection.close()
-    result = []
-    seen = set()
-    for username, remark, nickname in rows:
-        if not isinstance(username, str) or not ID.fullmatch(username) or username in seen:
-            continue
-        if 'Msg_' + hashlib.md5(username.encode()).hexdigest() not in tables:
-            continue
-        seen.add(username)
-        value = next((value.strip() for value in (remark, nickname) if isinstance(value, str) and value.strip()), '未命名会话')
-        name = ''.join(char for char in value if char >= ' ' and char != '\x7f')[:256] or '未命名会话'
-        result.append({'chat_id': username, 'name': name,
-                       'type': 'group' if username.endswith('@chatroom') else 'private'})
-    return result
+        job.finish()
 
 
 class WindowsWebManager:
@@ -127,6 +271,9 @@ class WindowsWebManager:
         self.provider = self.assistant = self.child = self.child_output = None
         self.active_config, self.contacts, self.catalog = {'conversations': []}, [], {}
         self.catalog_ready = self.catalog_loading = self.queued = self.switching = False
+        self.catalog_job, self.catalog_error = None, None
+        self.catalog_progress = {"schema_version": 1, "phase": "idle", "elapsed_seconds": 0,
+                                 "worker_active": False, **dict.fromkeys(CATALOG_COUNTS, 0)}
         self.closed, self.account_matched, self.account_blocked = False, bool(read_only), False
         self.account_probe_reason = 'windows_account_not_checked'
         self.account_diagnostics = {}
@@ -269,6 +416,7 @@ class WindowsWebManager:
             self.switching = True
             self._stop_active()
             self.contacts, self.catalog = [], {}
+            self._cancel_catalog(reset=True)
             self.catalog_ready = self.catalog_loading = False
             self.commands, self.queued = SimpleQueue(), False
         self.account_matched = False
@@ -360,6 +508,7 @@ class WindowsWebManager:
             # opened while the account was unverified cannot later read it.
             self.scope_generation = secrets.token_hex(16)
             self.contacts, self.catalog = [], {}
+            self._cancel_catalog(reset=True)
             self.catalog_ready = self.catalog_loading = False
             self.commands = SimpleQueue()
         self.account_blocked = False
@@ -466,6 +615,7 @@ class WindowsWebManager:
             if not self.account_blocked:
                 self.scope_generation = secrets.token_hex(16)
                 self.account_blocked, self.switching = True, True
+                self._cancel_catalog(reset=True)
                 self.catalog_ready = self.catalog_loading = self.queued = False
                 self.contacts, self.catalog, self.commands = [], {}, SimpleQueue()
                 self._stop_active()
@@ -697,7 +847,7 @@ class WindowsWebManager:
                 'initialization': {'state': 'working' if self.queued or self.stage == 'starting' else 'idle',
                                    'action': 'none', 'description': self.description},
                 'scope_limits': {'total': MAX_CONVERSATIONS, 'private': MAX_CONVERSATIONS, 'group': MAX_CONVERSATIONS},
-                **self.public_scope_context(), 'catalog': {'state': 'loading' if self.catalog_loading else 'ready' if self.catalog_ready else 'idle'},
+                **self.public_scope_context(), 'catalog': self._catalog_status(),
                 'active_scope': next((row for row in profiles if row['active']), None),
                 'profiles': profiles, 'workspace_path': '/'}
 
@@ -728,7 +878,8 @@ class WindowsWebManager:
                 'account_diagnostics': sanitize_diagnostics(self.account_diagnostics),
                 'selected_conversation_count': min(MAX_CONVERSATIONS, len(self.active_config.get('conversations', []))),
                 'collector_running': bool(connection.get('collector_running', self.child is not None and self.child.poll() is None)),
-                'collector_stage': stage if stage in {'starting', 'collecting', 'paused', 'stale', 'stopping', 'stopped', 'error'} else None}
+                'collector_stage': stage if stage in {'starting', 'collecting', 'paused', 'stale', 'stopping', 'stopped', 'error'} else None,
+                'catalog': self._catalog_status(description=False)}
 
     def request_recheck(self, expected_generation=None):
         with self.lock:
@@ -760,17 +911,127 @@ class WindowsWebManager:
             self._check_generation(expected_generation)
             raise ValueError('windows_existing_reader_configuration_required')
 
+    def _catalog_status(self, *, description=True):
+        job = self.catalog_job
+        domain_valid = (job is not None and job.generation == self.scope_generation
+                        and job.account_identity == self.account_identity
+                        and not self.closed and not self.account_blocked and self.account_matched)
+        progress = job.snapshot() if domain_valid else dict(self.catalog_progress)
+        if job is not None and not domain_valid:
+            progress['worker_active'] = bool(job.thread is not None and job.thread.is_alive())
+        reason = self.catalog_error if self.catalog_error in CATALOG_REASONS else None
+        state = 'error' if reason else 'loading' if self.catalog_loading else 'ready' if self.catalog_ready else 'idle'
+        result = {**progress, 'state': state, 'reason': reason}
+        if description:
+            result['description'] = ({
+                'windows_scope_catalog_timeout': '会话目录读取超过30秒预算。原采集继续保留；请在当前读取结束后重试。',
+                'windows_scope_catalog_cancelled': '会话目录读取已取消，原消息和关注范围保留。',
+                'windows_scope_catalog_limit': '会话元信息超出本轮读取上限，原关注范围保留。',
+                'windows_scope_key_authentication_failed': '会话目录读取密钥校验未通过，原数据和配置保留。',
+                'windows_scope_catalog_source_changed': '读取期间账号或资料依据发生变化，本次目录结果已丢弃。',
+                'windows_scope_catalog_unavailable': '会话目录读取未完成，原采集和关注范围保留。可重新读取。',
+            }.get(reason) if reason else
+                '正在准备会话目录，原关注范围继续采集。' if state == 'loading' else
+                '会话目录已就绪，可以搜索和选择。' if state == 'ready' else
+                '上一次会话目录读取正在结束，请稍候再读取。' if progress['worker_active'] else
+                '点击读取会话目录后，再选择需要关注的会话。')
+        return result
+
+    def _cancel_catalog(self, *, reset=False):
+        if self.catalog_job is not None:
+            self.catalog_job.cancel()
+            if self.catalog_job.thread is None or not self.catalog_job.thread.is_alive():
+                self.catalog_job = None
+        self.catalog_loading = False
+        if reset:
+            self.catalog_ready, self.catalog_error = False, None
+            self.catalog_progress = {'schema_version': 1, 'phase': 'idle', 'elapsed_seconds': 0,
+                                     'worker_active': False, **dict.fromkeys(CATALOG_COUNTS, 0)}
+
     def request_catalog(self, expected_generation=None):
         with self.lock:
             self._check_generation(expected_generation)
-            if (self.read_only or self.switching or self.wait_for_wechat and (
-                    self.account_blocked or not self.account_matched or not self.reader_config_ready)
-                    or not self._verify_account(force=True)):
+            if (self.closed or self.read_only or self.switching or self.queued or not self.cleanup_confirmed
+                    or self.account_blocked or not self.account_matched or not self.reader_config_ready):
                 raise ValueError('windows_scope_catalog_not_ready')
-            if not self.catalog_loading:
-                self.catalog_loading = True
-                self.commands.put(('catalog', None))
+            # Do not create replacement workers while a cancelled/slow read is
+            # still unwinding, and do not invalidate a completed catalog for a
+            # repeated click on the same ready picker.
+            if self.catalog_job is not None and (self.catalog_job.thread is None or self.catalog_job.thread.is_alive()):
+                return self.setup()
+            if not self._verify_account(force=True):
+                raise ValueError('windows_scope_catalog_not_ready')
+            if self.catalog_ready and self.catalog_error is None:
+                return self.setup()
+            try:
+                documents = self._source_documents()
+            except Exception:
+                self.catalog_error = 'windows_scope_catalog_source_changed'
+                return self.setup()
+            self.catalog_ready, self.catalog_loading, self.catalog_error = False, True, None
+            self.catalog_job = CatalogRead(documents, self.scope_generation, self.account_identity)
+            self.commands.put(('catalog', self.catalog_job))
             return self.setup()
+
+    def _start_catalog(self, job):
+        if job is not self.catalog_job or job.cancelled.is_set() or job.thread is not None:
+            return
+        loader = self.catalog_loader
+        def run():
+            try:
+                rows = loader(job)
+                job.check()
+                if not isinstance(rows, list) or len(rows) > CATALOG_LIMIT:
+                    raise CatalogReadError('windows_scope_catalog_limit')
+                job.update('complete', conversations_found=len(rows))
+                job.result = rows
+            except Exception as problem:
+                reason = job.stop_reason()
+                if reason is None and isinstance(problem, CatalogReadError):
+                    reason = str(problem)
+                job.error = reason if reason in CATALOG_REASONS else 'windows_scope_catalog_unavailable'
+            finally:
+                job.finish()
+        job.thread = threading.Thread(target=run, name='chatlens-contact-catalog', daemon=True)
+        job.thread.start()
+
+    def _poll_catalog(self):
+        job = self.catalog_job
+        if job is None or job.thread is None:
+            return
+        domain_valid = (not self.closed and job.generation == self.scope_generation
+                        and job.account_identity == self.account_identity
+                        and not self.account_blocked and self.account_matched and not self.switching)
+        if job.thread.is_alive():
+            if not domain_valid:
+                job.cancel()
+            elif job.stop_reason():
+                job.cancel(job.stop_reason())
+                self.catalog_error = job.stop_reason()
+                self.catalog_loading = self.catalog_ready = False
+            return
+        self.catalog_job = None
+        if not domain_valid:
+            return
+        self.catalog_progress = job.snapshot()
+        self.catalog_progress['worker_active'] = False
+        self.catalog_loading = False
+        reason = job.error or job.stop_reason()
+        if reason:
+            self.catalog_ready = False
+            self.catalog_error = reason if reason in CATALOG_REASONS else 'windows_scope_catalog_unavailable'
+            return
+        if not self._verify_account(force=True) or job.generation != self.scope_generation:
+            return
+        try:
+            if self._source_documents() != job.documents:
+                raise CatalogReadError('windows_scope_catalog_source_changed')
+            self._load_contacts(job.result)
+            self.catalog_error = None
+        except Exception as problem:
+            self.catalog_ready = False
+            reason = str(problem) if isinstance(problem, CatalogReadError) else None
+            self.catalog_error = reason if reason in CATALOG_REASONS else 'windows_scope_catalog_unavailable'
 
     def list_conversations(self, q='', *, expected_generation=None):
         with self.lock:
@@ -780,9 +1041,11 @@ class WindowsWebManager:
             rows = [dict(row) for row in self.contacts if q.casefold() in row['name'].casefold()] if self.catalog_ready else []
             if not q:
                 rows.sort(key=lambda row: (not row['selected'], row['type'], row['name'].casefold()))
-            return {'conversations': rows[:200], 'has_more': len(rows) > 200}
+            return {'conversations': rows[:200], 'has_more': len(rows) > 200, 'catalog': self._catalog_status()}
 
     def _begin_switch(self):
+        if self.catalog_job is not None:
+            self._cancel_catalog(reset=True)
         self.scope_generation = secrets.token_hex(16)
         self.switching = self.queued = True
         self.stage, self.reason = 'starting', None
@@ -824,8 +1087,7 @@ class WindowsWebManager:
             self.commands.put(('profile', identifier))
             return self.setup()
 
-    def _load_contacts(self):
-        rows = self.catalog_loader(self)
+    def _load_contacts(self, rows):
         old = {row['chat_id']: token for token, row in self.catalog.items()}
         contacts, catalog = [], {}
         selected = {row['chat_id'] for row in self.active_config['conversations']}
@@ -886,17 +1148,13 @@ class WindowsWebManager:
                     self._activate(self.active_scope_id)
                     return
                 if command == 'catalog':
-                    try:
-                        self._load_contacts()
-                    except Exception:
-                        self.catalog_ready = self.catalog_loading = False
-                        self.reason = 'windows_scope_catalog_unavailable'
-                        self.description = '会话名称暂不可用，原关注范围继续保留；请确认微信账号与读取权限后重试。'
+                    self._start_catalog(value)
                 elif command == 'select':
                     self.collection_requested = True
                     self._activate(value[0], value[1], value[2])
                 elif command == 'profile':
                     self._activate(value)
+                self._poll_catalog()
                 self._refresh_provider()
             except Exception:
                 try:
@@ -956,6 +1214,8 @@ class WindowsWebManager:
             if self.closed and self.child is None:
                 return
             self.closed = True
+            catalog_job = self.catalog_job
+            self._cancel_catalog(reset=True)
             self.scope_generation = secrets.token_hex(16)
             self.switching = True
             try:
@@ -964,3 +1224,5 @@ class WindowsWebManager:
                 if self.runtime_lock is not None:
                     os.close(self.runtime_lock)
                     self.runtime_lock = None
+        if catalog_job is not None and catalog_job.thread is not None:
+            catalog_job.thread.join(timeout=.2)

@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -19,7 +20,8 @@ from collector_web_meta import WebMetadata
 from continuous_store import CollectorStore
 from conversation_scope import alias_for
 from web_data import WebDataError
-from windows_web_manager import WindowsWebManager, atomic_private, scope_fingerprint
+from windows_web_manager import (WindowsWebManager, CatalogRead, CatalogReadError, load_contact_catalog,
+                                 atomic_private, scope_fingerprint)
 import web_runtime
 from windows_web_server import make_windows_server
 
@@ -115,6 +117,9 @@ class WindowsManagerTests(unittest.TestCase):
     def ready_catalog(self, manager):
         before = manager.child
         manager.request_catalog(expected_generation=manager.scope_generation)
+        manager.tick()
+        if manager.catalog_job is not None:
+            manager.catalog_job.thread.join(timeout=2)
         manager.tick()
         self.assertTrue(manager.catalog_ready)
         self.assertIs(manager.child,before)
@@ -418,7 +423,7 @@ class WindowsManagerTests(unittest.TestCase):
         self.clock_value+=4;manager.tick()
         document=manager.connection_diagnostics(expected_generation=manager.scope_generation)
         self.assertEqual(set(document),{'schema_version','kind','platform','connection_state','account_reason',
-            'checks','account_diagnostics','selected_conversation_count','collector_running','collector_stage'})
+            'checks','account_diagnostics','selected_conversation_count','collector_running','collector_stage','catalog'})
         self.assertEqual(document['account_diagnostics'],counts)
         self.assertEqual(document['account_reason'],'windows_account_mapped_database_unavailable')
         self.assertEqual(document['connection_state'],'account_unverified')
@@ -696,6 +701,404 @@ class WindowsManagerTests(unittest.TestCase):
         self.assertEqual(manager.status()['state'],'stale')
         document['recorded_at_utc']='2999-01-01T00:00:00+00:00';collector_service.write_public(own,document)
         self.assertEqual(manager.status()['state'],'stale')
+
+    def finish_catalog(self, manager):
+        job = manager.catalog_job
+        if job is not None and job.thread is not None:
+            job.thread.join(timeout=2)
+            self.assertFalse(job.thread.is_alive())
+        manager.tick()
+
+    def blocking_catalog(self):
+        started, release = threading.Event(), threading.Event()
+        def loader(job):
+            job.update('reading_contacts', contacts_seen=7)
+            started.set()
+            if not release.wait(3):
+                raise AssertionError('synthetic test did not release worker')
+            job.check()
+            return [dict(row) for row in self.choices]
+        manager = self.manager(catalog_loader=loader)
+        manager.request_catalog(expected_generation=manager.scope_generation)
+        manager.tick()
+        self.assertTrue(started.wait(1))
+        return manager, release
+
+    def test_async_catalog_keeps_setup_diagnostics_and_saved_messages_responsive(self):
+        manager, release = self.blocking_catalog()
+        child = manager.child
+        try:
+            started = time.monotonic()
+            setup = manager.setup()
+            document = manager.connection_diagnostics()
+            self.assertEqual(len(manager.messages('private_test')['messages']), 1)
+            self.assertLess(time.monotonic() - started, .3)
+            self.assertEqual(setup['catalog']['state'], 'loading')
+            self.assertEqual(setup['catalog']['phase'], 'reading_contacts')
+            self.assertEqual(document['catalog']['contacts_seen'], 7)
+            self.assertTrue(document['catalog']['worker_active'])
+            self.assertTrue(setup['connection']['can_modify_scope'])
+            self.assertIs(manager.child, child)
+            self.assertEqual(manager.list_conversations()['catalog']['state'], 'loading')
+        finally:
+            release.set()
+            self.finish_catalog(manager)
+        self.assertEqual(manager.setup()['catalog']['state'], 'ready')
+        self.assertEqual(manager.setup()['catalog']['conversations_found'], 4)
+        self.assertEqual(len(manager.list_conversations()['conversations']), 4)
+        self.assertIs(manager.child, child)
+
+    def test_catalog_failure_is_local_and_fixed_then_explicit_retry_can_succeed(self):
+        marker = str(self.root) + '/SYNTHETIC_PRIVATE_DRIVER_DETAIL'
+        manager = self.manager(catalog_loader=lambda _: (_ for _ in ()).throw(OSError(marker)))
+        child = manager.child
+        manager.request_catalog(expected_generation=manager.scope_generation)
+        manager.tick()
+        self.finish_catalog(manager)
+        catalog = manager.setup()['catalog']
+        self.assertEqual(catalog['state'], 'error')
+        self.assertEqual(catalog['reason'], 'windows_scope_catalog_unavailable')
+        self.assertEqual(manager.stage, 'running')
+        self.assertTrue(manager.account_matched)
+        self.assertIs(manager.child, child)
+        self.assertNotIn(marker, json.dumps(manager.setup()))
+        self.assertNotIn(marker, json.dumps(manager.connection_diagnostics()))
+        self.assertEqual(manager.list_conversations()['catalog']['state'], 'error')
+        manager.catalog_loader = lambda _: [dict(row) for row in self.choices]
+        manager.request_catalog(expected_generation=manager.scope_generation)
+        manager.tick()
+        self.finish_catalog(manager)
+        self.assertEqual(manager.setup()['catalog']['state'], 'ready')
+        self.assertIsNone(manager.setup()['catalog']['reason'])
+
+    def test_timeout_is_visible_but_retry_cannot_accumulate_workers(self):
+        manager, release = self.blocking_catalog()
+        job = manager.catalog_job
+        try:
+            job.deadline = job.clock() - 1
+            manager.tick()
+            catalog = manager.setup()['catalog']
+            self.assertEqual(catalog['state'], 'error')
+            self.assertEqual(catalog['reason'], 'windows_scope_catalog_timeout')
+            self.assertTrue(catalog['worker_active'])
+            for _ in range(3):
+                manager.request_catalog(expected_generation=manager.scope_generation)
+                manager.tick()
+                self.assertIs(manager.catalog_job, job)
+            self.assertIsNotNone(manager.child)
+        finally:
+            release.set()
+            self.finish_catalog(manager)
+        self.assertFalse(manager.setup()['catalog']['worker_active'])
+        self.assertEqual(manager.setup()['catalog']['reason'], 'windows_scope_catalog_timeout')
+        manager.catalog_loader = lambda _: [dict(row) for row in self.choices]
+        manager.request_catalog(expected_generation=manager.scope_generation)
+        manager.tick()
+        self.finish_catalog(manager)
+        self.assertTrue(manager.catalog_ready)
+
+    def test_queued_catalog_cancelled_before_tick_can_retry_after_scope_switch(self):
+        manager = self.manager()
+        generation = manager.scope_generation
+        manager.request_catalog(expected_generation=generation)
+        old_job = manager.catalog_job
+        self.assertIsNone(old_job.thread)
+        manager.restore_profile('legacy', expected_generation=generation)
+        self.assertIsNone(manager.catalog_job)
+        manager.tick()  # Retire the stale queued command, then perform switch.
+        manager.tick()
+        self.assertTrue(old_job.cancelled.is_set())
+        self.ready_catalog(manager)
+        self.assertEqual(manager.setup()['catalog']['state'], 'ready')
+
+    def test_queued_catalog_account_loss_and_return_does_not_block_retry(self):
+        manager = self.manager()
+        manager.request_catalog(expected_generation=manager.scope_generation)
+        old_job = manager.catalog_job
+        self.probe_result = {'state': 'mismatch', 'matched': False, 'reason': 'windows_account_changed_or_ambiguous'}
+        self.clock_value = 5
+        manager.tick()
+        self.assertIsNone(manager.catalog_job)
+        self.assertTrue(old_job.cancelled.is_set())
+        self.probe_result = {'state': 'matched', 'matched': True, 'reason': 'synthetic_matched'}
+        self.clock_value = 10
+        manager.tick()
+        self.ready_catalog(manager)
+
+    def test_running_catalog_account_loss_discards_counts_and_late_names(self):
+        manager, release = self.blocking_catalog()
+        job = manager.catalog_job
+        self.probe_result = {'state': 'mismatch', 'matched': False, 'reason': 'windows_account_changed_or_ambiguous'}
+        self.clock_value = 5
+        try:
+            manager.tick()
+            self.assertTrue(job.cancelled.is_set())
+            for _ in range(2):
+                manager.tick()
+                catalog = manager.setup()['catalog']
+                self.assertEqual(catalog['state'], 'idle')
+                self.assertEqual(catalog['phase'], 'idle')
+                self.assertEqual(catalog['contacts_seen'], 0)
+                self.assertIsNone(catalog['reason'])
+                self.assertTrue(catalog['worker_active'])
+            self.assertEqual(manager.contacts, [])
+        finally:
+            release.set()
+            job.thread.join(timeout=2)
+        self.probe_result = {'state': 'matched', 'matched': True, 'reason': 'synthetic_matched'}
+        self.clock_value = 10
+        manager.tick()
+        manager.tick()
+        self.assertEqual(manager.contacts, [])
+        self.assertEqual(manager.setup()['catalog']['contacts_seen'], 0)
+        manager.catalog_loader = lambda _: [dict(row) for row in self.choices]
+        self.ready_catalog(manager)
+
+    def test_scope_change_during_catalog_read_never_installs_old_result_or_counts(self):
+        manager, release = self.blocking_catalog()
+        job = manager.catalog_job
+        try:
+            manager.restore_profile('legacy', expected_generation=manager.scope_generation)
+            manager.tick()
+            for _ in range(2):
+                manager.tick()
+                catalog = manager.setup()['catalog']
+                self.assertEqual(catalog['state'], 'idle')
+                self.assertEqual(catalog['contacts_seen'], 0)
+                self.assertIsNone(catalog['reason'])
+        finally:
+            release.set()
+            self.finish_catalog(manager)
+        self.assertEqual(manager.contacts, [])
+        self.assertEqual(manager.setup()['catalog']['phase'], 'idle')
+
+    def test_close_cancels_worker_without_waiting_for_an_uncooperative_loader(self):
+        manager, release = self.blocking_catalog()
+        job = manager.catalog_job
+        try:
+            started = time.monotonic()
+            manager.close()
+            self.assertLess(time.monotonic() - started, .6)
+            self.assertTrue(job.cancelled.is_set())
+            self.assertIsNone(manager.child)
+        finally:
+            release.set()
+            job.thread.join(timeout=2)
+        manager.tick()
+        self.assertEqual(manager.contacts, [])
+
+    def test_contact_source_change_during_read_rejects_completed_catalog(self):
+        manager, release = self.blocking_catalog()
+        job = manager.catalog_job
+        try:
+            changed = read_private_json(self.data / 'private/keys.json')
+            changed['keys']['contact/contact.db']['enc_key'] = '02' * 32
+            atomic_private(self.data / 'private/keys.json', changed)
+        finally:
+            release.set()
+            self.finish_catalog(manager)
+        self.assertEqual(manager.setup()['catalog']['reason'], 'windows_scope_catalog_source_changed')
+        self.assertFalse(manager.catalog_ready)
+        self.assertEqual(manager.contacts, [])
+
+    def test_empty_ready_catalog_is_distinct_from_idle_or_error(self):
+        manager = self.manager(catalog_loader=lambda _: [])
+        self.assertEqual(manager.list_conversations()['catalog']['state'], 'idle')
+        manager.request_catalog(expected_generation=manager.scope_generation)
+        manager.tick()
+        self.finish_catalog(manager)
+        self.assertEqual(manager.list_conversations()['catalog']['state'], 'ready')
+        self.assertEqual(manager.list_conversations()['conversations'], [])
+        self.assertIsNone(manager.list_conversations()['catalog']['reason'])
+
+    def test_catalog_stale_generation_cannot_start_or_read_another_scope(self):
+        manager = self.manager()
+        with self.assertRaisesRegex(WebDataError, 'scope_changed'):
+            manager.request_catalog(expected_generation='stale')
+        with self.assertRaisesRegex(WebDataError, 'scope_changed'):
+            manager.list_conversations(expected_generation='stale')
+        self.assertIsNone(manager.catalog_job)
+
+    def test_catalog_progress_handler_precedes_the_first_schema_read(self):
+        path = self.db / 'synthetic-header.db'
+        path.write_bytes(b'SYNTHETIC_HEADER_')
+        events = []
+        class Connection:
+            def set_progress_handler(self, callback, interval):
+                self.callback = callback
+                events.append(('handler', interval))
+            def execute(self, sql):
+                events.append(('sql', sql))
+                return self
+            def fetchone(self): return ('synthetic-cipher',)
+            def close(self): events.append(('close', None))
+            def interrupt(self): events.append(('interrupt', None))
+        connection = Connection()
+        class Driver:
+            def connect(self, *args, **kwargs): return connection
+        job = CatalogRead((self.scope, {}), 'synthetic', 'synthetic')
+        opened = job.open(Driver(), path, '01' * 32)
+        job.cancel()
+        self.assertEqual(connection.callback(), 1)
+        job.release(opened)
+        job.finish()
+        first_schema = next(i for i, event in enumerate(events) if event[0] == 'sql' and 'sqlite_master' in event[1])
+        handler = next(i for i, event in enumerate(events) if event[0] == 'handler')
+        self.assertLess(handler, first_schema)
+        self.assertIn(('interrupt', None), events)
+
+    def test_catalog_total_budget_covers_opening_and_preserves_failure_phase(self):
+        now = [0]
+        job = CatalogRead((self.scope, {}), 'synthetic', 'synthetic', clock=lambda: now[0])
+        job.update('opening_contacts')
+        now[0] = 31
+        with self.assertRaisesRegex(CatalogReadError, 'windows_scope_catalog_timeout'):
+            job.update('reading_contacts')
+        self.assertEqual(job.snapshot()['phase'], 'opening_contacts')
+        self.assertEqual(job.snapshot()['elapsed_seconds'], 31)
+
+    def create_encrypted_catalog_sources(self, *, contact_count=None):
+        try:
+            import sqlcipher3.dbapi2 as driver
+        except ImportError:
+            self.skipTest('requires isolated SQLCipher dependency')
+        keys = read_private_json(self.data / 'private/keys.json')
+        for index, (relative, value) in enumerate(keys['keys'].items()):
+            path = self.db / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            connection = driver.connect(str(path))
+            connection.execute('PRAGMA key = "x\'%s\'"' % value['enc_key'])
+            connection.execute('PRAGMA cipher_compatibility=4')
+            connection.execute('PRAGMA cipher_page_size=4096')
+            if relative.startswith('message/'):
+                for row in self.choices[index::2]:
+                    table = 'Msg_' + hashlib.md5(row['chat_id'].encode()).hexdigest()
+                    connection.execute('CREATE TABLE "%s" (message_content TEXT)' % table)
+                    connection.execute('INSERT INTO "%s" VALUES (?)' % table, ('SYNTHETIC_BODY_MUST_NOT_BE_READ',))
+            else:
+                connection.execute('CREATE TABLE contact(username TEXT,remark TEXT,nick_name TEXT,private_body TEXT)')
+                if contact_count is None:
+                    rows = [(row['chat_id'], row['name'], '合成昵称', 'SYNTHETIC_CONTACT_SECRET') for row in self.choices]
+                    rows += [('synthetic-no-message-table', '无消息表的合成联系人', '', 'SYNTHETIC_CONTACT_SECRET')]
+                else:
+                    rows = [('synthetic-limit-%d' % n, '', '', 'SYNTHETIC_CONTACT_SECRET') for n in range(contact_count)]
+                connection.executemany('INSERT INTO contact VALUES (?,?,?,?)', rows)
+            connection.commit()
+            connection.close()
+        # Only the Windows native file-header read is substituted; the header
+        # bytes and full HMAC verification remain real synthetic SQLCipher.
+        native_page = patch('windows_keyproof_platform.read_page', side_effect=lambda path: Path(path).read_bytes()[:4096])
+        native_page.start()
+        self.addCleanup(native_page.stop)
+        return driver
+
+    def test_real_sqlcipher_catalog_checks_all_headers_and_never_reads_message_bodies(self):
+        driver = self.create_encrypted_catalog_sources()
+        connect = driver.connect
+        reads, denied = [], []
+        def metadata_connect(*args, **kwargs):
+            connection = connect(*args, **kwargs)
+            def authorize(action, source, column, *_):
+                if action == driver.SQLITE_READ:
+                    reads.append((source, column))
+                    if source.startswith('Msg_') or source == 'contact' and column == 'private_body':
+                        denied.append((source, column))
+                        return driver.SQLITE_DENY
+                return driver.SQLITE_OK
+            connection.set_authorizer(authorize)
+            return connection
+        manager = self.manager(catalog_loader=load_contact_catalog)
+        before = {path: hashlib.sha256(path.read_bytes()).hexdigest() for path in self.db.rglob('*.db')}
+        import windows_keyproof_core as proof
+        with patch.object(driver, 'connect', side_effect=metadata_connect), patch.object(proof, 'page_authenticates', wraps=proof.page_authenticates) as authenticate:
+            self.ready_catalog(manager)
+            self.assertEqual(authenticate.call_count, 3)
+        self.assertEqual(denied, [])
+        self.assertTrue(any(source == 'contact' for source, _ in reads))
+        self.assertEqual({row['name'] for row in manager.contacts}, {row['name'] for row in self.choices})
+        self.assertEqual(manager.setup()['catalog']['databases_checked'], 3)
+        self.assertEqual(manager.setup()['catalog']['contacts_seen'], 5)
+        self.assertEqual(before, {path: hashlib.sha256(path.read_bytes()).hexdigest() for path in self.db.rglob('*.db')})
+
+    def test_catalog_hmac_failure_prevents_any_sql_source_connection(self):
+        driver = self.create_encrypted_catalog_sources()
+        keys = read_private_json(self.data / 'private/keys.json')
+        keys['keys']['message/message_0.db']['enc_key'] = 'ff' * 32
+        atomic_private(self.data / 'private/keys.json', keys)
+        manager = self.manager(catalog_loader=load_contact_catalog)
+        child = manager.child
+        with patch.object(driver, 'connect', side_effect=AssertionError('must authenticate before SQL')) as connect:
+            manager.request_catalog(expected_generation=manager.scope_generation)
+            manager.tick()
+            self.finish_catalog(manager)
+            self.assertEqual(connect.call_count, 0)
+        self.assertEqual(manager.setup()['catalog']['reason'], 'windows_scope_key_authentication_failed')
+        self.assertEqual(manager.setup()['catalog']['phase'], 'validating_sources')
+        self.assertIs(manager.child, child)
+
+    def test_real_sqlcipher_contact_limit_is_visible_and_preserves_original_collector(self):
+        self.create_encrypted_catalog_sources(contact_count=10001)
+        manager = self.manager(catalog_loader=load_contact_catalog)
+        child = manager.child
+        manager.request_catalog(expected_generation=manager.scope_generation)
+        manager.tick()
+        self.finish_catalog(manager)
+        self.assertEqual(manager.setup()['catalog']['reason'], 'windows_scope_catalog_limit')
+        self.assertEqual(manager.setup()['catalog']['phase'], 'reading_contacts')
+        self.assertLessEqual(manager.setup()['catalog']['contacts_seen'], 10000)
+        self.assertIs(manager.child, child)
+        self.assertEqual(manager.contacts, [])
+
+    def test_metadata_queries_share_budget_instead_of_independent_one_point_five_seconds(self):
+        driver = self.create_encrypted_catalog_sources()
+        connect = driver.connect
+        now = [0]
+        manager = self.manager()
+        job = CatalogRead(manager._source_documents(), manager.scope_generation, manager.account_identity, clock=lambda: now[0])
+        class TimedConnection:
+            def __init__(self, connection): self.connection = connection
+            def __getattr__(self, name): return getattr(self.connection, name)
+            def execute(self, sql, *args):
+                if sql.startswith('SELECT '): now[0] += 2
+                return self.connection.execute(sql, *args)
+        def timed_connect(*args, **kwargs): return TimedConnection(connect(*args, **kwargs))
+        with patch.object(driver, 'connect', side_effect=timed_connect):
+            rows = load_contact_catalog(job)
+        self.assertEqual(len(rows), 4)
+        self.assertGreater(now[0], 1.5)
+        self.assertLess(now[0], 30)
+        self.assertEqual(job.snapshot()['phase'], 'complete')
+        self.assertEqual(job.connections, set())
+
+    def test_http_setup_and_diagnostics_respond_while_native_catalog_worker_is_busy(self):
+        manager, release = self.blocking_catalog()
+        static = self.package / 'web'
+        static.mkdir()
+        (static / 'index.html').write_text('<!doctype html>synthetic')
+        (static / 'connect.html').write_text('<!doctype html>synthetic connect')
+        server = make_windows_server(manager, static)
+        worker = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': .01}, daemon=True)
+        worker.start()
+        try:
+            started = time.monotonic()
+            for endpoint in ('/api/setup', '/api/setup/diagnostics', '/api/setup/conversations'):
+                connection = http.client.HTTPConnection(*server.server_address, timeout=1)
+                connection.request('GET', endpoint, headers={
+                    'Cookie': 'chatlens_session=' + server.token,
+                    'X-ChatLens-Scope': manager.scope_generation, 'Origin': server.base_url})
+                response = connection.getresponse()
+                result = json.loads(response.read())
+                connection.close()
+                self.assertEqual(response.status, 200)
+                self.assertEqual(result['catalog']['state'], 'loading')
+                self.assertEqual(result['catalog']['phase'], 'reading_contacts')
+            self.assertLess(time.monotonic() - started, 1)
+        finally:
+            server.shutdown()
+            server.server_close()
+            worker.join(timeout=2)
+            release.set()
+            self.finish_catalog(manager)
 
 
 if __name__=='__main__': unittest.main()

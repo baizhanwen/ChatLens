@@ -4,7 +4,7 @@
   const $ = id => document.getElementById(id);
   const stages = new Set(['needs_initialization', 'ready_to_select', 'ready_to_start', 'starting', 'running', 'error', 'waiting_for_wechat', 'needs_connection']);
   const connectionStates = new Set(['waiting_for_wechat', 'checking_account', 'account_unverified', 'wrong_account', 'connected', 'stopped', 'explicit_read_only', 'cleanup_required']);
-  const state = { setup: null, platform: null, generation: null, connected: false, error: null, busy: null, epoch: 0, setupRequest: 0, timer: null, failures: 0, listRequest: 0, listLoading: false, listError: false, listMore: false, rows: [], selected: new Map(), selectionSeeded: false, pickerGeneration: null, loadedGeneration: null, editing: false, redirecting: false, recovering: false, enterWorkspace: false, stayOnSetup: new URLSearchParams(location.search).get('manage') === '1' };
+  const state = { setup: null, platform: null, generation: null, connected: false, error: null, busy: null, epoch: 0, setupRequest: 0, timer: null, failures: 0, listRequest: 0, listLoading: false, listError: false, catalogError: null, listMore: false, rows: [], selected: new Map(), selectionSeeded: false, pickerGeneration: null, loadedGeneration: null, editing: false, redirecting: false, recovering: false, enterWorkspace: false, stayOnSetup: new URLSearchParams(location.search).get('manage') === '1' };
   const renderedLists = new Map();
   let profilesSignature = '';
   let searchTimer;
@@ -24,10 +24,19 @@
   function canOpenWorkspace() { return connection()?.can_read_saved === true && (!collectorRunning() || collectorReady()); }
   function connectionAction(kind) { const value = connection(); return value?.['can_' + kind] === true && Array.isArray(value.actions) && value.actions.includes(kind); }
   function working() { return state.busy !== null || state.setup?.initialization?.state === 'working' || state.setup?.stage === 'starting' || state.setup?.scope_switching === true || connection()?.state === 'checking_account' || collectorRunning() && collectorStage() === 'starting'; }
-  function catalogReady() { return state.setup?.catalog?.state === 'ready' || state.setup?.stage === 'ready_to_select'; }
-  function canSelect() { return state.connected && Boolean(state.generation) && state.editing && (windows() ? connection()?.can_modify_scope === true : ['ready_to_select', 'running', 'error'].includes(state.setup?.stage)) && catalogReady() && !working(); }
+  function catalogStatus() {
+    if (state.catalogError) return 'error';
+    const value = state.setup?.catalog?.state;
+    if (['loading', 'ready', 'error'].includes(value)) return value;
+    if (['windows_scope_catalog_unavailable', 'macos_contact_catalog_unavailable'].includes(state.setup?.reason)) return 'error';
+    if (value === 'idle') return 'idle';
+    return state.setup?.stage === 'ready_to_select' ? 'ready' : 'idle';
+  }
+  function catalogReady() { return catalogStatus() === 'ready'; }
+  function canManageSelection() { return state.connected && Boolean(state.generation) && (windows() ? connection()?.can_modify_scope === true : ['ready_to_select', 'running', 'error'].includes(state.setup?.stage)) && !working(); }
+  function canSelect() { return canManageSelection() && state.editing && catalogReady(); }
   function scopeLimit() { const value = state.setup?.scope_limits?.total; return Number.isSafeInteger(value) && value > 0 ? Math.min(value, 50) : 50; }
-  function resetPicker() { state.listRequest++; state.rows = []; state.selected.clear(); state.selectionSeeded = false; state.pickerGeneration = null; state.loadedGeneration = null; state.listLoading = false; state.listError = false; state.listMore = false; state.editing = false; clearTimeout(searchTimer); $('setup-conversation-search').value = ''; renderedLists.clear(); }
+  function resetPicker() { state.listRequest++; state.rows = []; state.selected.clear(); state.selectionSeeded = false; state.pickerGeneration = null; state.loadedGeneration = null; state.listLoading = false; state.listError = false; state.catalogError = null; state.listMore = false; state.editing = false; clearTimeout(searchTimer); $('setup-conversation-search').value = ''; renderedLists.clear(); }
 
   async function api(route, { method = 'GET', body, token } = {}) {
     if (!allowedOrigin()) throw error('loopback_required');
@@ -88,7 +97,7 @@
     if (value.stage === 'ready_to_select' && !value.scope_switching) state.editing = true;
     if (value.stage === 'starting' || value.scope_switching) { state.editing = false; state.listRequest++; state.listLoading = false; }
     render();
-    if (canSelect() && state.loadedGeneration !== state.generation && !state.listLoading) loadConversations();
+    if (canSelect() && state.loadedGeneration !== state.generation && !state.listLoading && !state.listError) loadConversations();
     if ((windows() ? state.enterWorkspace && collectorReady() : value.stage === 'running' && (state.enterWorkspace || !state.stayOnSetup)) && !state.redirecting) openWorkspace();
   }
   function openWorkspace() { if (!state.connected || (windows() ? !canOpenWorkspace() : state.setup?.stage !== 'running') || state.setup?.scope_switching || state.redirecting) return; state.redirecting = true; const target = ['/', '/index.html'].includes(state.setup.workspace_path) ? state.setup.workspace_path : '/'; location.assign(target); }
@@ -231,11 +240,11 @@
     $('active-scope-count').textContent = scope && selectedCount !== null ? selectedCount + ' 个会话 · ' + (count(scope.private_count) || 0) + ' 个私聊 · ' + (count(scope.group_count) || 0) + ' 个群聊' : '完成原账号读取核验后，可以查看和修改关注范围。';
     $('scope-manager-description').textContent = collectorAlive ? '查看和搜索名称时，当前采集进程保持运行。确认启用新的范围后才会切换。' : '可以保留原关注范围。修改范围会独立保存消息、AI 历史和采集位置，原范围仍可切回。';
     const canManage = active && value.can_manage === true && value.can_modify_scope === true && !isWorking;
-    $('manage-conversations').disabled = !canManage;
+    $('manage-conversations').disabled = !canManage || setup?.catalog?.worker_active === true;
     $('manage-conversations').textContent = setup?.catalog?.state === 'loading' ? '正在读取会话名称' : state.editing ? '查看会话选择' : '修改关注范围';
     $('manage-conversations').classList.toggle('is-loading', setup?.catalog?.state === 'loading');
-    $('scope-manage-help').hidden = canManage;
-    $('scope-manage-help').textContent = value.state === 'explicit_read_only' ? '离线只读模式不能修改关注范围。原范围与已保存消息保持不变。' : value.state === 'cleanup_required' ? '上一轮采集尚未确认停止，暂不能修改范围。请先按上方说明处理。' : isWorking ? '当前步骤完成后才能修改范围，请等待上方实际状态更新。' : '需要先完成原账号及读取配置核验，才能加载和修改会话。请使用上方“重新检测微信”继续。';
+    $('scope-manage-help').hidden = canManage && setup?.catalog?.worker_active !== true;
+    $('scope-manage-help').textContent = setup?.catalog?.worker_active === true ? '本次会话目录读取仍在处理或清理，请等待实际状态更新，不会重复启动另一轮读取。' : value.state === 'explicit_read_only' ? '离线只读模式不能修改关注范围。原范围与已保存消息保持不变。' : value.state === 'cleanup_required' ? '上一轮采集尚未确认停止，暂不能修改范围。请先按上方说明处理。' : isWorking ? '当前步骤完成后才能修改范围，请等待上方实际状态更新。' : '需要先完成原账号及读取配置核验，才能加载和修改会话。请使用上方“重新检测微信”继续。';
     $('open-workspace').disabled = !active || !canOpenWorkspace() || setup?.scope_switching === true;
     $('open-workspace').textContent = collectorAlive ? ready ? phase === 'paused' ? '查看工作台（采集暂停）' : '返回当前工作台' : '等待本轮采集状态' : '查看已保存消息（离线）';
     $('selection-card').hidden = !state.editing || !state.generation || value.can_modify_scope !== true || setup?.scope_switching === true;
@@ -287,7 +296,7 @@
     $('active-scope-label').textContent = typeof setup?.active_scope?.label === 'string' ? setup.active_scope.label : '当前关注范围';
     const scope = setup?.active_scope;
     $('active-scope-count').textContent = scope && count(scope.count) !== null ? scope.count + ' 个会话 · ' + (count(scope.private_count) || 0) + ' 个私聊 · ' + (count(scope.group_count) || 0) + ' 个群聊' : '选择后会建立独立的本机记录';
-    $('manage-conversations').disabled = !active || isWorking || setup?.checks?.reader_ready !== true;
+    $('manage-conversations').disabled = !active || isWorking || setup?.checks?.reader_ready !== true || setup?.catalog?.worker_active === true;
     $('manage-conversations').textContent = setup?.catalog?.state === 'loading' ? '正在读取会话名称' : state.editing ? '查看会话选择' : '修改关注范围';
     $('manage-conversations').classList.toggle('is-loading', setup?.catalog?.state === 'loading');
     $('open-workspace').disabled = !active || stage !== 'running' || isWorking;
@@ -302,14 +311,39 @@
   }
 
   function pickerEmpty(title, description) { const result = node('div', 'picker-empty'); result.append(node('strong', '', title), node('p', '', description)); return result; }
+  function catalogProgress() {
+    const catalog = state.setup?.catalog || {};
+    const phases = { queued: '等待读取会话目录', validating_sources: '正在检查读取资料', opening_message: '正在打开消息库', reading_message_tables: '正在查找会话索引', opening_contacts: '正在打开联系人库', reading_contacts: '正在读取联系人名称', preparing_choices: '正在整理可选会话' };
+    const parts = [phases[catalog.phase] || '正在准备会话目录'];
+    const seconds = count(catalog.elapsed_seconds);
+    if (seconds !== null) parts.push('用时 ' + String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0'));
+    if (count(catalog.databases_checked) > 0) parts.push('已检查 ' + catalog.databases_checked + ' 个库');
+    if (count(catalog.contacts_seen) > 0) parts.push('已读取 ' + catalog.contacts_seen + ' 条联系人');
+    return parts.join(' · ');
+  }
+  function pickerPhase() {
+    if (!state.connected) return ['blocked', '等待本机连接', '请先恢复本机服务连接，当前选择会保留。'];
+    if (state.busy === 'catalog' || catalogStatus() === 'loading') return ['loading', '正在准备会话目录', catalogProgress() + '。原关注范围保持不变。'];
+    if (!canManageSelection()) return ['blocked', '暂时无法修改关注范围', windows() ? $('scope-manage-help').textContent : '请等待当前步骤结束，并确认微信账号与本机读取能力已就绪。'];
+    if (catalogStatus() === 'error') {
+      const reason = state.catalogError || state.setup?.catalog?.reason || state.setup?.reason;
+      const descriptions = { windows_scope_catalog_timeout: '会话目录读取超时，原消息和关注范围保留。', windows_scope_catalog_limit: '会话目录超过当前读取上限，原关注范围保留。', windows_scope_key_authentication_failed: '会话目录读取配置未通过校验，原配置和消息保留。', windows_scope_catalog_source_changed: '读取期间资料发生变化，原关注范围保留。', windows_scope_catalog_cancelled: '本次会话目录读取已取消，原关注范围保留。' };
+      return ['error', '会话目录读取未完成', (descriptions[reason] || '本次未能读取会话目录，原消息和关注范围保留。') + (state.setup?.catalog?.worker_active === true ? '正在结束本次读取，请稍候再重试。' : '请点击“重新读取会话目录”重试。')];
+    }
+    if (!catalogReady()) return ['idle', '尚未读取会话目录', '请点击“读取会话目录”，准备可选私聊和群聊。'];
+    if (state.listLoading || !state.selectionSeeded && !state.listError) return ['loading', '正在加载会话名称', '只查询当前账号的名称，已选会话会保留。'];
+    if (state.listError) return ['error', '会话列表加载未完成', '请点击“重新加载列表”，当前范围内的选择会保留。'];
+    return ['ready', '', ''];
+  }
   function renderSelection() {
-    const loading = state.listLoading || state.setup?.catalog?.state === 'loading';
+    const phase = pickerPhase(), loading = phase[0] === 'loading', failed = phase[0] === 'error';
     $('setup-conversation-search').disabled = !canSelect() || !state.selectionSeeded;
+    $('selection-card').dataset.catalogState = phase[0];
     for (const type of ['private', 'group']) {
-      const list = $(type + '-list'), rows = state.rows.filter(row => row.type === type);
+      const list = $(type + '-list'), rows = phase[0] === 'ready' ? state.rows.filter(row => row.type === type) : [];
       list.setAttribute('aria-busy', String(loading));
-      $(type + '-result-count').textContent = loading ? '读取中' : String(rows.length);
-      const signature = JSON.stringify([rows, [...state.selected.keys()], canSelect(), loading, state.listError, scopeLimit()]);
+      $(type + '-result-count').textContent = loading ? '读取中' : phase[0] === 'ready' ? String(rows.length) : '—';
+      const signature = JSON.stringify([rows, [...state.selected.keys()], canSelect(), phase, state.listError, scopeLimit(), $('setup-conversation-search').value]);
       if (renderedLists.get(type) !== signature) {
         const focused = list.contains(document.activeElement) ? document.activeElement.dataset.pickerId : null;
         list.replaceChildren();
@@ -321,7 +355,10 @@
           checkbox.addEventListener('change', () => { if (!canSelect() || generation !== state.generation) return; if (checkbox.checked && state.selected.size >= scopeLimit()) { checkbox.checked = false; $('setup-announcer').textContent = '最多选择 ' + scopeLimit() + ' 个会话。'; return; } if (checkbox.checked) state.selected.set(row.id, row); else state.selected.delete(row.id); renderSelection(); $('setup-announcer').textContent = '已选择 ' + state.selected.size + ' 个会话。'; });
           list.append(label);
         }
-        if (!rows.length) list.append(pickerEmpty(loading ? '正在读取会话名称' : state.listError ? '暂时无法读取会话' : '没有匹配的' + (type === 'group' ? '群聊' : '私聊'), loading ? windows() ? '只读取当前账号的会话名称，不改变已保存消息。' : '只读取当前账号的会话名称，当前采集保持运行。' : state.listError ? '请重新读取，当前范围内的选择会保留。' : '试试其他名称，或清空搜索。'));
+        if (!rows.length) {
+          const kind = type === 'group' ? '群聊' : '私聊', searched = Boolean($('setup-conversation-search').value.trim());
+          list.append(pickerEmpty(phase[0] === 'ready' ? (searched ? '没有匹配的' : '暂无可选') + kind : phase[1], phase[0] === 'ready' ? searched ? '试试其他名称，或清空搜索。' : '当前目录中没有可选的' + kind + '。' : phase[2]));
+        }
         renderedLists.set(type, signature);
         if (focused) [...list.querySelectorAll('.picker-checkbox')].find(checkbox => checkbox.dataset.pickerId === focused)?.focus({ preventScroll: true });
       }
@@ -335,9 +372,13 @@
     $('start-selected').disabled = total < 1 || total > scopeLimit() || !state.selectionSeeded || !canSelect() || loading || state.listError || state.pickerGeneration !== state.generation;
     $('start-selected').classList.toggle('is-loading', state.busy === 'select'); $('start-selected').setAttribute('aria-busy', String(state.busy === 'select'));
     $('start-selected').textContent = state.busy === 'select' ? '正在确认所选范围' : '启用所选关注范围';
-    $('conversation-feedback').hidden = !loading && !state.listError && !state.listMore;
-    $('conversation-feedback-text').textContent = loading ? '正在查找会话名称，已选内容会保留…' : state.listError ? '读取没有完成，请重新尝试。' : '只展示部分匹配结果，请输入更具体的名称继续查找。';
-    $('retry-conversations').hidden = !state.listError; $('retry-conversations').disabled = !canSelect();
+    $('conversation-feedback').hidden = phase[0] === 'ready' && !state.listMore;
+    $('conversation-feedback').classList.toggle('is-error', failed);
+    $('conversation-feedback').setAttribute('role', failed ? 'alert' : 'status');
+    $('conversation-feedback-text').textContent = phase[0] === 'ready' ? '只展示部分匹配结果，请输入更具体的名称继续查找。' : phase[2];
+    $('retry-conversations').hidden = !failed && phase[0] !== 'idle';
+    $('retry-conversations').disabled = !canManageSelection() || state.setup?.catalog?.worker_active === true;
+    $('retry-conversations').textContent = catalogReady() && state.listError ? '重新加载列表' : phase[0] === 'idle' ? '读取会话目录' : '重新读取会话目录';
   }
   function renderProfiles() {
     const rows = Array.isArray(state.setup?.profiles) ? state.setup.profiles.filter(row => typeof row?.id === 'string' && typeof row.label === 'string' && count(row.count) !== null) : [];
@@ -352,7 +393,12 @@
     const request = ++state.listRequest, generation = state.generation, query = state.selectionSeeded ? $('setup-conversation-search').value.trim() : ''; state.listLoading = true; state.listError = false; renderSelection();
     try {
       const result = await api('/api/setup/conversations?' + new URLSearchParams({ q: query }));
-      if (request !== state.listRequest || generation !== state.generation || !state.editing) return;
+      if (request !== state.listRequest || generation !== state.generation || !canSelect()) return;
+      if (result?.catalog && ['idle', 'loading', 'error'].includes(result.catalog.state)) {
+        state.setup = { ...state.setup, catalog: result.catalog };
+        state.loadedGeneration = null;
+        return;
+      }
       if (!Array.isArray(result?.conversations)) throw error('invalid_response');
       const seen = new Set();
       const rows = result.conversations.map(row => { if (!row || typeof row.id !== 'string' || !row.id || seen.has(row.id) || typeof row.name !== 'string' || !row.name.trim() || !['private', 'group'].includes(row.type)) throw error('invalid_response'); seen.add(row.id); return { id: row.id, name: row.name, type: row.type, selected: row.selected === true }; });
@@ -376,10 +422,15 @@
     const checks = ['process_running', 'account_verified', 'reader_ready', 'scope_selected', 'collecting'];
     const counters = ['handles_seen', 'handles_with_name', 'type_names_present', 'file_type_handles', 'file_names_retained', 'all_named_db_candidates', 'database_names_seen', 'matching_root_paths', 'other_root_paths', 'unresolved_database_paths', 'family_process_count', 'family_processes_completed', 'main_database_names_seen', 'helper_database_names_seen', 'mapped_verification_passes', 'mapped_regions_queried', 'mapped_data_regions_seen', 'mapped_pagefile_regions_skipped', 'mapped_names_seen', 'mapped_name_query_failures'];
     const booleans = ['query_completed', 'mapped_file_query_used'];
-    if (!keys(value, top) || value.schema_version !== 1 || value.kind !== 'chatlens_windows_connection_diagnostics' || value.platform !== 'windows' || !code(value.connection_state) || !code(value.account_reason) || !code(value.collector_stage) || typeof value.collector_running !== 'boolean' || !Number.isSafeInteger(value.selected_conversation_count) || value.selected_conversation_count < 0 || value.selected_conversation_count > 50 || !keys(value.checks, checks) || checks.some(key => value.checks[key] !== null && typeof value.checks[key] !== 'boolean')) throw error('invalid_diagnostics');
+    const fields = Object.hasOwn(value || {}, 'catalog') ? [...top, 'catalog'] : top;
+    if (!keys(value, fields) || value.schema_version !== 1 || value.kind !== 'chatlens_windows_connection_diagnostics' || value.platform !== 'windows' || !code(value.connection_state) || !code(value.account_reason) || !code(value.collector_stage) || typeof value.collector_running !== 'boolean' || !Number.isSafeInteger(value.selected_conversation_count) || value.selected_conversation_count < 0 || value.selected_conversation_count > 50 || !keys(value.checks, checks) || checks.some(key => value.checks[key] !== null && typeof value.checks[key] !== 'boolean')) throw error('invalid_diagnostics');
     const detail = value.account_diagnostics;
     if (!object(detail) || Object.keys(detail).some(key => !['schema_version', ...counters, ...booleans].includes(key)) || Object.keys(detail).length > 0 && detail.schema_version !== 1 || booleans.some(key => Object.hasOwn(detail, key) && typeof detail[key] !== 'boolean') || counters.some(key => Object.hasOwn(detail, key) && (!Number.isSafeInteger(detail[key]) || detail[key] < 0 || detail[key] > 32768))) throw error('invalid_diagnostics');
-    return Object.fromEntries(top.map(key => [key, value[key]]));
+    if (Object.hasOwn(value, 'catalog')) {
+      const catalog = value.catalog, numbers = ['databases_checked', 'tables_seen', 'contacts_seen', 'conversations_found'];
+      if (!keys(catalog, ['schema_version', 'state', 'phase', 'reason', 'elapsed_seconds', 'worker_active', ...numbers]) || catalog.schema_version !== 1 || !['idle', 'loading', 'ready', 'error'].includes(catalog.state) || !['idle', 'queued', 'validating_sources', 'opening_message', 'reading_message_tables', 'opening_contacts', 'reading_contacts', 'preparing_choices', 'complete', 'cancelled', 'failed'].includes(catalog.phase) || !code(catalog.reason) || typeof catalog.worker_active !== 'boolean' || count(catalog.elapsed_seconds) === null || catalog.elapsed_seconds > 86400 || numbers.some(key => count(catalog[key]) === null || catalog[key] > 1000000)) throw error('invalid_diagnostics');
+    }
+    return Object.fromEntries(fields.map(key => [key, value[key]]));
   }
 
   async function downloadDiagnostics() {
@@ -412,23 +463,36 @@
     const epoch = state.epoch, generation = state.generation;
     if (kind === 'select' || kind === 'profile' || kind === 'start') state.enterWorkspace = true;
     if (kind === 'recheck') { state.enterWorkspace = false; state.stayOnSetup = true; }
-    if (kind === 'catalog') state.editing = true;
+    if (kind === 'catalog') {
+      if (state.setup?.catalog?.worker_active === true) { feedback('正在结束上一次会话目录读取，请稍候再试。'); return; }
+      state.editing = true; state.catalogError = null; state.listError = false; state.listRequest++; state.listLoading = false; state.loadedGeneration = null;
+    }
     state.busy = kind; state.setupRequest++; render();
     try {
       const body = kind === 'select' ? { conversation_ids: [...state.selected.keys()], scope_generation: generation } : kind === 'profile' ? { profile_id: profileId, scope_generation: generation } : {};
       const result = await api('/api/setup/' + kind, { method: 'POST', body });
       if (epoch !== state.epoch) return;
       if (stages.has(result?.stage) && typeof result.account?.detected === 'boolean') acceptSetup(result); else acceptSetup(await api('/api/setup'));
-    } catch (problem) { if (epoch === state.epoch && !ignored(problem)) { state.enterWorkspace = false; setError(problem); } }
-    finally { if (epoch === state.epoch) { state.busy = null; render(); if (canSelect() && state.loadedGeneration !== state.generation && !state.listLoading) loadConversations(); schedule(state.epoch); } }
+    } catch (problem) {
+      if (epoch === state.epoch && !ignored(problem)) {
+        state.enterWorkspace = false;
+        if (kind === 'catalog' && problem.status !== 401) { state.catalogError = problem.code || 'catalog_request_failed'; feedback('会话目录读取没有完成，可以在下方重试。'); }
+        else setError(problem);
+      }
+    }
+    finally { if (epoch === state.epoch) { state.busy = null; render(); if (canSelect() && state.loadedGeneration !== state.generation && !state.listLoading && !state.listError) loadConversations(); schedule(state.epoch); } }
   }
   function beginSelection() {
-    if (!state.connected || !state.generation || working() || windows() && connection()?.can_modify_scope !== true) return;
-    if (!catalogReady()) { mutate('catalog'); return; }
+    if (!canManageSelection()) { feedback(windows() ? $('scope-manage-help').textContent || '请先完成上方账号与读取条件核验。' : '请等待本机读取条件就绪，再修改关注范围。'); return; }
     state.editing = true;
     render();
-    if (state.loadedGeneration !== state.generation && !state.listLoading) loadConversations();
     $('selection-card').scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    if (!catalogReady()) { mutate('catalog'); return; }
+    if (state.loadedGeneration !== state.generation && !state.listLoading && !state.listError) loadConversations();
+  }
+  function retryConversations() {
+    if (!canManageSelection()) { feedback('请等待当前步骤结束，并确认账号与读取条件已就绪。'); return; }
+    if (!catalogReady()) mutate('catalog'); else loadConversations();
   }
 
   $('initialize-button').addEventListener('click', () => mutate('initialize')); $('retry-initialization').addEventListener('click', () => mutate('initialize'));
@@ -436,7 +500,7 @@
   $('windows-recheck').addEventListener('click', () => mutate('recheck')); $('windows-start').addEventListener('click', () => mutate('start'));
   $('download-connection-diagnostics').addEventListener('click', downloadDiagnostics);
   $('windows-offline').addEventListener('click', openWorkspace); $('windows-open-workspace').addEventListener('click', openWorkspace);
-  $('retry-connection').addEventListener('click', connect); $('check-status').addEventListener('click', () => poll()); $('retry-conversations').addEventListener('click', loadConversations);
+  $('retry-connection').addEventListener('click', connect); $('check-status').addEventListener('click', () => poll()); $('retry-conversations').addEventListener('click', retryConversations);
   for (const type of ['private', 'group']) $(type + '-list').addEventListener('keydown', event => { if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return; const rows = [...$(type + '-list').querySelectorAll('.picker-checkbox:not(:disabled)')]; if (!rows.length) return; const current = rows.indexOf(document.activeElement), next = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : (current + (['ArrowUp', 'ArrowLeft'].includes(event.key) ? -1 : 1) + rows.length) % rows.length; event.preventDefault(); rows[next].focus(); });
   $('setup-conversation-search').addEventListener('input', () => { clearTimeout(searchTimer); state.listRequest++; state.rows = []; state.listLoading = true; state.listError = false; renderSelection(); searchTimer = setTimeout(loadConversations, 250); });
   window.addEventListener('pagehide', () => { state.epoch++; state.setupRequest++; clearTimeout(state.timer); resetPicker(); state.setup = null; state.generation = null; state.connected = false; state.busy = null; state.enterWorkspace = false; render(); });
