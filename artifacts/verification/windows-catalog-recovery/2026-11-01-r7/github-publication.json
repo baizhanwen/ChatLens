@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "status": "通过",
+  "verified_at_utc": "2026-11-01T15:13:18.359965+00:00",
+  "repository": "https://github.com/baizhanwen/ChatLens",
+  "source_commit": "94614fb4f27ca69f18c9dfd43928d3e4c4b4ba72",
+  "tag": "windows-web-20261101-r7",
+  "tag_target_sha": "94614fb4f27ca69f18c9dfd43928d3e4c4b4ba72",
+  "remote_main_contains_source_commit": true,
+  "release_url": "https://github.com/baizhanwen/ChatLens/releases/tag/windows-web-20261101-r7",
+  "is_prerelease": true,
+  "is_draft": false,
+  "assets": [
+    {
+      "name": "ChatLens-Windows-Web-20261101-r7-SHA256SUMS.txt",
+      "bytes": 103,
+      "sha256": "6148fc4fc7c0b82a6581deb2622e64ddb2dcc1c1a0fe6c78d10d5d01bcfd4a94",
+      "github_digest": "sha256:6148fc4fc7c0b82a6581deb2622e64ddb2dcc1c1a0fe6c78d10d5d01bcfd4a94",
+      "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r7/ChatLens-Windows-Web-20261101-r7-SHA256SUMS.txt",
+      "download_verified": true
+    },
+    {
+      "name": "ChatLens-Windows-Web-20261101-r7-TEST-GUIDE.md",
+      "bytes": 14620,
+      "sha256": "c71dcafaef840fb48fa9e71f9bb95160fe4bd213018832902ee6c358f590ce67",
+      "github_digest": "sha256:c71dcafaef840fb48fa9e71f9bb95160fe4bd213018832902ee6c358f590ce67",
+      "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r7/ChatLens-Windows-Web-20261101-r7-TEST-GUIDE.md",
+      "download_verified": true
+    },
+    {
+      "name": "ChatLens-Windows-Web-20261101-r7.zip",
+      "bytes": 15649372,
+      "sha256": "997db558458471ae7b69633da82b7be470b2e35c64c4f400a7abed84b51abb0b",
+      "github_digest": "sha256:997db558458471ae7b69633da82b7be470b2e35c64c4f400a7abed84b51abb0b",
+      "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261101-r7/ChatLens-Windows-Web-20261101-r7.zip",
+      "download_verified": true
+    }
+  ],
+  "old_release_assets_overwritten": false,
+  "private_chat_or_configs_published": false,
+  "existing_license_state_preserved": true,
+  "r6_native_account_verification_user_reported_status": "通过",
+  "r7_windows_live_directory_scope_and_direction_status": "未验证",
+  "second_windows_machine_status": "待外部条件"
+}
