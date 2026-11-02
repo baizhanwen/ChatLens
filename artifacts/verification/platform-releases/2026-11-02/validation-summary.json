@@ -2,7 +2,7 @@
   "schema_version": 1,
   "recorded_at_utc": "2026-11-02T10:14:58.823178+00:00",
   "status": "通过",
-  "publication_status": "未验证",
+  "publication_status": "通过",
   "python_tests": 866,
   "python_report": ".build/history-fix/python-unittest-final.log",
   "browser_checks": 112,
@@ -140,5 +140,6 @@
     "scripts/windows-proof/collector_service.py": "4cb9333c609871769c07d84cea598fbadd6edc9c2ab351012e81ebf4019b9810",
     "scripts/build_macos_web_package.py": "88fc7fd928392cc63a2721ec83df33f92fedddffbec2c81b939110300de97abd",
     "scripts/build_windows_web_package.py": "13794c2cce09be79d941f2e3ff3d75faff9a9f7813a1228e45f30254e9b4e5df"
-  }
+  },
+  "github_publication_report": "artifacts/verification/platform-releases/2026-11-02/github-publication.json"
 }

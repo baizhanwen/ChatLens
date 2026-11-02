@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "verified_at_utc": "2026-11-02T10:23:07.493841+00:00",
+  "status": "通过",
+  "repository": "https://github.com/baizhanwen/ChatLens",
+  "source_commit": "08b957a7c5a1df840a93a2e4f163e81a8df70f8d",
+  "remote_main_contains_source_commit": true,
+  "releases": [
+    {
+      "platform": "macos",
+      "tag": "macos-web-20261102-r1",
+      "tag_target_sha": "08b957a7c5a1df840a93a2e4f163e81a8df70f8d",
+      "release_url": "https://github.com/baizhanwen/ChatLens/releases/tag/macos-web-20261102-r1",
+      "is_prerelease": true,
+      "is_draft": false,
+      "tagged_source_payload_files_verified": 41,
+      "assets": [
+        {
+          "name": "ChatLens-macOS-arm64-Web-20261102-r1-SHA256SUMS.txt",
+          "bytes": 224,
+          "sha256": "ec45334d6db4e7d555b6642c033c8c4a2bd4a5116b6b605cf22fc2db0f886914",
+          "github_digest": "sha256:ec45334d6db4e7d555b6642c033c8c4a2bd4a5116b6b605cf22fc2db0f886914",
+          "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/macos-web-20261102-r1/ChatLens-macOS-arm64-Web-20261102-r1-SHA256SUMS.txt",
+          "download_verified": true
+        },
+        {
+          "name": "ChatLens-macOS-arm64-Web-20261102-r1-TEST-GUIDE.md",
+          "bytes": 4527,
+          "sha256": "59abdad9eebe80cfc9660434df581e5d5cc1d3cb9432672b2560401066d25aaa",
+          "github_digest": "sha256:59abdad9eebe80cfc9660434df581e5d5cc1d3cb9432672b2560401066d25aaa",
+          "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/macos-web-20261102-r1/ChatLens-macOS-arm64-Web-20261102-r1-TEST-GUIDE.md",
+          "download_verified": true
+        },
+        {
+          "name": "ChatLens-macOS-arm64-Web-20261102-r1.zip",
+          "bytes": 25175340,
+          "sha256": "a1d69e1e350c548fd4c6932d7e67473e1de676c799d97ec2be3779f6391aa8ac",
+          "github_digest": "sha256:a1d69e1e350c548fd4c6932d7e67473e1de676c799d97ec2be3779f6391aa8ac",
+          "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/macos-web-20261102-r1/ChatLens-macOS-arm64-Web-20261102-r1.zip",
+          "download_verified": true
+        }
+      ]
+    },
+    {
+      "platform": "windows",
+      "tag": "windows-web-20261102-r9",
+      "tag_target_sha": "08b957a7c5a1df840a93a2e4f163e81a8df70f8d",
+      "release_url": "https://github.com/baizhanwen/ChatLens/releases/tag/windows-web-20261102-r9",
+      "is_prerelease": true,
+      "is_draft": false,
+      "tagged_source_payload_files_verified": 45,
+      "assets": [
+        {
+          "name": "ChatLens-Windows-Web-20261102-r9-SHA256SUMS.txt",
+          "bytes": 216,
+          "sha256": "7f9b5307f3560535b1907642b701a61618398709cb64da1a4c208a8a3370e830",
+          "github_digest": "sha256:7f9b5307f3560535b1907642b701a61618398709cb64da1a4c208a8a3370e830",
+          "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261102-r9/ChatLens-Windows-Web-20261102-r9-SHA256SUMS.txt",
+          "download_verified": true
+        },
+        {
+          "name": "ChatLens-Windows-Web-20261102-r9-TEST-GUIDE.md",
+          "bytes": 3882,
+          "sha256": "6e588729f84934304edf0b4df815be61d850cbe9277f854404c41e3863b0c29b",
+          "github_digest": "sha256:6e588729f84934304edf0b4df815be61d850cbe9277f854404c41e3863b0c29b",
+          "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261102-r9/ChatLens-Windows-Web-20261102-r9-TEST-GUIDE.md",
+          "download_verified": true
+        },
+        {
+          "name": "ChatLens-Windows-Web-20261102-r9.zip",
+          "bytes": 15687853,
+          "sha256": "4bf38dd1ebec7cd34eff0bb1020652ca23c0f4e5247b94e26d3d02c7faf3ed4c",
+          "github_digest": "sha256:4bf38dd1ebec7cd34eff0bb1020652ca23c0f4e5247b94e26d3d02c7faf3ed4c",
+          "download_url": "https://github.com/baizhanwen/ChatLens/releases/download/windows-web-20261102-r9/ChatLens-Windows-Web-20261102-r9.zip",
+          "download_verified": true
+        }
+      ]
+    }
+  ],
+  "downloaded_assets_count": 6,
+  "old_release_assets_overwritten": false,
+  "previous_candidates_published": false,
+  "private_chat_configuration_or_keys_published": false,
+  "root_pdf_published": false,
+  "project_license_state_preserved": true,
+  "windows_native_execution_status": "未验证",
+  "another_macos_machine_installation_status": "未验证",
+  "macos_notarization_status": "未验证",
+  "live_saved_history_recovery_status": "通过"
+}
