@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-11-02T09:04:35.519223+00:00",
+  "purpose": "mac_five_step_current_account_detection_and_user_requested_consent_default",
+  "platform": "macOS",
+  "python_regression": {
+    "status": "通过",
+    "test_count": 830,
+    "report": ".build/test-evidence/2026-11-02-mac-five-step/python-unittest.log"
+  },
+  "browser_suites": {
+    "mac_five_steps": {
+      "status": "通过",
+      "check_count": 32,
+      "report": ".build/test-evidence/2026-11-02-mac-five-step/mac-five-final/browser-qa.json",
+      "native_windows_executed": false
+    },
+    "mac_multi_account": {
+      "status": "通过",
+      "check_count": 14,
+      "report": ".build/test-evidence/2026-11-02-mac-five-step/mac-multi-with-consent/browser-qa.json",
+      "native_windows_executed": false
+    },
+    "windows_connect_contract": {
+      "status": "通过",
+      "check_count": 15,
+      "report": ".build/test-evidence/2026-11-02-mac-five-step/windows-onboarding-final2/browser-qa.json",
+      "native_windows_executed": false
+    },
+    "ai_default_consent": {
+      "status": "通过",
+      "check_count": 35,
+      "report": ".build/test-evidence/2026-11-02-mac-five-step/ai-default-consent/browser-qa.json",
+      "native_windows_executed": false
+    }
+  },
+  "live_observation": {
+    "status": "通过",
+    "account_detected": true,
+    "checks": {
+      "wechat_running": true,
+      "access_ready": true,
+      "reader_ready": true
+    },
+    "setup_stage": "running",
+    "setup_reason": null,
+    "collector_state": "collecting",
+    "collector_status_http": 200,
+    "initialization_confirmed_by_user": true,
+    "attention_scope_selected_by_user": true,
+    "original_account_files_preserved": true,
+    "service_host": "existing_authorized_codex_host",
+    "terminal_double_click_after_fix": "未验证",
+    "new_message_body_comparison": "未验证",
+    "collector_status_evidence": "live-status.json"
+  },
+  "diagnosis": {
+    "before_user_restart_native_open_account_roots": 2,
+    "before_user_restart_terminal_api_reason": "macos_active_account_not_ready",
+    "after_user_restart_native_unique_account": true,
+    "original_terminal_permission_root_cause": "未验证",
+    "initialization_first_capture_attempt": "失败",
+    "initialization_user_retry": "通过"
+  },
+  "consent_default": {
+    "requested_by_user": true,
+    "default_checked": true,
+    "manual_uncheck_preserved_within_scope": true,
+    "scope_or_target_change_restores_default": true,
+    "requires_send_click": true,
+    "real_model_called_by_verification": false
+  },
+  "platform_boundaries": {
+    "windows_package_rebuilt": false,
+    "windows_native_live_validation": "未验证",
+    "mac_windows_data_shared": false,
+    "different_machine": "未验证",
+    "long_term_stability": "未验证"
+  },
+  "privacy": {
+    "account_identifiers_exported": false,
+    "contact_or_group_names_exported": false,
+    "message_bodies_exported": false,
+    "keys_or_tokens_exported": false,
+    "real_screenshots_saved": false
+  },
+  "source_sha256": {
+    "apps/web/app.js": "cbf7979c4293e2341b4911ad3e2cb92018bf0f090312000ab55cfb6c26de0925",
+    "apps/web/index.html": "0c201cc8bac299ddc56bf15ce55ff229fadd0ba150d3722f8ce2bd35557cea89",
+    "apps/web/connect.js": "c6cf06443cdafb5c21f4e2ad9e6ba606112e4d52dcd7aa56100ed2cc6b437529",
+    "apps/web/connect.html": "0de1c8102f26bec47b181c4c8d926b24beab45f6b9f255cc88153cc5a5d1a633",
+    "apps/web/connect.css": "6cff5dfa5703b8fcb99691fae37cc8fe1eae9938d86d66f90cc84e72dfd05959",
+    "scripts/macos_active_account.py": "ab1ae20642cac9a07b2871c3b58334ff5540d2fd43c8d9c91d5dbe1f00258573",
+    "scripts/macos_web.py": "b1eabff40e45ecd782e2b9ae50dd60c857cdd65df50c3a0b27f9ec36453fcf8e",
+    "scripts/web-macos-detection-smoke.cjs": "4abe55b339a0edaf3b06dc42642379b899a8f0dc50c90f58c18773fb9b695e63",
+    "scripts/web-ai-smoke.cjs": "22180f86ab38fc5c7ca47ee56a1cb56d929320908018db70038234a2c6fa0ce4"
+  }
+}

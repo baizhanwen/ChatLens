@@ -1,0 +1,35 @@
+Third-party components in ChatLens macOS arm64 Web 20261102-r1
+
+Python: CPython 3.12.14, Astral python-build-standalone release 20260814,
+aarch64-apple-darwin pgo+lto full archive. Only the installed runtime subset is
+redistributed; build objects, pip, tests and bytecode caches are excluded.
+The complete upstream license directory and PYTHON.json component metadata are
+preserved under licenses/python-build-standalone/. The runtime's own LICENSE.txt
+is also preserved. The source archive URL, size and SHA256 are in MACOS-MANIFEST.json.
+Upstream: https://github.com/astral-sh/python-build-standalone/releases/tag/20260814
+
+sqlcipher3-wheels 0.5.7, CPython 3.12 macOS 11 arm64 wheel:
+https://pypi.org/project/sqlcipher3-wheels/0.5.7/
+Wrapper license retained in runtime/lib/python3.12/site-packages/sqlcipher3_wheels-0.5.7.dist-info/licenses/LICENSE.
+This is the laggykiller/sqlcipher3 third-party wheel, not an official Apple or
+SQLCipher vendor binary. Its unmodified C extension reports SQLCipher 4.12.0
+community / SQLite 3.51.1 and contains the OpenSSL 3.6.0 version string.
+SQLCipher BSD-3-Clause license: licenses/LICENSE.sqlcipher.txt
+Source: https://raw.githubusercontent.com/sqlcipher/sqlcipher/v4.12.0/LICENSE.md
+OpenSSL Apache-2.0 license: licenses/LICENSE.openssl.txt
+Source: https://raw.githubusercontent.com/openssl/openssl/openssl-3.6.0/LICENSE.txt
+
+python-zstandard 0.25.0, CPython 3.12 macOS 11 arm64 wheel:
+https://pypi.org/project/zstandard/0.25.0/
+The original wrapper BSD-3-Clause license is preserved in its dist-info/licenses/.
+The C backend reports Zstandard 1.5.7. The optional cffi extra is not included.
+Zstandard BSD license (the BSD option is used): licenses/LICENSE.zstd.txt
+Source: https://raw.githubusercontent.com/facebook/zstd/v1.5.7/LICENSE
+
+Local initialization algorithm reference, not executed third-party bootstrap:
+https://gist.github.com/acmerfight/0a01249ef72970d07a2603dbb629e80f
+Only independently scoped key/page validation code is used; original WeChat is
+not modified, and authorization for current-account initialization is local.
+
+No repository-wide license is inferred or assigned by this packaging script.
+This notice identifies third-party components and preserves their notices only.

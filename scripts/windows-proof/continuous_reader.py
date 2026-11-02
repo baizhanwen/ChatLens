@@ -97,6 +97,9 @@ class ContinuousReader:
             self.resumed = snapshot['initialized']
             if self.resumed:
                 self._validate_snapshot(snapshot, epochs)
+                from scope_history import apply_history_plan
+                snapshot = apply_history_plan(store, snapshot['cursors'], epochs)
+                self._validate_snapshot(snapshot, epochs)
             for relative in self._shards:
                 self._connections[relative] = _open(driver, self._root / relative, self._keys[relative])
             if not self.resumed:
@@ -125,8 +128,8 @@ class ContinuousReader:
                     raise EngineError('continuous_native_state_not_ready')
                 if self._sources() != epochs:
                     raise EngineError('continuous_source_epoch_changed')
-                store.initialize(cursors, epochs)
-                snapshot = store.snapshot()
+                from scope_history import apply_history_plan
+                snapshot = apply_history_plan(store, cursors, epochs, initialize=True)
                 self._validate_snapshot(snapshot, epochs)
             self.baseline_completed_at = snapshot.get('baseline_completed_at')
         except BaseException:

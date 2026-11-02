@@ -16,7 +16,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 import macos_web as web
-from macos_active_account import ActiveAccount
+from macos_active_account import ActiveAccount, ActiveAccountError
 import macos_collector
 from collector_private import read_private_json, write_private_json_new
 
@@ -316,6 +316,69 @@ class MacWebManagerTests(unittest.TestCase):
         self.assertTrue(self.manager.setup()['account']['detected'])
         self.assertEqual(self.manager.stage, 'needs_initialization')
         self.assertEqual(self.initializers, [])
+
+    def test_current_service_metadata_failure_is_not_reported_as_logged_out(self):
+        failure = ActiveAccountError('macos_active_process_metadata_invalid',
+                                     wechat_running=True, metadata_issue='client_version')
+        self.manager = self.new_manager(detector=mock.Mock(side_effect=failure))
+        self.manager.start()
+        with self.http() as request:
+            status, _, document = request('GET', '/api/setup')
+        self.assertEqual(status, 200)
+        self.assertEqual(document['reason'], 'macos_active_process_metadata_invalid')
+        self.assertFalse(document['account']['detected'])
+        self.assertIs(document['checks']['wechat_running'], True)
+        self.assertFalse(document['checks']['access_ready'])
+        self.assertEqual(document['detection']['metadata_issue'], 'client_version')
+        self.assertIn('无法核验客户端版本', document['initialization']['description'])
+        self.assertNotIn('请先登录', document['initialization']['description'])
+        self.assert_public(document)
+
+    def test_detection_reports_permission_multiple_roots_absent_and_unknown_separately(self):
+        cases = [
+            (ActiveAccountError('macos_active_process_not_running', wechat_running=False), False, '打开微信'),
+            (ActiveAccountError('macos_active_account_ambiguous', wechat_running=True), True, '多个账号'),
+            (ActiveAccountError('macos_active_path_unavailable', wechat_running=True), True, '完全磁盘访问权限'),
+            (ActiveAccountError('macos_active_account_not_identified', wechat_running=True), True, '暂时无法'),
+            (OSError('SYNTHETIC_SECRET_ACCOUNT_PATH'), None, '暂时无法确认'),
+            (ActiveAccountError('SYNTHETIC_SECRET_UNKNOWN', wechat_running=True), None, '暂时无法确认'),
+        ]
+        for failure, running, description in cases:
+            with self.subTest(code=getattr(failure, 'code', None)):
+                manager = self.new_manager(detector=mock.Mock(side_effect=failure))
+                try:
+                    manager.start()
+                    result = manager.setup()
+                    self.assertIs(result['checks']['wechat_running'], running)
+                    self.assertIn(description, result['initialization']['description'])
+                    expected = failure.code if running is not None else 'macos_active_account_not_ready'
+                    self.assertEqual(result['reason'], expected)
+                    self.assertFalse(result['account']['detected'])
+                    self.assert_public(result)
+                finally:
+                    manager.close()
+
+    def test_detection_failure_retries_after_three_seconds_and_recovers_current_account(self):
+        detector = mock.Mock(side_effect=[ActiveAccountError('macos_active_account_ambiguous', wechat_running=True),
+                                          self.second])
+        self.manager = self.new_manager(detector=detector)
+        self.manager.start()
+        self.manager.last_detection = 100
+        with mock.patch.object(web.time, 'monotonic', return_value=102.99):
+            self.manager.tick()
+        self.assertEqual(detector.call_count, 1)
+        with mock.patch.object(web.time, 'monotonic', return_value=103.01):
+            self.manager.tick()
+        self.assertEqual(detector.call_count, 2)
+        result = self.manager.setup()
+        self.assertTrue(result['account']['detected'])
+        self.assertIs(result['checks']['wechat_running'], True)
+        self.assertIsNone(result['reason'])
+        self.assertIsNone(result['detection']['metadata_issue'])
+        self.assertEqual(self.manager.account, self.second)
+        self.assertIsNone(self.manager.key_file)
+        self.assertEqual(self.initializers, [])
+        self.assert_public(result)
 
     def test_failed_initializer_factory_clears_queue_so_a_retry_can_progress(self):
         self.manager.start()

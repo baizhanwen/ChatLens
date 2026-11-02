@@ -26,6 +26,7 @@ from collector_private import ensure_private_dir, read_private_json, write_priva
 from collector_service import Heartbeat, prepare_session
 from collector_web_meta import WebMetadata
 from continuous_store import CollectorStore
+from scope_history import apply_history_plan
 from wechat_identity import establish_identity
 from windows_web_manager import WindowsWebManager
 from windows_web_server import make_windows_server
@@ -33,6 +34,12 @@ from windows_web_server import make_windows_server
 
 def now():
     return datetime.now(timezone.utc).isoformat()
+
+
+def synthetic_epochs():
+    return {relative: {'file_identity': [100, index + 1], 'salt_sha256': 'a' * 64,
+                       'key_sha256': 'b' * 64}
+            for index, relative in enumerate(('message/message_0.db', 'message/message_1.db'))}
 
 
 class SyntheticProvider:
@@ -71,11 +78,13 @@ class SyntheticChild:
         self.scope, _, _, _, _, binding = prepare_session(self.data_dir)
         self.config = self.scope['config']
         self.store = CollectorStore(self.data_dir / 'private/store', binding)
-        self.cursors = self.store.snapshot()['cursors'] if self.store.resumed else {
-            'message/message_0.db': {row['alias']: {'local_id': 0, 'present': True}
-                                   for row in self.config['conversations']}}
-        if not self.store.resumed:
-            self.store.initialize(self.cursors, {})
+        fresh = {relative: {row['alias']: {'local_id': runtime.source_serials[row['chat_id']] if index == 0 else 0,
+                                          'present': index == 0}
+                            for row in self.config['conversations']}
+                 for index, relative in enumerate(synthetic_epochs())}
+        cursors = self.store.snapshot()['cursors'] if self.store.resumed else fresh
+        self.cursors = apply_history_plan(self.store, cursors, synthetic_epochs(),
+                                          initialize=not self.store.resumed)['cursors']
         metadata = WebMetadata(self.data_dir / 'private', self.store.binding_digest, now())
         private = next(row for row in self.config['conversations'] if not row['chat_id'].endswith('@chatroom'))
         identity = establish_identity(self.store.binding_digest, ['synthetic-windows-self'],
@@ -92,17 +101,21 @@ class SyntheticChild:
     def commit(self, *, direction='incoming', alias=None, body=None):
         row = next(row for row in self.config['conversations'] if row['alias'] == (alias or self.config['conversations'][0]['alias']))
         before, after = self.cursors, json.loads(json.dumps(self.cursors))
-        after['message/message_0.db'][row['alias']]['local_id'] += 1
-        serial = after['message/message_0.db'][row['alias']]['local_id']
+        serial = max(self.runtime.source_serials[row['chat_id']],
+                     before['message/message_0.db'][row['alias']]['local_id']) + 1
+        self.runtime.source_serials[row['chat_id']] = serial
+        after['message/message_0.db'][row['alias']]['local_id'] = serial
         sender = 'synthetic-windows-self' if direction == 'outgoing' else '' if direction == 'unknown' else (
             'synthetic-windows-member' if row['chat_id'].endswith('@chatroom') else row['chat_id'])
         text = body or '合成 Windows %s · %s · %s · %d' % (
             '原范围' if self.data_dir == self.runtime.data else self.data_dir.parent.name[:8],
             self.runtime.name(row['chat_id']), direction, serial)
-        event = {'source_key': hashlib.sha256((row['alias'] + ':' + str(serial)).encode()).hexdigest(),
+        identity = ['message/message_0.db', row['chat_id'], serial, synthetic_epochs()['message/message_0.db']]
+        event = {'source_key': hashlib.sha256(json.dumps(identity, ensure_ascii=False, sort_keys=True,
+                                                        separators=(',', ':')).encode()).hexdigest(),
             'alias': row['alias'], 'source_local_id': serial, 'sender_id': sender, 'body': text,
             'sent_at': int(datetime.now(timezone.utc).timestamp()), 'observed_at': now()}
-        self.store.commit(before, after, [event], {})
+        self.store.commit(before, after, [event], synthetic_epochs())
         self.cursors = after
         self.heartbeat()
 
@@ -145,6 +158,7 @@ class SyntheticWindowsRuntime:
                 ['合成交付讨论群', '合成订单确认群'][index - 35] if index < 37 else '合成群聊%02d' % index)
             self.choices.append({'chat_id': 'synthetic-windows-peer-%d' % index if not group else 'synthetic-windows-group-%d@chatroom' % index,
                 'name': name, 'type': 'group' if group else 'private'})
+        self.source_serials = {row['chat_id']: 0 for row in self.choices}
         config = {'conversations': [{'alias': alias, 'chat_id': self.choices[index]['chat_id'],
                     'expected_sender_id': 'synthetic-windows-peer-0'} for alias,index in [('private_test',0),('group_test',35)]]}
         write_private_json_new(private / 'scope.json', {'schema_version': 1, 'session_id': 'd' * 32,
@@ -195,6 +209,7 @@ class SyntheticWindowsRuntime:
             old.seed(); self.stop_child(old, old.output)
         self.own(old_run)
         self.old_snapshot = self.snapshot('legacy')
+        self.old_legacy_rows = self.legacy_rows()
         self.own(self.manager.start)
         self.server = attach_ai_routes(make_windows_server(self.manager, ROOT / 'apps/web'),
             lambda **kwargs: self.manager.get_ai_service(**kwargs))
@@ -253,6 +268,13 @@ class SyntheticWindowsRuntime:
         return {'checkpoint_sha256': hashlib.sha256(json.dumps(checkpoint).encode()).hexdigest(),
             'messages_sha256': hashlib.sha256(json.dumps(rows).encode()).hexdigest(), 'baseline': checkpoint[2], 'count':len(rows)}
 
+    def legacy_rows(self):
+        connection = sqlite3.connect((self.data / 'private/store/collector.sqlite3').as_uri() + '?mode=ro', uri=True)
+        try:
+            return connection.execute('SELECT rowid,* FROM messages ORDER BY rowid').fetchall()
+        finally:
+            connection.close()
+
     def command(self, value):
         name = value['command']
         if name == 'seed':
@@ -295,8 +317,11 @@ class SyntheticWindowsRuntime:
             self.own(phase)
         elif name == 'connection':
             return self.own(self.manager.setup)
+        original_preserved = (self.legacy_rows()[:len(self.old_legacy_rows)] == self.old_legacy_rows
+                              and self.snapshot('legacy')['baseline'] == self.old_snapshot['baseline'])
         return {'provider_calls':len(self.provider.calls),'raw_identity_leaks':self.provider.raw_identity_leaks,
             'account_state':self.account_state,'legacy_unchanged':self.snapshot('legacy') == self.old_snapshot,
+            'legacy_original_preserved':original_preserved,
             'children_started':self.manager.children_started,
             **self.manager.public_scope_context()}
 

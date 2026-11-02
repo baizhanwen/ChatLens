@@ -17,7 +17,9 @@ if str(MODULES) not in sys.path:
     sys.path.insert(0, str(MODULES))
 import continuous_reader as reader_module
 from continuous_store import CollectorStore, DB_NAME, StoreError
-from conversation_scope import alias_for
+from conversation_scope import alias_for, normalize_conversations
+from collector_private import write_private_json_new
+from scope_history import write_history_plan
 
 try:
     import sqlcipher3.dbapi2 as cipher
@@ -170,6 +172,70 @@ class ContinuousReaderTests(unittest.TestCase):
         self.assertEqual(storage.stats()['total_messages'], 1)
         self.assertEqual(self.driver.old_reads, [])
         self.assertEqual(self.driver.forbidden_reads, [])
+
+    def test_new_profile_inherits_retained_group_history_and_gap_but_not_added_chat_old_body(self):
+        """Actual SQLCipher reader consumes the production private history plan."""
+        def metadata(name, chats, session_id):
+            data = self.root.parent / name
+            for path in (data, data / 'private', data / 'private/store'):
+                path.mkdir(mode=0o700)
+            config = {'conversations': normalize_conversations({'conversations': chats})}
+            identity = [self.root.stat().st_dev, self.root.stat().st_ino]
+            scope = {'schema_version': 1, 'platform': 'macos', 'session_id': session_id,
+                     'db_root': str(self.root), 'root_identity': identity,
+                     'config': config, 'shards': list(self.keys), 'client_version': '4.1.11'}
+            write_private_json_new(data / 'private/scope.json', scope)
+            binding = {'schema_version': 1, 'platform': 'macos', 'session_id': session_id,
+                       'root': str(self.root), 'root_identity': identity,
+                       'config': config, 'shards': list(self.keys)}
+            return data, config, binding
+
+        source_data, self.config, self.binding = metadata(
+            'synthetic-history-source', self.config['conversations'], '1' * 32)
+        self.state = source_data / 'private/store'
+        source_reader, source_store = self.reader()
+        self.insert(GROUP, 2, 'SYNTHETIC_ALREADY_COLLECTED_GROUP')
+        self.insert(PEER, 2, 'SYNTHETIC_REMOVED_PRIVATE_NOT_IMPORTED')
+        self.writer.commit()
+        self.assertEqual(source_reader.poll()['new_messages'], 2)
+        old_checkpoint = source_store.snapshot()
+        source_reader.close()
+        source_store.close()
+        original_source_hash = hashlib.sha256((self.state / DB_NAME).read_bytes()).hexdigest()
+
+        added = 'synthetic_reader_newly_added'
+        for con in self.writers.values():
+            self.create_table(con, added)
+            con.commit()
+        self.insert(added, 1, OLD)
+        self.insert(GROUP, 3, 'SYNTHETIC_GROUP_DURING_SCOPE_SWITCH')
+        self.writer.commit()
+        target_data, config, binding = metadata('synthetic-history-target', [
+            {'alias': alias_for(GROUP), 'chat_id': GROUP},
+            {'alias': alias_for(added), 'chat_id': added}], '2' * 32)
+        write_history_plan(target_data, [source_data], continuity_source=source_data)
+        target_store = CollectorStore(target_data / 'private/store', binding)
+        self.stores.append(target_store)
+        target_reader = reader_module.ContinuousReader(self.driver, self.root, self.keys, config,
+                                                       target_store, lambda: BACKGROUND)
+        self.readers.append(target_reader)
+        state = target_store.snapshot()
+        self.assertEqual(state['cursors']['message/message_0.db'][alias_for(GROUP)]['local_id'],
+                         old_checkpoint['cursors']['message/message_0.db']['group_test']['local_id'])
+        self.assertEqual(state['cursors']['message/message_0.db'][alias_for(added)]['local_id'], 1)
+        self.assertEqual(target_store.stats()['total_messages'], 1)
+        self.assertEqual(target_reader.poll()['new_messages'], 1)
+        self.insert(added, 2, 'SYNTHETIC_NEWLY_ENABLED_CHAT_NEW_TEXT')
+        self.writer.commit()
+        self.assertEqual(target_reader.poll()['new_messages'], 1)
+        with sqlite3.connect(target_data / 'private/store' / DB_NAME) as connection:
+            rows = connection.execute('SELECT body FROM messages ORDER BY rowid').fetchall()
+        self.assertEqual(rows, [('SYNTHETIC_ALREADY_COLLECTED_GROUP',),
+                                ('SYNTHETIC_GROUP_DURING_SCOPE_SWITCH',),
+                                ('SYNTHETIC_NEWLY_ENABLED_CHAT_NEW_TEXT',)])
+        self.assertEqual(self.driver.old_reads, [])
+        self.assertEqual(self.driver.forbidden_reads, [])
+        self.assertEqual(hashlib.sha256((self.state / DB_NAME).read_bytes()).hexdigest(), original_source_hash)
 
     def test_invalid_explicit_shards_and_uninitialized_subset_fail_without_baseline(self):
         storage = self.storage()

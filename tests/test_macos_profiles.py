@@ -9,13 +9,14 @@ import tempfile
 import threading
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 import macos_web as web
-from macos_active_account import ActiveAccount
+from macos_active_account import ActiveAccount, ActiveAccountError
+from macos_collector import MacNativeProbe as RealMacNativeProbe
 from ai_service import AiError
 from collector_private import ensure_private_dir, read_private_json, write_private_json_new
 from conversation_scope import alias_for, normalize_conversations
@@ -134,6 +135,117 @@ class ScopeRuntimeTests(unittest.TestCase):
         self.assertNotEqual(identifier, second)
         self.assertEqual(self.manager.setup()['active_scope']['private_count'], 0)
         self.assertEqual(self.manager.setup()['active_scope']['group_count'], 2)
+
+    def test_runtime_ambiguous_account_pauses_and_recovers_without_reusing_old_account_keys(self):
+        self.select(['opaque-a', 'opaque-c'])
+        old_collector = self.manager.collector
+        old_generation, old_directory = self.manager.scope_generation, self.manager.directory
+        old_key = self.manager.key_file.read_bytes()
+        old_checkpoint = self.manager.data_dir / 'private/synthetic-checkpoint.json'
+        checkpoint = old_checkpoint.read_bytes()
+        self.manager.detector = Mock(side_effect=ActiveAccountError('macos_active_account_ambiguous', wechat_running=True))
+        self.manager.last_detection = self.manager.last_poll = 0
+        self.manager.tick()
+        setup = self.manager.setup()
+        self.assertFalse(setup['account']['detected'])
+        self.assertTrue(setup['checks']['wechat_running'])
+        self.assertFalse(setup['checks']['reader_ready'])
+        self.assertEqual(setup['reason'], 'macos_active_account_ambiguous')
+        self.assertNotEqual(setup['stage'], 'running')
+        self.assertTrue(setup['detection']['collector_paused'])
+        self.assertEqual(setup['profiles'], [])
+        self.assertIsNone(setup['active_scope'])
+        self.assertEqual(setup['catalog']['state'], 'idle')
+        self.assertEqual(self.manager.list_conversations()['conversations'], [])
+        self.assertFalse(self.manager._native()['probe_succeeded'])
+        self.assertEqual(self.manager.status()['state'], 'paused')
+        self.assertEqual(self.manager.status()['reason'], 'macos_active_account_ambiguous')
+        self.manager.request_initialize()
+        self.assertFalse(self.manager.queued)
+        self.assertEqual(self.manager.directory, old_directory)
+        self.assertEqual(self.manager.key_file.read_bytes(), old_key)
+        self.assertEqual(old_checkpoint.read_bytes(), checkpoint)
+
+        # The original account can recover without changing its stored domain.
+        self.manager.detector = lambda _: self.account
+        self.manager.last_detection = 0
+        self.manager.tick()
+        self.assertTrue(self.manager.setup()['account']['detected'])
+        self.assertEqual(self.manager.status()['state'], 'collecting')
+        self.assertEqual(self.manager.scope_generation, old_generation)
+
+        # A later unique new account gets a fresh namespace, never the old key.
+        self.current = self.other_account
+        self.manager.detector = lambda _: self.current
+        self.manager.last_detection = 0
+        self.manager.tick()
+        self.assertEqual(self.manager.account, self.other_account)
+        self.assertNotEqual(self.manager.directory, old_directory)
+        self.assertNotEqual(self.manager.scope_generation, old_generation)
+        self.assertEqual(self.manager.stage, 'needs_initialization')
+        self.assertIsNone(self.manager.key_file)
+        self.assertEqual(self.manager.contacts, [])
+        self.assertTrue(old_collector.closed)
+        self.assertEqual(old_checkpoint.read_bytes(), checkpoint)
+
+    def test_same_account_process_restart_recovers_with_fresh_pid_and_original_checkpoint(self):
+        self.select(['opaque-a', 'opaque-c'])
+        collector = self.manager.collector
+        generation = self.manager.scope_generation
+        checkpoint = self.manager.data_dir / 'private/synthetic-checkpoint.json'
+        before = checkpoint.read_bytes()
+        self.manager.probe.write_bytes(b'SYNTHETIC_EXECUTABLE_NEVER_RUN')
+        self.manager.probe.chmod(0o700)
+        def synthetic_run(*arguments, **options):
+            payload = {'matching_applications': 1, 'running': True, 'screen_state_available': True,
+                       'frontmost': False, 'screen_locked': False, 'process_id': self.current.pid,
+                       'process_started_at': self.current.started_at, 'version': self.current.client_version}
+            return SimpleNamespace(returncode=0, stdout=json.dumps(payload).encode())
+        def make_probe(path, *, expected_version):
+            return RealMacNativeProbe(path, expected_version=expected_version, run=synthetic_run)
+        original_probe = make_probe(self.manager.probe, expected_version=self.account.client_version)
+        self.assertTrue(original_probe()['probe_succeeded'])
+        self.manager.native_probe = original_probe
+        restarted = ActiveAccount(self.account.db_root, self.account.pid + 100,
+                                  self.account.started_at + 50, self.account.client_version)
+        self.current = restarted
+        self.assertFalse(original_probe()['probe_succeeded'])
+        self.manager.last_detection = 0
+        with patch.object(web, 'MacNativeProbe', side_effect=make_probe):
+            self.manager.tick()
+        self.assertEqual(self.manager.account, restarted)
+        self.assertIsNot(self.manager.native_probe, original_probe)
+        self.assertEqual(self.manager.native_probe.process_identity,
+                         (restarted.pid, restarted.started_at, restarted.client_version))
+        self.assertTrue(self.manager._native()['probe_succeeded'])
+        self.assertTrue(self.manager.setup()['account']['detected'])
+        self.assertEqual(self.manager.status()['state'], 'collecting')
+        self.assertEqual(self.manager.scope_generation, generation)
+        self.assertIs(self.manager.collector, collector)
+        self.assertEqual(checkpoint.read_bytes(), before)
+
+    def test_same_account_new_process_version_must_match_saved_reader_session(self):
+        self.select(['opaque-a', 'opaque-c'])
+        original = self.manager.account
+        collector, directory = self.manager.collector, self.manager.directory
+        self.current = ActiveAccount(original.db_root, original.pid + 100,
+                                     original.started_at + 50, '9.9.9')
+        self.manager.last_detection = 0
+        self.manager.tick()
+        result = self.manager.setup()
+        self.assertFalse(result['account']['detected'])
+        self.assertEqual(result['reason'], 'macos_active_client_version_changed')
+        self.assertEqual(self.manager.status()['state'], 'paused')
+        self.assertFalse(self.manager._native()['probe_succeeded'])
+        self.assertEqual(self.manager.account, original)
+        self.assertEqual(self.manager.directory, directory)
+        self.assertIs(self.manager.collector, collector)
+
+        self.current = original
+        self.manager.last_detection = 0
+        self.manager.tick()
+        self.assertTrue(self.manager.setup()['account']['detected'])
+        self.assertIsNone(self.manager.setup()['reason'])
 
     def test_switch_preserves_old_checkpoint_and_has_independent_assistant_and_message_dirs(self):
         first = self.select(['opaque-a', 'opaque-c'])

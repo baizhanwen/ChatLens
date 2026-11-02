@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-11-02T10:10:18.731695+00:00",
+  "status": "通过",
+  "platform": "windows",
+  "architecture": "x64",
+  "package_revision": "20261102-r9",
+  "package_name": "ChatLens-Windows-Web-20261102-r9.zip",
+  "bytes": 15687853,
+  "sha256": "4bf38dd1ebec7cd34eff0bb1020652ca23c0f4e5247b94e26d3d02c7faf3ed4c",
+  "file_count": 102,
+  "public_source_count": 45,
+  "crc_manifest_hashes_whitelist": "通过",
+  "current_public_source_bytes_match": true,
+  "python_import_closure": "通过",
+  "source_sha256": {
+    "README-WEB.txt": "a911a375be25f9e9038b2098ffafc7ad115689db86e0bcab7d18c6519201383f",
+    "Start-ChatLens.cmd": "8f0f405df0f18afcd41a25a473ef886dc7de29af5812cbb4133594b7170e69fe",
+    "Start-Web.ps1": "092d9f881e98b5f9d798ae2739498fb9843cd1df78945fa04dea31c5fde712a1",
+    "THIRD-PARTY-SELECTED-NOTICES.txt": "81ed978b30349b236aa534b448072ef543feb0388c170747d92a47fb7fbff8cc",
+    "ai_knowledge.py": "9d024668840614600c478ef4296adf878b24b2be93159666950a28c43d8a3e97",
+    "ai_provider.py": "279be60690934c5994bc7a99b928859c06ae6f610c820c071a22c78b08b110f7",
+    "ai_query.py": "ad2c2b5b6a5d6ddcbccef27e7dd90181990ba13b84cd580a9713f2d55cee8565",
+    "ai_service.py": "b9dfb7c7526cd3d0e68b5de7f36de754a10294d551a4b7f747bd7e22eec424bf",
+    "ai_statistics.py": "d77c2b882644afc80662df04a2519d06ed4c24b270b6f91893b4d1a46d983058",
+    "ai_web_server.py": "11e88b85b14092a8c1722c6ba4f696e05e5075be501c5d190d014e164255c19d",
+    "collector_private.py": "d15f709c9932d524d3e04443d3e48289aa9e8c015a01c9f9a90314a96a98ebc3",
+    "collector_service.py": "4cb9333c609871769c07d84cea598fbadd6edc9c2ab351012e81ebf4019b9810",
+    "collector_supervisor.py": "b83f2a1397fe204695753c92361b567e2414ed8ea2e61200c3828343452e4034",
+    "collector_web_meta.py": "ee918d2443bbfe5827429b6659ad9154be2b2c1920611a29c3ee240ade02d4ae",
+    "continuous_reader.py": "56a0161e5b2fb7c099f2393d34fc4b8e79fee2a7c4abed27ae58807ebe74986a",
+    "continuous_store.py": "77cda4a4cb4cf6287cb8a67cee888f863ea9c6615fecbc74976fd2dac13ecaf3",
+    "conversation_scope.py": "974b5a8df919e20384f18834f2971a317a8df108bbf53fd3e44a5e5780827443",
+    "scope_history.py": "38942d982dc498b80890e320dafaf8c7d470040879d304c15d40e2c20128154a",
+    "web/app.js": "cbf7979c4293e2341b4911ad3e2cb92018bf0f090312000ab55cfb6c26de0925",
+    "web/assets/chatlens-mark.svg": "cc731ab7cb50c466e7e9bad19786c7e067619c4d36fb45c7aaf35001ae16f7c0",
+    "web/connect.css": "6cff5dfa5703b8fcb99691fae37cc8fe1eae9938d86d66f90cc84e72dfd05959",
+    "web/connect.html": "97546b0eb209c54bf032d6dace7c5a41c01d527507d3f9289d2a644492c9ea40",
+    "web/connect.js": "c6cf06443cdafb5c21f4e2ad9e6ba606112e4d52dcd7aa56100ed2cc6b437529",
+    "web/index.html": "0c201cc8bac299ddc56bf15ce55ff229fadd0ba150d3722f8ce2bd35557cea89",
+    "web/styles.css": "1a96f1b4d4e0430eb9fb7040039b72155be64099541d0eabe8c713ca1464c5a3",
+    "web_data.py": "7b6917859fa3bb5d9f5f8517011ef2376808692b3e64c52feb7aeb2edf8aaee1",
+    "web_runtime.py": "7a38e70dfc88a04b1969c87e8165f1f01e2c623f8d2c60015eb136065fe5cd44",
+    "web_server.py": "eee83d0db863f8370e14e32a4fc76dc15b89ca67e7a4ac38c66623e3b2e3253a",
+    "wechat_identity.py": "af4399b1a0f06f9417f5de9c244b364cd7ad16eb2417cd591199bb3a9406fcbf",
+    "windows_account_probe.py": "8fbcd6eea3a8cdea75106ce6ce8228aa245e82bd8c1221f557f0ceb5ac4e0ca3",
+    "windows_catalog_paging.py": "9eff6b9e38a79500a8a2e1cc59bdc0ab894004ba685db32915110370f47476de",
+    "windows_keyproof_core.py": "a7b52dd019f387699b36336ea97fb37cf937326efee4e97b18eedd5b02d64673",
+    "windows_keyproof_platform.py": "e83de63546fafeca9afe2d419e7a27b9405cd31482020c5286d5c5530a0bf121",
+    "windows_mapped_files.py": "5d84b8d3e7687134195dad4007c8dc1651b780a7d70243b3712f9173e67b7b7f",
+    "windows_onboarding.py": "944ab345554d5b358f7011379a05af7d34ac32f94baf031c70b84833a4cfc731",
+    "windows_onboarding_native.py": "089c61012dc0ea9f70c2a3f650f9abcd97084da52fc9a5c4d1eec4507bce3f24",
+    "windows_process_detection.py": "e6f6015b4a9c8f7916703c32fdf336140106f7afb340714bbe15ab0762a48523",
+    "windows_selected_engine.py": "7714a9c736716ae4bf3ac196205c7cabf9620d7a0302b8fe6526e252b45b7d93",
+    "windows_selected_native.py": "0e073fcfce09d734cc616314143e073d75552411c4b5e93259d4eb5b3a5389a0",
+    "windows_selected_progress.py": "850f5dea81681789c5f6ab813e56785b1bc8a3c21065fee1455863eb9e5fe565",
+    "windows_selected_runner.py": "9b68ef29d1b352d23f405de5acfe94fc05f9a2b067138bddaf50e1c205d2576a",
+    "windows_selected_supervisor.py": "1c8351ce8bbce488a5855ee4dbbba8d106f17443937a676a9eeba4747b51c4ae",
+    "windows_web_manager.py": "7fdcc5bf2c1d635c67d9f2f0367fc616423093e79d53afe348d87c40c93c6c74",
+    "windows_web_server.py": "f7ad71969cce0c0194ba4a90dce1e629850476117831ed88024531612abb776d",
+    "windows_workspace.py": "6d939012ab5e00c24f07a5a62d6ed67dd6e9caa4458a3db2d5b8179656d4186a"
+  },
+  "fixed_inputs": [
+    {
+      "name": "python-3.14.10-embed-amd64.zip",
+      "bytes": 12619664,
+      "sha256": "90905e64a840557d8c1bc4f5b74db3d7ee85e3ffb217611cac1c7813acea4159",
+      "url": "https://www.python.org/ftp/python/3.14.10/python-3.14.10-embed-amd64.zip"
+    },
+    {
+      "name": "sqlcipher3-0.6.4-cp314-cp314-win_amd64.whl",
+      "bytes": 2626446,
+      "sha256": "33a4bb79d5bffbdcc1443ff7fd10556ad781fd4986a710c0c577b817b06e11ac",
+      "url": "https://files.pythonhosted.org/packages/f1/eb/b243c4233f5487a1acf1810ac53bde439c3f11b606a4641328adc43d41b8/sqlcipher3-0.6.4-cp314-cp314-win_amd64.whl"
+    },
+    {
+      "name": "zstandard-0.25.0-cp314-cp314-win_amd64.whl",
+      "bytes": 516118,
+      "sha256": "c19bcdd826e95671065f8692b5a4aa95c52dc7a02a4c5a0cac46deb879a017a2",
+      "url": "https://files.pythonhosted.org/packages/3a/43/241f9615bcf8ba8903b3f0432da069e857fc4fd1783bd26183db53c4804b/zstandard-0.25.0-cp314-cp314-win_amd64.whl"
+    }
+  ],
+  "license_files": [
+    "THIRD-PARTY-SELECTED-NOTICES.txt",
+    "runtime/LICENSE.txt",
+    "runtime/sqlcipher3-0.6.4.dist-info/licenses/LICENSE",
+    "runtime/zstandard-0.25.0.dist-info/licenses/LICENSE"
+  ],
+  "private_data_packaged": false,
+  "macos_binary_or_launcher_packaged": false,
+  "old_packages_unchanged": true,
+  "old_package_sha256": {
+    "ChatLens-Windows-Web-20261101-r2.zip": "0a74637781551b7cd52faae39fe6b9ec6042b05001188966788df70ea6649469",
+    "ChatLens-Windows-Web-20261101-r3.zip": "e8a75d9c91526fb639355da85213300472e90c826cde628d59e596c5f66dd63b",
+    "ChatLens-Windows-Web-20261101-r4.zip": "d9b00c744ce636747f6e64e99100a29a3674d728efd51e2c96310489c941664a",
+    "ChatLens-Windows-Web-20261101-r5.zip": "53ef8517386e6837802524c0aa5dc0389fc3b203c89749a3b0866d318bbf51e8",
+    "ChatLens-Windows-Web-20261101-r6.zip": "b1c61e551e16000b317baa458d0a06a23dcc0f7901633c8d1bcda936943d25dd",
+    "ChatLens-Windows-Web-20261101-r7.zip": "997db558458471ae7b69633da82b7be470b2e35c64c4f400a7abed84b51abb0b",
+    "ChatLens-Windows-Web-20261101-r8.zip": "3bf0c63ca7e539a0c15e7f3b72cf9f94ce0bb5f32162fa1a9029d4dde6433b49",
+    "ChatLens-Windows-Web-20261101.zip": "b7d5f8899327a95a8bc7da192d82059e7aa68a0542041875b653dc3cc6fbb188",
+    "ChatLens-Windows-Web-20261102-r9.zip": "2c9e94356bbbcf10e23ac28e810df734a427c9d0b71f762cf0b754706656b368"
+  },
+  "native_windows_execution": "未验证",
+  "real_message_verification": "未验证",
+  "real_model_called_during_build": false,
+  "source_regression_count_reported_by_root": 866,
+  "windows_synthetic_browser_checks_reported_by_root": 14,
+  "release_assets": [
+    {
+      "name": "ChatLens-Windows-Web-20261102-r9.zip",
+      "path": "artifacts/deliverables/platform-releases/2026-11-02-final/windows/ChatLens-Windows-Web-20261102-r9.zip",
+      "bytes": 15687853,
+      "sha256": "4bf38dd1ebec7cd34eff0bb1020652ca23c0f4e5247b94e26d3d02c7faf3ed4c"
+    },
+    {
+      "name": "ChatLens-Windows-Web-20261102-r9-TEST-GUIDE.md",
+      "path": "artifacts/deliverables/platform-releases/2026-11-02-final/windows/ChatLens-Windows-Web-20261102-r9-TEST-GUIDE.md",
+      "bytes": 3882,
+      "sha256": "6e588729f84934304edf0b4df815be61d850cbe9277f854404c41e3863b0c29b"
+    },
+    {
+      "name": "ChatLens-Windows-Web-20261102-r9-SHA256SUMS.txt",
+      "path": "artifacts/deliverables/platform-releases/2026-11-02-final/windows/ChatLens-Windows-Web-20261102-r9-SHA256SUMS.txt",
+      "bytes": 216,
+      "sha256": "7f9b5307f3560535b1907642b701a61618398709cb64da1a4c208a8a3370e830"
+    }
+  ]
+}

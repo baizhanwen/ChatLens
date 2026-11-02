@@ -16,7 +16,7 @@ SOURCES = (
     'Verify-Collector.ps1', 'Start-Collector.cmd', 'README-COLLECTOR.txt',
     'collector_service.py', 'collector_supervisor.py', 'collector_private.py',
     'windows_account_probe.py', 'windows_process_detection.py', 'windows_mapped_files.py',
-    'continuous_reader.py', 'continuous_store.py', 'conversation_scope.py', 'wechat_identity.py', 'collector_web_meta.py', 'windows_selected_engine.py',
+    'continuous_reader.py', 'continuous_store.py', 'scope_history.py', 'web_data.py', 'conversation_scope.py', 'wechat_identity.py', 'collector_web_meta.py', 'windows_selected_engine.py',
     'windows_selected_native.py', 'windows_selected_supervisor.py',
     'windows_keyproof_core.py', 'windows_keyproof_platform.py',
     'THIRD-PARTY-SELECTED-NOTICES.txt',

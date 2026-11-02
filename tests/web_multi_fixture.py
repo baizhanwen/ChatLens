@@ -11,6 +11,7 @@ import http.client
 import json
 from pathlib import Path
 from queue import Queue, Empty
+import secrets
 import sqlite3
 import sys
 import tempfile
@@ -25,6 +26,7 @@ import ai_service
 from ai_web_server import attach_ai_routes
 from collector_private import ensure_private_dir, read_private_json, write_private_json_new
 from continuous_store import CollectorStore
+from scope_history import apply_history_plan
 from conversation_scope import normalize_conversations
 from macos_active_account import ActiveAccount
 import macos_web as web
@@ -72,11 +74,16 @@ class SyntheticCollector:
         self.pending_messages = []
         self.private = session.data_dir / 'private'
         self.store = CollectorStore(self.private / 'store', session.binding)
-        self.cursors = self.store.snapshot()['cursors'] if self.store.resumed else {
-            'message/message_0.db': {row['alias']: {'local_id': 0, 'present': True}
-                                   for row in session.config['conversations']}}
-        if not self.store.resumed:
-            self.store.initialize(self.cursors, {})
+        self.epochs = runtime.source_epochs()
+        baseline = {'message/message_0.db': {row['alias']: {
+            'local_id': len(runtime.source_messages(row['chat_id'])), 'present': True}
+            for row in session.config['conversations']}}
+        # Consume the same production history plan as ContinuousReader. Only
+        # source MAX discovery and source polling are synthetic in this fixture.
+        current = self.store.snapshot()
+        snapshot = apply_history_plan(self.store, current['cursors'] if self.store.resumed else baseline, self.epochs,
+                                      initialize=not self.store.resumed)
+        self.cursors = snapshot['cursors']
         own = runtime.self_id()
         private = next((row for row in session.config['conversations']
                         if not row['chat_id'].endswith('@chatroom')), None)
@@ -91,31 +98,36 @@ class SyntheticCollector:
                                  'synthetic-group-member': '合成群成员'}}
                 for row in session.config['conversations']]}
         web.atomic_private(self.private / 'catalog.json', catalog)
-        if not self.store.resumed:
-            for row in session.config['conversations']:
+        for row in session.config['conversations']:
+            source = (runtime.accounts.index(runtime.current), row['chat_id'])
+            if source not in runtime.previously_watched:
+                runtime.previously_watched.add(source)
                 for direction in ('incoming', 'outgoing', 'unknown'):
                     self.commit(row['alias'], direction=direction)
+        self._flush_source()
         self.heartbeat()
 
     def commit(self, alias=None, *, direction='incoming', body=None):
         chats = self.session.config['conversations']
         selected = next(row for row in chats if row['alias'] == (alias or chats[0]['alias']))
+        self.runtime.append_source(selected['chat_id'], direction=direction, body=body)
+        self._flush_source()
+        return self.store.stats()['total_messages']
+
+    def _flush_source(self):
         before = self.cursors
         after = json.loads(json.dumps(before))
-        after['message/message_0.db'][selected['alias']]['local_id'] += 1
-        serial = after['message/message_0.db'][selected['alias']]['local_id']
-        sender = self.runtime.self_id() if direction == 'outgoing' else '' if direction == 'unknown' else (
-            'synthetic-group-member' if selected['chat_id'].endswith('@chatroom') else selected['chat_id'])
-        prefix = self.runtime.manager.pending_scope_id or self.runtime.manager.active_scope_id
-        text = body or '合成账号%d · 档案%s · %s · %s · %d' % (self.runtime.accounts.index(self.runtime.current),
-            prefix[:8], self.runtime.name_for(selected['chat_id']), direction, serial)
-        event = {'source_key': hashlib.sha256((selected['alias'] + ':' + str(serial)).encode()).hexdigest(),
-            'alias': selected['alias'], 'source_local_id': serial,
-            'sent_at': int(datetime.now(timezone.utc).timestamp()), 'sender_id': sender,
-            'body': text, 'observed_at': now()}
-        result = self.store.commit(before, after, [event], {})
-        self.cursors = after
-        return result['total_messages']
+        events = []
+        for chat in self.session.config['conversations']:
+            cursor = after['message/message_0.db'][chat['alias']]
+            fresh = [event for event in self.runtime.source_messages(chat['chat_id'])
+                     if event['source_local_id'] > cursor['local_id']]
+            for event in fresh:
+                events.append({**event, 'alias': chat['alias']})
+                cursor['local_id'] = event['source_local_id']
+        if events:
+            self.store.commit(before, after, events, self.epochs)
+            self.cursors = after
 
     def heartbeat(self, stage='collecting'):
         web.atomic_private(self.private / 'web-status.json', {'schema_version': 1,
@@ -127,6 +139,7 @@ class SyntheticCollector:
         self.polls += 1
         while self.pending_messages:
             self.commit(**self.pending_messages.pop(0))
+        self._flush_source()
         self.heartbeat()
 
     def close(self, **options):
@@ -146,8 +159,11 @@ class SyntheticRuntime:
         for index in range(2):
             path = self.root / ('synthetic-account-%d' % index) / 'db_storage'
             path.mkdir(parents=True)
-            self.accounts.append(ActiveAccount(path, 100 + index, 1700000000 + index, '4.1.15'))
+            self.accounts.append(ActiveAccount(path, 100 + index, 1700000000 + index, '4.1.11'))
         self.current = self.accounts[0]
+        self.synthetic_source = {}
+        self.previously_watched = set()
+        self.next_scope_gap = []
         self.choices = []
         private_names = ['合成青禾客户', '合成星桥客户', '合成远帆客户']
         group_names = ['合成交付讨论群', '合成订单确认群']
@@ -193,6 +209,32 @@ class SyntheticRuntime:
     def name_for(self, chat_id):
         return next(row['name'] for row in self.choices if row['chat_id'] == chat_id)
 
+    def source_epochs(self):
+        info = self.current.db_root.stat()
+        index = self.accounts.index(self.current)
+        return {'message/message_0.db': {'file_identity': [info.st_dev, info.st_ino],
+            'salt_sha256': hashlib.sha256(('synthetic-salt-%d' % index).encode()).hexdigest(),
+            'key_sha256': hashlib.sha256(('synthetic-key-%d' % index).encode()).hexdigest()}}
+
+    def source_messages(self, chat_id):
+        return self.synthetic_source.setdefault((self.accounts.index(self.current), chat_id), [])
+
+    def append_source(self, chat_id, *, direction='incoming', body=None):
+        rows = self.source_messages(chat_id)
+        serial = len(rows) + 1
+        sender = self.self_id() if direction == 'outgoing' else '' if direction == 'unknown' else (
+            'synthetic-group-member' if chat_id.endswith('@chatroom') else chat_id)
+        text = body or '合成账号%d · %s · %s · %d' % (
+            self.accounts.index(self.current), self.name_for(chat_id), direction, serial)
+        # The production source identity is independent of profile and alias.
+        identity = ['message/message_0.db', chat_id, serial, self.source_epochs()['message/message_0.db']]
+        canonical = json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
+        event = {'source_key': hashlib.sha256(canonical).hexdigest(), 'source_local_id': serial,
+            'sent_at': int(datetime.now(timezone.utc).timestamp()), 'sender_id': sender,
+            'body': text, 'observed_at': now()}
+        rows.append(event)
+        return event
+
     def make_manager(self):
         return web.MacWebManager(ROOT, self.workspace, self.root / 'synthetic-not-executed-probe',
                                  detector=lambda _: self.current)
@@ -218,16 +260,29 @@ class SyntheticRuntime:
     def prepare(self, data_dir, **options):
         data_dir = Path(data_dir)
         if data_dir.exists():
-            config = read_private_json(data_dir / 'private/scope.json')['config']
+            scope = read_private_json(data_dir / 'private/scope.json')
+            config = scope['config']
         else:
             config = {'conversations': normalize_conversations(read_private_json(options['selected_config']))}
             ensure_private_dir(data_dir, create=True)
             private = ensure_private_dir(data_dir / 'private', create=True)
             ensure_private_dir(private / 'store', create=True)
-            write_private_json_new(private / 'scope.json', {'schema_version': 1,
-                'config': config, 'db_root': str(self.current.db_root)})
+            info = self.current.db_root.stat()
+            scope = {'schema_version': 1, 'platform': 'macos', 'session_id': secrets.token_hex(16),
+                'db_root': str(self.current.db_root), 'root_identity': [info.st_dev, info.st_ino],
+                'config': config, 'shards': ['message/message_0.db'],
+                'client_version': self.current.client_version}
+            write_private_json_new(private / 'scope.json', scope)
+            # Source-only timing seam: these arrive after the old collector
+            # stopped but before the new target discovers its source MAX.
+            for event in self.next_scope_gap:
+                self.append_source(event['chat_id'], body=event['body'])
+            self.next_scope_gap = []
+        binding = {'schema_version': 1, 'platform': 'macos', 'session_id': scope['session_id'],
+                   'root': scope['db_root'], 'root_identity': scope['root_identity'],
+                   'config': config, 'shards': scope['shards']}
         return SimpleNamespace(data_dir=data_dir, config=config, client_version=self.current.client_version,
-            binding={'source': 'explicit_synthetic_multi_source', 'account': web.account_identity(self.current), 'config': config})
+            binding=binding)
 
     def collect(self, session, native, **options):
         value = SyntheticCollector(self, session, native, **options)
@@ -301,12 +356,17 @@ class SyntheticRuntime:
         connection = sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)
         try:
             checkpoint = connection.execute('SELECT cursors,epochs,baseline_completed_at,last_commit_at,commits FROM checkpoint').fetchone()
-            messages = connection.execute('SELECT * FROM messages ORDER BY rowid').fetchall()
+            messages = connection.execute('SELECT rowid,* FROM messages ORDER BY rowid').fetchall()
         finally:
             connection.close()
         return {'checkpoint_sha256': hashlib.sha256(json.dumps(checkpoint).encode()).hexdigest(),
+                'database_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
                 'messages_sha256': hashlib.sha256(json.dumps(messages).encode()).hexdigest(),
-                'baseline': checkpoint[2], 'count': len(messages)}
+                'baseline': checkpoint[2], 'count': len(messages),
+                'cursors': json.loads(checkpoint[0]),
+                'unique_source_keys': len({row[1] for row in messages}),
+                'row_fingerprints': {str(row[0]): hashlib.sha256(json.dumps(row).encode()).hexdigest()
+                                     for row in messages}}
 
     def switch_account(self):
         self.current = self.accounts[1] if self.current == self.accounts[0] else self.accounts[0]
@@ -325,6 +385,14 @@ class SyntheticRuntime:
             self.own(lambda: self.manager.collector.pending_messages.append({
                 'alias': value.get('alias'), 'direction': value.get('direction', 'incoming'),
                 'body': value.get('body', '合成编辑名单期间收到的新文字')}))
+        elif command == 'preload_source':
+            row = next(row for row in self.choices if row['id'] == value['choice_id'])
+            self.own(lambda: self.append_source(row['chat_id'],
+                body=value.get('body', '合成未关注时的旧源文字，不应被新会话导入')))
+        elif command == 'gap_on_next_scope':
+            row = next(row for row in self.choices if row['id'] == value['choice_id'])
+            self.own(lambda: self.next_scope_gap.append({'chat_id': row['chat_id'],
+                'body': value.get('body', '合成切换间隙测试群文字')}))
         elif command == 'slow':
             self.provider.entered.clear(); self.provider.release.clear(); self.provider.slow = True
         elif command == 'release':

@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+[ ! -L "$0" ] || exit 2
+TASK_ROOT=$(CDPATH= cd -P -- "$(/usr/bin/dirname -- "$0")" && /bin/pwd -P)
+exec "$TASK_ROOT/runtime/bin/python3.12" -I -S -B "$TASK_ROOT/scripts/macos_package_check.py" --check

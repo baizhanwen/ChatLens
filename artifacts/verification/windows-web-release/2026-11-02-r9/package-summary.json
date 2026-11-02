@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-11-02T09:17:42.184707+00:00",
+  "status": "通过",
+  "platform": "windows",
+  "architecture": "x64",
+  "revision": "20261102-r9",
+  "package_name": "ChatLens-Windows-Web-20261102-r9.zip",
+  "bytes": 15681360,
+  "sha256": "2c9e94356bbbcf10e23ac28e810df734a427c9d0b71f762cf0b754706656b368",
+  "file_count": 101,
+  "public_source_count": 44,
+  "fixed_runtime_inputs": 3,
+  "fixed_runtime_hashes_verified": true,
+  "crc_manifest_whitelist_hashes_import_closure": "通过",
+  "private_data_packaged": false,
+  "native_macos_payloads_packaged": false,
+  "license_files": [
+    "THIRD-PARTY-SELECTED-NOTICES.txt",
+    "runtime/LICENSE.txt",
+    "runtime/sqlcipher3-0.6.4.dist-info/licenses/LICENSE",
+    "runtime/zstandard-0.25.0.dist-info/licenses/LICENSE"
+  ],
+  "changed_files_from_r8_excluding_manifest": [
+    "README-WEB.txt",
+    "web/app.js",
+    "web/connect.css",
+    "web/connect.html",
+    "web/connect.js",
+    "web/index.html"
+  ],
+  "old_web_package_hashes": {
+    "ChatLens-Windows-Web-20261101-r2.zip": "0a74637781551b7cd52faae39fe6b9ec6042b05001188966788df70ea6649469",
+    "ChatLens-Windows-Web-20261101-r3.zip": "e8a75d9c91526fb639355da85213300472e90c826cde628d59e596c5f66dd63b",
+    "ChatLens-Windows-Web-20261101-r4.zip": "d9b00c744ce636747f6e64e99100a29a3674d728efd51e2c96310489c941664a",
+    "ChatLens-Windows-Web-20261101-r5.zip": "53ef8517386e6837802524c0aa5dc0389fc3b203c89749a3b0866d318bbf51e8",
+    "ChatLens-Windows-Web-20261101-r6.zip": "b1c61e551e16000b317baa458d0a06a23dcc0f7901633c8d1bcda936943d25dd",
+    "ChatLens-Windows-Web-20261101-r7.zip": "997db558458471ae7b69633da82b7be470b2e35c64c4f400a7abed84b51abb0b",
+    "ChatLens-Windows-Web-20261101-r8.zip": "3bf0c63ca7e539a0c15e7f3b72cf9f94ce0bb5f32162fa1a9029d4dde6433b49",
+    "ChatLens-Windows-Web-20261101.zip": "b7d5f8899327a95a8bc7da192d82059e7aa68a0542041875b653dc3cc6fbb188"
+  },
+  "old_web_packages_unchanged": true,
+  "related_synthetic_tests": 9,
+  "native_windows_execution": "未验证",
+  "real_message_verification": "未验证",
+  "real_model_called_during_build": false,
+  "release_assets": [
+    {
+      "name": "ChatLens-Windows-Web-20261102-r9.zip",
+      "bytes": 15681360,
+      "sha256": "2c9e94356bbbcf10e23ac28e810df734a427c9d0b71f762cf0b754706656b368"
+    },
+    {
+      "name": "ChatLens-Windows-Web-20261102-r9-TEST-GUIDE.md",
+      "bytes": 2753,
+      "sha256": "b52156835001bfca6461e43e3b5b428cdef50cd88defa9f81211da97b678e7da"
+    },
+    {
+      "name": "ChatLens-Windows-Web-20261102-r9-SHA256SUMS.txt",
+      "bytes": 216,
+      "sha256": "7c59243a70988b245fd1af82b7b7d436e3d4d1adce94e01da945d7d1d2fb0cf3"
+    }
+  ]
+}

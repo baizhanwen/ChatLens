@@ -12,7 +12,7 @@ from build_windows_selected_package import ARTIFACTS, CACHE_DIRECTORY, cached_ar
 
 PREFIX = 'ChatLens-Windows-Web'
 MANIFEST = 'WEB-MANIFEST.json'
-PACKAGE_REVISION = '20261101-r8'
+PACKAGE_REVISION = '20261102-r9'
 SOURCES = (
     'Start-Web.ps1', 'Start-ChatLens.cmd', 'README-WEB.txt',
     'web_runtime.py', 'web_server.py', 'windows_web_manager.py', 'windows_web_server.py',
@@ -20,7 +20,7 @@ SOURCES = (
     'windows_workspace.py', 'windows_onboarding.py', 'windows_onboarding_native.py', 'windows_catalog_paging.py',
     'web_data.py', 'collector_web_meta.py',
     'collector_service.py', 'collector_supervisor.py', 'collector_private.py',
-    'continuous_reader.py', 'continuous_store.py', 'conversation_scope.py', 'wechat_identity.py', 'windows_selected_engine.py',
+    'continuous_reader.py', 'continuous_store.py', 'scope_history.py', 'conversation_scope.py', 'wechat_identity.py', 'windows_selected_engine.py',
     'windows_selected_native.py', 'windows_selected_supervisor.py',
     'windows_selected_runner.py', 'windows_selected_progress.py',
     'windows_keyproof_core.py', 'windows_keyproof_platform.py',
@@ -71,10 +71,20 @@ def build(root, output):
             raise RuntimeError('required_stdlib_sqlite3_package_missing')
     manifest = {
         'schema_version': 1, 'kind': 'chatlens_windows_local_web_package',
+        'platform': 'windows', 'architecture': 'x64',
         'package_revision': PACKAGE_REVISION,
         'built_at_utc': datetime.now(timezone.utc).isoformat(),
         'scope': 'explicit_1_to_50_conversation_profiles_with_received_sent_unknown_statistics',
         'conversation_limits': {'minimum': 1, 'maximum': 50},
+        'release_changes': ['Windows-only offline runtime package; macOS is distributed separately.',
+                            'Updated shared Web interface with user-requested cloud-fragment consent default selected; sending still requires the explicit Send action.',
+                            'Preserve already-collected same-account history when editing the selected list; continuously selected conversations retain their committed cursors and new conversations start at the new baseline.'],
+        'cloud_analysis': {'consent_default_selected': True,
+                           'requires_explicit_send': True,
+                           'manual_opt_out_preserved_within_scope': True,
+                           'new_scope_or_model_target_uses_default': True,
+                           'backend_scope_and_target_fingerprint_validation': 'retained',
+                           'real_model_called_during_build': False},
         'startup': 'Interactive readiness guide with an automatic current-user workspace, retryable current-account verification and explicitly requested first-use initialization. Search for and confirm conversations before collection; no automatic read-only fallback.',
         'process_selection': 'After exact executable, supported version, x64 architecture and creation-time checks, prefer exactly one visible, unowned main-window candidate (IsWindowVisible and GW_OWNER == NULL), matching .NET MainWindowHandle filtering without reading titles. Multiple valid main-window candidates remain ambiguous. Only when no valid main-window candidates exist may a unique process-tree root be selected as a hidden/tray candidate; account-reading verification is still required.',
         'account_process_family': {
@@ -92,6 +102,12 @@ def build(root, output):
         'collector_readiness': 'Only a fresh heartbeat from the currently owned collector establishes actual initialization, collecting, paused or stale state; saved data and a launched process do not establish collection readiness.',
         'native_windows_sdk_execution_status': '未验证',
         'isolation': 'Account-bound profiles with independent store, checkpoint and AI history; stale scope requests are rejected.',
+        'same_account_history': {'source': 'committed_same_account_profile_stores_only',
+                                 'selected_conversations_only': True,
+                                 'continuous_selection': 'inherit_committed_cursor_from_previous_active_scope',
+                                 'new_selection': 'new_source_baseline_with_previously_saved_local_history_if_available',
+                                 'existing_target': 'append_missing_history_without_rewinding_checkpoint_or_replacing_rowids',
+                                 'cross_account_copy': False, 'ai_history_copy': False},
         'upgrade_handling': 'Use a current-user machine-bound workspace. Reuse a uniquely matching registered or discovered existing collector-data in place without moving messages, baseline, assistant or configuration. Ambiguous data requires explicit local import; new accounts use separate private directories.',
         'first_use': 'Detect the current verified WeChat process/account locally, explicitly initialize a new reader with the bounded existing key reader, then search for and confirm selected conversations before any collection. Old explicit data-dir entry remains compatible.',
         'supported_database_layout': ['message/message_0.db', 'message/message_1.db', 'contact/contact.db'],

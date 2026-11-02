@@ -24,7 +24,7 @@
   const preferences = { density: 'spacious', autoScroll: true };
   const pending = new Map();
   const scrollPositions = new Map();
-  const ai = { initialized: false, status: null, provider: null, statusError: false, statusAt: 0, statusRequest: 0, threadId: null, turns: [], threads: [], threadRequest: 0, job: null, jobTimer: null, jobRequest: 0, cancelledRequest: false, consentKey: null, scopeSignature: null, evidenceRequest: 0, testJob: null, testTimer: null, modelBusy: false, plan: null, planSignature: null, planRequest: 0, planTimer: null, planBusy: false, planSubmitting: false, planError: null, previewThreads: new Map() };
+  const ai = { initialized: false, status: null, provider: null, statusError: false, statusAt: 0, statusRequest: 0, threadId: null, turns: [], threads: [], threadRequest: 0, job: null, jobTimer: null, jobRequest: 0, cancelledRequest: false, cloudConsentAllowed: true, consentKey: null, scopeSignature: null, evidenceRequest: 0, testJob: null, testTimer: null, modelBusy: false, plan: null, planSignature: null, planRequest: 0, planTimer: null, planBusy: false, planSubmitting: false, planError: null, previewThreads: new Map() };
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -546,6 +546,7 @@
     clearTimeout(ai.planTimer);
     ai.job = ai.testJob = ai.plan = ai.provider = ai.status = null;
     ai.threadId = ai.planSignature = ai.consentKey = null;
+    ai.cloudConsentAllowed = false;
     ai.turns = [];
     ai.threads = [];
     ai.previewThreads.clear();
@@ -1219,7 +1220,7 @@
 
   function setAiProvider(provider) {
     if (!provider || typeof provider.configured !== 'boolean') throw apiError('invalid_response');
-    if (ai.provider?.target_fingerprint !== provider.target_fingerprint) { ai.consentKey = null; ai.lastTestResult = null; $('ai-cloud-confirm').checked = false; aiNotice(); }
+    if (ai.provider?.target_fingerprint !== provider.target_fingerprint) { ai.consentKey = null; ai.cloudConsentAllowed = true; ai.lastTestResult = null; aiNotice(); }
     ai.provider = { base_url: typeof provider.base_url === 'string' ? provider.base_url : '', model: typeof provider.model === 'string' ? provider.model : '', has_key: provider.has_key === true, configured: provider.configured, target_fingerprint: typeof provider.target_fingerprint === 'string' ? provider.target_fingerprint : '', is_local: provider.is_local === true };
     renderAiControls();
     renderModelConnectionStatus();
@@ -1273,7 +1274,10 @@
     const cloud = LIVE && configured && !provider.is_local && plan?.requires_model === true;
     $('ai-cloud-consent').hidden = !cloud;
     $('ai-cloud-confirm').disabled = busy;
-    $('ai-cloud-confirm').checked = cloud && ai.consentKey === aiScopeKey();
+    // Default on for each chosen scope/target; a manual opt-out survives all
+    // renders, plan refreshes and polling until that scope or target changes.
+    ai.consentKey = cloud && ai.cloudConsentAllowed ? aiScopeKey() : null;
+    $('ai-cloud-confirm').checked = ai.cloudConsentAllowed;
     $('ai-cloud-confirm-label').textContent = '允许将' + (plan ? plan.time_label + '、' + aiPlanScopeLabel(plan) : '本次所选范围') + '内与问题相关的文字片段发送至 ' + aiTarget() + '。';
     document.querySelectorAll('[data-ai-prompt]').forEach(button => { button.disabled = busy; });
     $('ai-runtime').hidden = !ai.job;
@@ -1434,7 +1438,7 @@
       }
       if (['today', '7d', 'all'].includes(latestUser?.time_range)) $('ai-time-range').value = latestUser.time_range;
       const scopeSignature = $('ai-time-range').value + '|' + aiScope().sort().join(',');
-      if (scopeSignature !== ai.scopeSignature) { ai.consentKey = null; $('ai-cloud-confirm').checked = false; }
+      if (scopeSignature !== ai.scopeSignature) { ai.consentKey = null; ai.cloudConsentAllowed = true; }
       ai.scopeSignature = scopeSignature;
       ai.turns = result.messages.filter(row => ['user', 'assistant', 'system'].includes(row.role) && typeof row.content === 'string').map(row => ({ ...row, status: 'done', evidence: cleanAiEvidence(row.evidence), plan: cleanAiPlan(row.plan) }));
       queueAiPlan();
@@ -1457,7 +1461,7 @@
     const hadConversation = ai.turns.length > 0;
     ai.scopeSignature = signature;
     ai.consentKey = null;
-    $('ai-cloud-confirm').checked = false;
+    ai.cloudConsentAllowed = true;
     ai.threadId = null;
     ai.turns = [];
     ai.threadRequest++;
@@ -1817,7 +1821,7 @@
     $('ai-question').addEventListener('input', queueAiPlan);
     $('ai-scope').addEventListener('change', resetAiScope);
     $('ai-time-range').addEventListener('change', resetAiScope);
-    $('ai-cloud-confirm').addEventListener('change', () => { ai.consentKey = $('ai-cloud-confirm').checked ? aiScopeKey() : null; });
+    $('ai-cloud-confirm').addEventListener('change', () => { ai.cloudConsentAllowed = $('ai-cloud-confirm').checked; ai.consentKey = ai.cloudConsentAllowed ? aiScopeKey() : null; });
     $('ai-new-thread').addEventListener('click', newAiThread);
     $('ai-cancel').addEventListener('click', cancelAiJob);
     $('ai-new-answer').addEventListener('click', () => { $('ai-chat-scroll').scrollTop = $('ai-chat-scroll').scrollHeight; $('ai-new-answer').hidden = true; });

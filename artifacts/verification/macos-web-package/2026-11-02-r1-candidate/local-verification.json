@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-11-02T09:37:05.125838+00:00",
+  "status": "candidate_not_published",
+  "publication_paused_for_new_scope_continuity_fix": true,
+  "package": "ChatLens-macOS-arm64-Web-20261102-r1.zip",
+  "bytes": 25168982,
+  "sha256": "83c7159e3cc367afcea3efe255aeec823c40cac746339ccf95cbe8423c79a5d2",
+  "archive_files": 905,
+  "runtime_check": {
+    "status": "passed",
+    "public_files_checked": 904,
+    "python": "3.12.14",
+    "sqlcipher": "4.12.0 community",
+    "zstandard": "0.25.0",
+    "wechat_or_private_workspace_accessed": false,
+    "network_requested": false
+  },
+  "extracted_then_moved_to_directory_with_spaces": true,
+  "relative_bridge_prepare_help": "passed",
+  "package_bytecode_cache_count": 0,
+  "native_probe_signature": "passed",
+  "native_probe_minimum_macos_27": true,
+  "offline_default_tls_context": {
+    "certificate_required": true,
+    "hostname_checked": true,
+    "ca_count": 128
+  },
+  "public_source_file_hashes_in_manifest": true,
+  "runtime_and_wheel_upstream_pins": [
+    {
+      "kind": "runtime",
+      "name": "cpython-3.12.14+20260814-aarch64-apple-darwin-pgo+lto-full.tar.zst",
+      "bytes": 54796258,
+      "sha256": "1f6e3adb3467ba77dd7930f91af8960a7cbb1586715efc313af8dd478a8911ec",
+      "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260814/cpython-3.12.14%2B20260814-aarch64-apple-darwin-pgo%2Blto-full.tar.zst"
+    },
+    {
+      "kind": "wheel",
+      "distribution": "sqlcipher3_wheels",
+      "package": "sqlcipher3",
+      "name": "sqlcipher3_wheels-0.5.7-cp312-cp312-macosx_11_0_arm64.whl",
+      "bytes": 3163917,
+      "sha256": "75636e5eea2669cc0d31d39c639dc69769824020456ba7b181a0c4836b221952",
+      "url": "https://files.pythonhosted.org/packages/7d/f9/981464b4f8144f8ce5b6ffa80429b24fd342ce1991a48bc9fdc60c438469/sqlcipher3_wheels-0.5.7-cp312-cp312-macosx_11_0_arm64.whl"
+    },
+    {
+      "kind": "wheel",
+      "distribution": "zstandard",
+      "package": "zstandard",
+      "name": "zstandard-0.25.0-cp312-cp312-macosx_11_0_arm64.whl",
+      "bytes": 640436,
+      "sha256": "913cbd31a400febff93b564a23e17c3ed2d56c064006f54efec210d586171c00",
+      "url": "https://files.pythonhosted.org/packages/aa/1c/d920d64b22f8dd028a8b90e2d756e431a5d86194caa78e3819c7bf53b4b3/zstandard-0.25.0-cp312-cp312-macosx_11_0_arm64.whl"
+    }
+  ],
+  "local_user_absolute_path_hits": 0,
+  "forbidden_private_venv_or_startup_hook_members": 0,
+  "package_tests": {
+    "passed": 10,
+    "real_private_data_accessed": false
+  },
+  "synthetic_http": {
+    "status": "未验证",
+    "sandbox_socket_bind": "PermissionError_EPERM",
+    "pending_command": ".build/wechat-read-venv/bin/python -B scripts/verify_macos_web_package.py --package artifacts/deliverables/macos-web/ChatLens-macOS-arm64-Web-20261102-r1.zip --output .build/macos-web-package-clean-approved"
+  },
+  "acceptance_boundaries": {
+    "another_mac": "未验证",
+    "terminal_double_click_and_gatekeeper": "未验证",
+    "extracted_package_live_wechat_collection": "未验证",
+    "real_model_called": false,
+    "real_wechat_or_private_workspace_accessed": false
+  }
+}

@@ -305,7 +305,7 @@ class CollectorStore:
         except (sqlite3.Error, ValueError, TypeError, UnicodeError):
             raise StoreError('collector_checkpoint_invalid') from None
 
-    def initialize(self, cursors, epochs):
+    def initialize(self, cursors, epochs, *, events=()):
         self._check_files()
         cursor_json, epoch_json = _json_map(cursors), _json_map(epochs)
         self._validate_scope_cursors(cursors)
@@ -314,6 +314,8 @@ class CollectorStore:
             current = self.snapshot()
             if current['initialized']:
                 raise StoreError('collector_baseline_already_initialized')
+            self._insert_history(events)
+            self._fault('after_history_inserts')
             when = _now()
             self._connection.execute('UPDATE checkpoint SET initialized=1,cursors=?,epochs=?,baseline_completed_at=?,last_commit_at=? WHERE id=1', (cursor_json, epoch_json, when, when))
             self._fault('before_baseline_commit')
@@ -324,9 +326,79 @@ class CollectorStore:
                 raise
             if isinstance(error, (KeyboardInterrupt, SystemExit)):
                 raise
+            code = getattr(error, 'code', None)
+            if isinstance(code, str) and re.fullmatch(r'scope_history_[a-z_]{1,80}', code):
+                raise
             raise StoreError('collector_baseline_commit_failed') from None
         self._fault('after_baseline_commit')
         return self.snapshot()
+
+    def _insert_history(self, events):
+        """Stream validated history inside the caller's destination transaction.
+
+        Existing rowids and first-observed timestamps are retained. A source
+        identity with different original content aborts the whole transaction.
+        """
+        if isinstance(events, (str, bytes, dict)):
+            raise StoreError('collector_history_events_invalid')
+        inserted = duplicates = 0
+        try:
+            iterator = iter(events)
+        except TypeError:
+            raise StoreError('collector_history_events_invalid') from None
+        for event in iterator:
+            row = self._event(event)
+            if self._aliases is not None and row[1] not in self._aliases:
+                raise StoreError('collector_event_scope_invalid')
+            prior = self._connection.execute(
+                'SELECT source_key,alias,source_local_id,sent_at,sender_id,body,observed_at '
+                'FROM messages WHERE source_key=?', (row[0],)).fetchone()
+            if prior is not None:
+                if tuple(prior[:6]) != row[:6]:
+                    raise StoreError('collector_source_message_conflict')
+                duplicates += 1
+            else:
+                self._connection.execute('INSERT INTO messages VALUES (?,?,?,?,?,?,?)', row)
+                inserted += 1
+        return inserted, duplicates
+
+    def merge_history(self, expected_cursors, events, epochs):
+        """Add already committed local history without changing any checkpoint.
+
+        This is intentionally separate from normal source polling. It preserves
+        existing rowids, cursors, baseline, commit count and reference targets.
+        """
+        self._check_files()
+        expected_json, epoch_json = _json_map(expected_cursors), _json_map(epochs)
+        self._validate_scope_cursors(expected_cursors)
+        try:
+            self._connection.execute('BEGIN IMMEDIATE')
+            current = self.snapshot()
+            if not current['initialized']:
+                raise StoreError('collector_baseline_required')
+            if _canonical(current['cursors']) != expected_json:
+                raise StoreError('collector_checkpoint_conflict')
+            if _canonical(current['epochs']) != epoch_json:
+                raise StoreError('collector_source_epoch_changed')
+            inserted, duplicates = self._insert_history(events)
+            self._fault('after_history_inserts')
+            self._fault('before_history_commit')
+            self._connection.commit()
+        except BaseException as error:
+            self._connection.rollback()
+            if isinstance(error, StoreError):
+                raise
+            if isinstance(error, (KeyboardInterrupt, SystemExit)):
+                raise
+            # Preserve the history module's fixed errors for a useful reason;
+            # never include the original exception's potentially private text.
+            code = getattr(error, 'code', None)
+            if isinstance(code, str) and re.fullmatch(r'scope_history_[a-z_]{1,80}', code):
+                raise
+            raise StoreError('collector_history_commit_failed') from None
+        self._fault('after_history_commit')
+        return {'inserted': inserted, 'duplicates': duplicates,
+                'total_messages': self.stats()['total_messages']}
 
     @staticmethod
     def _event(event):

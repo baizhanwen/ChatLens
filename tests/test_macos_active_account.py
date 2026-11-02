@@ -72,6 +72,7 @@ class ActiveAccountTests(unittest.TestCase):
         self.assertRegex(str(failure.exception), '^macos_active_[a-z_]+$')
         for private in (str(self.root), 'SYNTHETIC_ACTIVE', 'SYNTHETIC_INACTIVE', 'BODY_AND_KEYS'):
             self.assertNotIn(private, str(failure.exception))
+        return failure.exception
 
     def test_single_active_account_uses_open_files_without_scanning_or_reading_payload(self):
         self.listing += ('n' + str(self.first / 'message') + '\nn/dev/null\n').encode()
@@ -98,7 +99,55 @@ class ActiveAccountTests(unittest.TestCase):
 
     def test_two_active_roots_fail_closed_despite_one_expected_account(self):
         self.listing += ('n' + str(self.second / 'message/message_0.db') + '\n').encode()
-        self.assert_error('macos_active_account_ambiguous')
+        error = self.assert_error('macos_active_account_ambiguous')
+        self.assertIs(error.wechat_running, True)
+
+    def test_old_root_with_only_log_file_still_cannot_be_guessed_inactive(self):
+        stale_log = self.first / 'synthetic-log-only'
+        stale_log.write_bytes(b'SYNTHETIC_NO_CHAT_PAYLOAD')
+        self.listing = ('p12345\nn' + str(stale_log) + '\nn' +
+                        str(self.second / 'message/message_0.db') + '\n').encode()
+        error = self.assert_error('macos_active_account_ambiguous')
+        self.assertIs(error.wechat_running, True)
+
+    def test_explicit_native_no_process_is_distinct_from_invalid_probe(self):
+        self.probe_documents = [dict(platform='wechat', os='macOS', running=False, matching_applications=0)]
+        error = self.assert_error('macos_active_process_not_running')
+        self.assertIs(error.wechat_running, False)
+        self.assertEqual(len(self.calls), 1)
+
+    def test_multiple_native_processes_are_rejected_without_lsof(self):
+        self.probe_documents = [metadata(matching_applications=2)]
+        error = self.assert_error('macos_active_process_ambiguous')
+        self.assertIs(error.wechat_running, True)
+        self.assertEqual(len(self.calls), 1)
+
+    def test_metadata_failure_only_reports_validated_running_and_fixed_category(self):
+        for changes, issue, running in (
+                ({'version': 'unknown'}, 'client_version', True),
+                ({'process_started_at': None}, 'process_started_at', True),
+                ({'process_id': None}, 'process_id', True),
+                ({'frontmost': None}, 'frontmost_state', True),
+                ({'screen_state_available': None}, 'screen_state', True),
+                ({'bundle_id': 'SYNTHETIC_PRIVATE_BUNDLE'}, 'application_state', None),
+                ({'matching_applications': True}, 'application_count', None)):
+            with self.subTest(issue=issue):
+                self.calls = []
+                self.probe_documents = [metadata(**changes)]
+                error = self.assert_error('macos_active_process_metadata_invalid')
+                self.assertIs(error.wechat_running, running)
+                self.assertEqual(error.metadata_issue, issue)
+                self.assertEqual(len(self.calls), 1)
+
+    def test_lsof_failure_retains_only_validated_running_fact(self):
+        original = self.runner
+        def runner(command, **options):
+            if command[0] == '/usr/sbin/lsof':
+                raise PermissionError('SYNTHETIC_PRIVATE_PATH')
+            return original(command, **options)
+        error = self.assert_error('macos_active_open_files_unavailable', runner=runner)
+        self.assertIs(error.wechat_running, True)
+        self.assertIsNone(error.metadata_issue)
 
     def test_no_regular_open_file_or_only_outside_fixed_scope_is_not_an_account(self):
         self.listing = ('p12345\nn' + str(self.first) + '\nn' + str(self.first / 'message') +
@@ -130,7 +179,7 @@ class ActiveAccountTests(unittest.TestCase):
                 self.assert_error('macos_active_process_changed')
 
     def test_multiple_missing_or_untrusted_process_metadata_rejected_before_lsof(self):
-        cases = [dict(running=False), dict(matching_applications=2), dict(matching_applications=True),
+        cases = [dict(running=False), dict(matching_applications=True),
                  dict(process_id=True), dict(process_id=0), dict(process_id=2**31),
                  dict(process_started_at=True), dict(process_started_at=float('nan')),
                  dict(process_started_at=float('inf')), dict(process_started_at=-1),

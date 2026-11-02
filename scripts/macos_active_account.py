@@ -22,11 +22,18 @@ ACCOUNT = re.compile(r'[A-Za-z0-9_@.-]{1,256}\Z')
 VERSION = re.compile(r'[0-9][0-9A-Za-z ._-]{0,39}\Z')
 MAX_PROBE_BYTES = 128 * 1024
 MAX_LSOF_BYTES = 2 * 1024 * 1024
+METADATA_ISSUES = frozenset({'probe_output', 'application_count', 'application_state',
+                             'process_id', 'process_started_at', 'client_version',
+                             'frontmost_state', 'screen_state'})
 
 
 class ActiveAccountError(ValueError):
-    def __init__(self, code):
+    def __init__(self, code, *, wechat_running=None, metadata_issue=None):
         self.code = self.reason = code
+        # Only a validated probe sample may establish this fact. It is separate
+        # from account identification and never includes private process data.
+        self.wechat_running = wechat_running if type(wechat_running) is bool else None
+        self.metadata_issue = metadata_issue if isinstance(metadata_issue, str) and metadata_issue in METADATA_ISSUES else None
         super().__init__(code)
 
 
@@ -120,38 +127,61 @@ def _pairs(rows):
 
 
 def _identity(source):
+    running = None
+    issue = 'probe_output'
     try:
         value = json.loads(source, object_pairs_hook=_pairs,
                            parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
-        if (not isinstance(value, dict) or value.get('bundle_id') != BUNDLE or value.get('running') is not True
-                or type(value.get('matching_applications')) is not int or value['matching_applications'] != 1
-                or type(value.get('process_id')) is not int or not 1 <= value['process_id'] <= 2**31 - 1
-                or type(value.get('process_started_at')) not in (int, float)
-                or not math.isfinite(value['process_started_at']) or value['process_started_at'] <= 0
-                or not isinstance(value.get('version'), str) or VERSION.fullmatch(value['version']) is None):
+        if not isinstance(value, dict):
+            raise ValueError
+        issue = 'application_count'
+        count = value.get('matching_applications')
+        if type(count) is not int or not 0 <= count <= 1024:
+            raise ValueError
+        # With no application, the native probe has no bundle or PID fields.
+        # Require its explicit WeChat/platform marker rather than treating
+        # malformed or missing metadata as proof that WeChat is closed.
+        if (value.get('running') is False and count == 0
+                and value.get('platform') == 'wechat' and value.get('os') == 'macOS'
+                and value.get('bundle_id', BUNDLE) == BUNDLE):
+            raise ActiveAccountError('macos_active_process_not_running', wechat_running=False)
+        issue = 'application_state'
+        if value.get('bundle_id') != BUNDLE or value.get('running') is not True or count < 1:
+            raise ValueError
+        running = True
+        if count != 1:
+            raise ActiveAccountError('macos_active_process_ambiguous', wechat_running=True)
+        issue = 'process_id'
+        if type(value.get('process_id')) is not int or not 1 <= value['process_id'] <= 2**31 - 1:
+            raise ValueError
+        issue = 'process_started_at'
+        if (type(value.get('process_started_at')) not in (int, float)
+                or not math.isfinite(value['process_started_at']) or value['process_started_at'] <= 0):
+            raise ValueError
+        issue = 'client_version'
+        if not isinstance(value.get('version'), str) or VERSION.fullmatch(value['version']) is None:
             raise ValueError
         for name in ('frontmost', 'screen_state_available', 'screen_locked'):
+            issue = 'frontmost_state' if name == 'frontmost' else 'screen_state'
             if type(value.get(name)) is not bool:
                 raise ValueError
         return value['process_id'], float(value['process_started_at']), value['version']
+    except ActiveAccountError:
+        raise
     except Exception:
-        raise ActiveAccountError('macos_active_process_metadata_invalid') from None
+        raise ActiveAccountError('macos_active_process_metadata_invalid', wechat_running=running,
+                                 metadata_issue=issue) from None
 
 
-def detect_active_account(probe_path=None, *, runner=None, home=None):
-    """Return one private active root, pinned by metadata samples around lsof.
+def _open_account_root(runner, pid, base):
+    """Resolve a unique root; callers already validated the running process."""
+    try:
+        return _inspect_open_account_root(runner, pid, base)
+    except ActiveAccountError as error:
+        raise ActiveAccountError(error.code, wechat_running=True) from None
 
-    Test seams accept a synthetic runner and synthetic home. The production
-    caller supplies neither and never scans account folders for activity.
-    """
-    runner = subprocess.run if runner is None else runner
-    probe = DEFAULT_PROBE if probe_path is None else Path(probe_path)
-    _safe_path(probe, False)
-    user_home = Path.home() if home is None else Path(home)
-    base = user_home / 'Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files'
-    first = _identity(_execute(runner, [str(probe), 'wechat'], MAX_PROBE_BYTES,
-                               'macos_active_process_probe_failed'))
-    pid, started, version = first
+
+def _inspect_open_account_root(runner, pid, base):
     listing = _execute(runner, ['/usr/sbin/lsof', '-nP', '-p', str(pid), '-Fn'], MAX_LSOF_BYTES,
                        'macos_active_open_files_unavailable')
     lines = listing.split('\n')
@@ -187,12 +217,33 @@ def detect_active_account(probe_path=None, *, runner=None, home=None):
             roots[root] = (info.st_dev, info.st_ino)
     if len(roots) != 1:
         raise ActiveAccountError('macos_active_account_ambiguous' if roots else 'macos_active_account_not_identified')
+    root = next(iter(roots))
+    return root, roots[root]
+
+
+def detect_active_account(probe_path=None, *, runner=None, home=None):
+    """Return one private active root, pinned by metadata samples around lsof.
+
+    Test seams accept a synthetic runner and synthetic home. The production
+    caller supplies neither and never scans account folders for activity.
+    """
+    runner = subprocess.run if runner is None else runner
+    probe = DEFAULT_PROBE if probe_path is None else Path(probe_path)
+    _safe_path(probe, False)
+    user_home = Path.home() if home is None else Path(home)
+    base = user_home / 'Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files'
+    first = _identity(_execute(runner, [str(probe), 'wechat'], MAX_PROBE_BYTES,
+                               'macos_active_process_probe_failed'))
+    pid, started, version = first
+    root, identity = _open_account_root(runner, pid, base)
     second = _identity(_execute(runner, [str(probe), 'wechat'], MAX_PROBE_BYTES,
                                 'macos_active_process_probe_failed'))
     if second != first:
-        raise ActiveAccountError('macos_active_process_changed')
-    root = next(iter(roots))
-    current = _safe_path(root, True)
-    if (current.st_dev, current.st_ino) != roots[root]:
-        raise ActiveAccountError('macos_active_account_root_changed')
+        raise ActiveAccountError('macos_active_process_changed', wechat_running=True)
+    try:
+        current = _safe_path(root, True)
+    except ActiveAccountError as error:
+        raise ActiveAccountError(error.code, wechat_running=True) from None
+    if (current.st_dev, current.st_ino) != identity:
+        raise ActiveAccountError('macos_active_account_root_changed', wechat_running=True)
     return ActiveAccount(root, pid, started, version)

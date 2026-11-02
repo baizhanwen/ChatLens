@@ -4,11 +4,15 @@
   const $ = id => document.getElementById(id);
   const stages = new Set(['needs_initialization', 'ready_to_select', 'ready_to_start', 'starting', 'running', 'error', 'waiting_for_wechat', 'needs_connection']);
   const connectionStates = new Set(['waiting_for_wechat', 'checking_account', 'account_unverified', 'wrong_account', 'connected', 'stopped', 'explicit_read_only', 'cleanup_required']);
+  const macReasonCodes = new Set(['macos_active_process_not_running', 'macos_active_process_ambiguous', 'macos_active_account_ambiguous', 'macos_active_account_not_identified', 'macos_active_account_not_ready', 'macos_active_account_root_changed', 'macos_active_directory_required', 'macos_active_file_unsafe', 'macos_active_local_volume_required', 'macos_active_mount_metadata_unavailable', 'macos_active_native_platform_required', 'macos_active_open_file_limit', 'macos_active_open_file_path_invalid', 'macos_active_open_file_process_mismatch', 'macos_active_open_files_unavailable', 'macos_active_path_redirected', 'macos_active_path_unavailable', 'macos_active_path_unsafe', 'macos_active_process_changed', 'macos_active_process_metadata_invalid', 'macos_active_process_probe_failed', 'macos_saved_reader_unavailable', 'macos_contact_catalog_unavailable', 'macos_reader_initialization_failed', 'macos_setup_operation_failed']);
   const state = { setup: null, platform: null, generation: null, connected: false, error: null, busy: null, epoch: 0, setupRequest: 0, timer: null, failures: 0, listRequest: 0, listLoading: false, listError: false, catalogError: null, listMore: false, listNextCursor: null, listQuery: null, searchPending: false, pageLoading: false, pageError: false, onboardingError: null, rows: [], selected: new Map(), selectionSeeded: false, pickerGeneration: null, loadedGeneration: null, editing: false, redirecting: false, recovering: false, enterWorkspace: false, stayOnSetup: new URLSearchParams(location.search).get('manage') === '1' };
   const renderedLists = new Map();
+  macReasonCodes.add('macos_active_process_rebind_unavailable');
+  macReasonCodes.add('macos_active_client_version_changed');
   let profilesSignature = '';
   let searchTimer;
   let toastTimer;
+  let macRechecking = false;
 
   function node(tag, className, text) { const result = document.createElement(tag); if (className) result.className = className; if (text !== undefined) result.textContent = text; return result; }
   function feedback(text) { clearTimeout(toastTimer); $('setup-toast').textContent = text; $('setup-toast').hidden = false; toastTimer = setTimeout(() => { $('setup-toast').hidden = true; }, 4200); }
@@ -33,8 +37,9 @@
     return state.setup?.stage === 'ready_to_select' ? 'ready' : 'idle';
   }
   function catalogReady() { return catalogStatus() === 'ready'; }
-  function canManageSelection() { return state.connected && Boolean(state.generation) && (windows() ? connection()?.can_modify_scope === true && (!state.setup?.onboarding || state.setup.onboarding.state === 'ready') : ['ready_to_select', 'running', 'error'].includes(state.setup?.stage)) && !working(); }
-  function canSearchConversations() { return state.connected && Boolean(state.generation) && (!state.busy || state.busy === 'catalog') && state.setup?.initialization?.state !== 'working' && state.setup?.stage !== 'starting' && state.setup?.scope_switching !== true && connection()?.state !== 'checking_account' && (windows() ? connection()?.can_modify_scope === true && (!state.setup?.onboarding || state.setup.onboarding.state === 'ready') : ['ready_to_select', 'running', 'error'].includes(state.setup?.stage)); }
+  function macReaderReady() { return state.setup?.account?.detected === true && state.setup?.checks?.reader_ready === true; }
+  function canManageSelection() { return state.connected && Boolean(state.generation) && (windows() ? connection()?.can_modify_scope === true && (!state.setup?.onboarding || state.setup.onboarding.state === 'ready') : macReaderReady() && ['ready_to_select', 'running', 'error'].includes(state.setup?.stage)) && !working(); }
+  function canSearchConversations() { return state.connected && Boolean(state.generation) && (!state.busy || state.busy === 'catalog') && state.setup?.initialization?.state !== 'working' && state.setup?.stage !== 'starting' && state.setup?.scope_switching !== true && connection()?.state !== 'checking_account' && (windows() ? connection()?.can_modify_scope === true && (!state.setup?.onboarding || state.setup.onboarding.state === 'ready') : macReaderReady() && ['ready_to_select', 'running', 'error'].includes(state.setup?.stage)); }
   function searchQuery() { return $('setup-conversation-search').value.trim(); }
   function canSelect() { return canManageSelection() && state.editing && catalogReady(); }
   function scopeLimit() { const value = state.setup?.scope_limits?.total; return Number.isSafeInteger(value) && value > 0 ? Math.min(value, 50) : 50; }
@@ -93,11 +98,12 @@
     state.generation = nextGeneration;
     if (typeof value.platform === 'string') state.platform = value.platform;
     state.setup = value;
+    if (!windows() && !macReaderReady()) resetPicker();
     if (value.onboarding && value.onboarding.state !== 'ready' && (state.editing || state.rows.length || state.selected.size)) resetPicker();
     state.connected = true;
     state.error = null;
     state.failures = 0;
-    if (value.stage === 'ready_to_select' && !value.scope_switching && (!value.onboarding || value.onboarding.state === 'ready')) state.editing = true;
+    if (value.stage === 'ready_to_select' && !value.scope_switching && (windows() ? !value.onboarding || value.onboarding.state === 'ready' : macReaderReady())) state.editing = true;
     if (value.stage === 'starting' || value.scope_switching) { state.editing = false; state.listRequest++; state.listLoading = false; }
     render();
     maybeLoadConversations();
@@ -318,6 +324,23 @@
     }
   }
 
+  function renderMacFlow(setup, isWorking, action) {
+    const detected = setup?.account?.detected === true, running = setup?.checks?.wechat_running;
+    const readerReady = setup?.checks?.reader_ready === true;
+    const stage = setup?.stage, selected = count(setup?.active_scope?.count);
+    const scopeReady = selected > 0 || ['starting', 'running'].includes(stage);
+    const step = !detected && running !== true ? 'process' : !detected ? 'account' : !readerReady ? 'initialize' : !scopeReady ? 'select' : 'collect';
+    const facts = {
+      process: [running === true || detected, running === false ? '未找到' : running === true || detected ? '已找到' : '尚未确认', running === false ? '请打开这台 Mac 上的微信' : running === true || detected ? '已检测到本机微信程序' : '等待本机进程检测结果'],
+      account: [detected, detected ? '已核验' : '尚未核验', detected ? '当前登录账号与读取目录已确认' : running === true ? '微信已运行，账号读取依据尚未确认' : '先检测微信程序，再核验当前账号'],
+      initialize: [readerReady, readerReady ? '已就绪' : action ? '等待本人操作' : detected && isWorking ? '正在准备' : '待准备', readerReady ? '当前账号的本机读取能力已就绪' : detected ? '首次连接由你确认初始化' : '先完成当前账号核验'],
+      select: [scopeReady, scopeReady ? selected > 0 ? '已选 ' + selected + ' 个' : '已确认范围' : '待选择', scopeReady ? '仅处理本人已确认的关注范围' : '选择需要关注的私聊与群聊'],
+      collect: [stage === 'running', stage === 'running' ? '采集器已启动' : stage === 'starting' ? '正在准备' : '尚未开始', stage === 'running' ? '进入工作台查看实际心跳与新文字' : stage === 'starting' ? '正在准备所选范围，等待本轮就绪' : '选择范围后自动准备本轮采集']
+    };
+    document.querySelectorAll('[data-step]').forEach(item => { if (item.dataset.step === step) item.setAttribute('aria-current', 'step'); else item.removeAttribute('aria-current'); item.classList.toggle('is-complete', facts[item.dataset.step]?.[0] === true); });
+    document.querySelectorAll('[data-mac-check]').forEach(item => { const fact = facts[item.dataset.macCheck]; item.classList.toggle('is-complete', fact[0]); item.classList.toggle('is-current', item.dataset.macCheck === step); if (item.dataset.macCheck === step) item.setAttribute('aria-current', 'step'); else item.removeAttribute('aria-current'); item.querySelector('.windows-check-state').textContent = fact[1]; item.querySelector('.windows-check-detail').textContent = fact[2]; });
+  }
+
   function render() {
     const setup = state.setup, stage = setup?.stage, initialization = setup?.initialization || {}, active = state.connected, action = initialization.state === 'needs_user_action' ? actionCopy[initialization.action] : null, isWorking = working();
     $('connection-notice').hidden = !state.error;
@@ -333,14 +356,16 @@
     $('setup-steps').hidden = false;
     $('mac-account-card').hidden = false;
     $('scope-manage-help').hidden = true;
-    $('account-title').textContent = setup?.account?.detected ? setup.account.display_name?.trim() || '当前登录微信已识别' : setup ? '等待本机微信登录' : '正在识别当前登录的微信';
-    $('account-description').textContent = setup?.account?.detected ? '仅在当前登录的微信中选择需要关注的沟通。' : '请在这台电脑打开微信并完成登录，页面会自动检查。';
+    const detected = setup?.account?.detected === true, wechatRunning = setup?.checks?.wechat_running;
+    $('account-title').textContent = detected ? setup.account.display_name?.trim() || '当前登录微信已识别' : !setup ? '正在检测本机微信' : wechatRunning === false ? '未检测到本机微信程序' : wechatRunning === true ? '微信已运行，当前账号尚未核验' : '暂时无法确认本机微信状态';
+    $('account-description').textContent = typeof initialization.description === 'string' && initialization.description.trim() ? initialization.description : detected ? '仅在当前登录的微信中选择需要关注的沟通。' : wechatRunning === false ? '请打开本机微信并完成登录，然后重新检查状态。' : '请查看本机检测原因，页面会自动继续检查。';
+    const macReason = macReasonCodes.has(setup?.reason) ? setup.reason : null;
+    $('mac-account-details').hidden = !macReason;
+    $('mac-account-reason').textContent = macReason ? '状态原因：' + macReason : '';
     const stageCopy = { needs_initialization: isWorking ? '正在初始化' : action ? '等待本人操作' : '需要首次连接', ready_to_select: '可以选择会话', starting: '正在切换范围', running: '工作台已就绪', error: '需要处理' };
-    $('setup-stage').textContent = state.error ? '连接中断' : !active ? '正在连接' : stageCopy[stage] || '正在检查';
+    $('setup-stage').textContent = state.error ? '连接中断' : !active ? '正在连接' : !detected ? wechatRunning === false ? '未找到微信' : wechatRunning === true ? '账号待核验' : '状态待确认' : stageCopy[stage] || '正在检查';
     $('setup-stage').className = 'tag tag-' + (state.error || stage === 'error' ? 'failure' : stage === 'ready_to_select' || stage === 'running' ? 'success' : isWorking ? 'running' : 'waiting');
-    for (const [key, field] of [['wechat', 'wechat_running'], ['access', 'access_ready'], ['reader', 'reader_ready']]) { const value = setup?.checks?.[field]; $(key + '-check').textContent = value === true ? '已就绪' : value === false ? '需要处理' : '检查中'; $(key + '-check-dot').className = 'check-dot' + (value === true ? ' is-ready' : value === false ? ' is-missing' : ''); }
-    const step = !setup?.account?.detected ? 'account' : ['ready_to_select', 'starting', 'running'].includes(stage) ? 'select' : 'initialize', order = ['account', 'initialize', 'select'];
-    document.querySelectorAll('[data-step]').forEach(item => { if (item.dataset.step === step) item.setAttribute('aria-current', 'step'); else item.removeAttribute('aria-current'); item.classList.toggle('is-complete', order.indexOf(item.dataset.step) < order.indexOf(step)); });
+    renderMacFlow(setup, isWorking, action);
     $('initialization-card').hidden = ['ready_to_select', 'starting', 'running', 'error'].includes(stage);
     $('initialization-progress').hidden = !isWorking || stage === 'starting';
     $('user-action-note').hidden = !action;
@@ -348,15 +373,16 @@
     $('initialize-button').disabled = !active || !state.generation || Boolean(state.busy) || initialization.state === 'working' || (!setup?.account?.detected && !action);
     $('initialize-button').classList.toggle('is-loading', initialization.state === 'working' || state.busy === 'initialize');
     $('initialize-button').setAttribute('aria-busy', String(initialization.state === 'working' || state.busy === 'initialize'));
-    $('initialize-button').textContent = !active ? '等待本机连接' : isWorking ? '正在初始化' : action ? action[2] : setup?.account?.detected ? '开始本机初始化' : '等待微信登录';
+    $('initialize-button').textContent = !active ? '等待本机连接' : isWorking ? '正在初始化' : action ? action[2] : detected ? '开始本机初始化' : '等待当前账号核验';
     $('initialize-help').textContent = action ? '请本人完成上方操作，页面也会自动继续检查。' : isWorking ? '正在进行本机初始化，请按页面出现的提示操作。' : '不会自动退出你的微信；需要本人操作时会明确提示。';
     $('setup-error').hidden = stage !== 'error';
     $('setup-error-description').textContent = typeof initialization.description === 'string' && initialization.description.trim() ? initialization.description : '本机连接没有完成。请确认微信状态和文件访问权限，再尝试初始化。';
-    $('setup-reason').textContent = /^[a-z0-9_]{1,100}$/.test(setup?.reason || '') ? setup.reason : '暂未提供其他状态信息。';
+    $('setup-reason').textContent = macReason || '暂未提供其他状态信息。';
     $('retry-initialization').disabled = !active || !state.generation || isWorking || !setup?.account?.detected;
-    $('check-status').disabled = Boolean(state.busy);
+    $('check-status').disabled = Boolean(state.busy) || macRechecking || expired || fileMode;
+    $('check-status').textContent = macRechecking ? '正在检查状态' : '重新检查状态';
     $('scope-capability-note').hidden = !active || Boolean(state.generation);
-    $('scope-manager').hidden = !state.generation || !['running', 'error'].includes(stage) || setup?.scope_switching === true;
+    $('scope-manager').hidden = !state.generation || !detected || setup?.checks?.reader_ready !== true || !(count(setup?.active_scope?.count) > 0) || !['running', 'error'].includes(stage) || setup?.scope_switching === true;
     $('active-scope-label').textContent = typeof setup?.active_scope?.label === 'string' ? setup.active_scope.label : '当前关注范围';
     const scope = setup?.active_scope;
     $('active-scope-count').textContent = scope && count(scope.count) !== null ? scope.count + ' 个会话 · ' + (count(scope.private_count) || 0) + ' 个私聊 · ' + (count(scope.group_count) || 0) + ' 个群聊' : '选择后会建立独立的本机记录';
@@ -364,7 +390,7 @@
     $('manage-conversations').textContent = setup?.catalog?.state === 'loading' ? '正在读取会话名称' : state.editing ? '查看会话选择' : '修改关注范围';
     $('manage-conversations').classList.toggle('is-loading', setup?.catalog?.state === 'loading');
     $('open-workspace').disabled = !active || stage !== 'running' || isWorking;
-    $('selection-card').hidden = !state.editing || !state.generation || stage === 'starting';
+    $('selection-card').hidden = !macReaderReady() || !state.editing || !state.generation || stage === 'starting';
     $('selection-limit').textContent = '可选 1–' + scopeLimit() + ' 个会话';
     $('starting-card').hidden = stage !== 'starting';
     $('starting-title').textContent = '正在启用关注范围';
@@ -421,7 +447,7 @@
           const label = node('label', 'picker-row' + (selected ? ' is-selected' : '') + (disabled ? ' is-disabled' : ''));
           const checkbox = node('input', 'picker-checkbox'); checkbox.type = 'checkbox'; checkbox.checked = selected; checkbox.disabled = disabled; checkbox.dataset.pickerId = row.id; checkbox.setAttribute('aria-label', '关注' + row.name);
           label.append(node('span', 'avatar ' + (type === 'group' ? 'sand' : 'sage'), row.name.slice(0, type === 'group' ? 2 : 1)), node('strong', '', row.name), checkbox);
-          checkbox.addEventListener('change', () => { if (!canSelect() || generation !== state.generation) return; if (checkbox.checked && state.selected.size >= scopeLimit()) { checkbox.checked = false; $('setup-announcer').textContent = '最多选择 ' + scopeLimit() + ' 个会话。'; return; } if (checkbox.checked) state.selected.set(row.id, row); else state.selected.delete(row.id); renderSelection(); $('setup-announcer').textContent = '已选择 ' + state.selected.size + ' 个会话。'; });
+          checkbox.addEventListener('change', () => { if (!checkbox.isConnected || !canSelect() || generation !== state.generation) return; if (checkbox.checked && state.selected.size >= scopeLimit()) { checkbox.checked = false; $('setup-announcer').textContent = '最多选择 ' + scopeLimit() + ' 个会话。'; return; } if (checkbox.checked) state.selected.set(row.id, row); else state.selected.delete(row.id); renderSelection(); $('setup-announcer').textContent = '已选择 ' + state.selected.size + ' 个会话。'; });
           list.append(label);
         }
         if (!rows.length) {
@@ -457,7 +483,7 @@
     more.classList.toggle('is-loading', state.pageLoading); more.setAttribute('aria-busy', String(state.pageLoading));
   }
   function renderProfiles() {
-    const rows = Array.isArray(state.setup?.profiles) ? state.setup.profiles.filter(row => typeof row?.id === 'string' && typeof row.label === 'string' && count(row.count) !== null) : [];
+    const rows = (windows() || macReaderReady()) && Array.isArray(state.setup?.profiles) ? state.setup.profiles.filter(row => typeof row?.id === 'string' && typeof row.label === 'string' && count(row.count) !== null) : [];
     $('profiles-card').hidden = !state.generation || !rows.length;
     const signature = JSON.stringify([state.generation, rows, state.connected, working(), connection()?.can_modify_scope]); if (signature === profilesSignature) return; profilesSignature = signature;
     const list = $('saved-profiles'); list.replaceChildren();
@@ -626,7 +652,7 @@
   $('windows-recheck').addEventListener('click', () => mutate('recheck')); $('windows-start').addEventListener('click', () => mutate('start'));
   $('download-connection-diagnostics').addEventListener('click', downloadDiagnostics);
   $('windows-offline').addEventListener('click', openWorkspace); $('windows-open-workspace').addEventListener('click', openWorkspace);
-  $('retry-connection').addEventListener('click', connect); $('check-status').addEventListener('click', () => poll()); $('retry-conversations').addEventListener('click', retryConversations);
+  $('retry-connection').addEventListener('click', connect); $('check-status').addEventListener('click', async () => { if (windows() || state.busy || macRechecking || !allowedOrigin() || state.error?.status === 401) return; macRechecking = true; clearTimeout(state.timer); render(); try { await poll(); } finally { macRechecking = false; render(); } }); $('retry-conversations').addEventListener('click', retryConversations);
   $('load-more-conversations').addEventListener('click', () => loadConversations({ append: true }));
   $('search-conversations').addEventListener('click', () => searchConversations({ explicit: true }));
   $('setup-conversation-search').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); searchConversations({ explicit: true }); } });

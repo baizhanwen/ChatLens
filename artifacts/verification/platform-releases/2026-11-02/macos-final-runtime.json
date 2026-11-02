@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "archive_extracted_and_moved": true,
+  "moved_directory_contains_spaces": true,
+  "runtime_check": {
+    "status": "passed",
+    "public_files_checked": 905,
+    "python": "3.12.14",
+    "sqlcipher": "4.12.0 community",
+    "zstandard": "0.25.0",
+    "wechat_or_private_workspace_accessed": false,
+    "network_requested": false
+  },
+  "offline_default_tls_context": {
+    "certificate_required": true,
+    "hostname_checked": true,
+    "ca_count": 128
+  },
+  "relative_initializer_bridge": "passed",
+  "apple_helper_import_without_cache": "passed",
+  "second_package_check_after_helper_import": "passed",
+  "native_probe_signature": "passed",
+  "binary_dependency_checks": 21,
+  "binary_dependencies_system_or_relative": true,
+  "dylib_ids_checked_separately": true,
+  "synthetic_http": {
+    "status": "passed",
+    "http_requests": 4,
+    "manager": "production",
+    "server": "production",
+    "detector": "explicit_synthetic",
+    "native_probe_executed": false,
+    "source_database_opened": false,
+    "model_called": false,
+    "network_guard": "loopback_only"
+  },
+  "real_wechat_or_private_workspace_accessed": false,
+  "terminal_gatekeeper_or_another_machine_tested": false
+}

@@ -23,6 +23,9 @@
 .account-heading h2 { margin: 4px 0 2px; font-size: 18px; line-height: 1.7; overflow-wrap: anywhere; }
 .account-heading p { margin: 0; color: var(--text-secondary); font-size: 12px; }
 .account-heading > .tag { margin-left: auto; flex-shrink: 0; }
+.mac-detection-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 18px; }
+.mac-detection-actions .field-help { margin: 0; min-width: 0; }
+.account-card .mac-connection-checks { margin-bottom: 18px; }
 .connect-checks { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; margin: 25px 0 0; padding: 18px 0 0; border-top: 1px solid var(--border); }
 .connect-checks > div { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; }
 .connect-checks > div + div { border-left: 1px solid var(--border); padding-left: 18px; }

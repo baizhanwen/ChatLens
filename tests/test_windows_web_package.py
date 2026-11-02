@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import build_windows_web_package as package
 import build_windows_collector_package as collector_package
+PRODUCTION_ARTIFACTS = package.ARTIFACTS
 
 
 def zip_bytes(entries):
@@ -85,7 +86,18 @@ class WindowsWebPackageTests(unittest.TestCase):
             prefix = package.PREFIX + '/'
             entries = {name[len(prefix):]: archive.read(name) for name in archive.namelist()}
         manifest = json.loads(entries.pop(package.MANIFEST))
-        self.assertEqual(manifest['package_revision'], '20261101-r8')
+        self.assertEqual(manifest['package_revision'], '20261102-r9')
+        self.assertEqual(manifest['platform'], 'windows')
+        self.assertEqual(manifest['architecture'], 'x64')
+        self.assertEqual(manifest['cloud_analysis'], {
+            'consent_default_selected': True, 'requires_explicit_send': True,
+            'manual_opt_out_preserved_within_scope': True,
+            'new_scope_or_model_target_uses_default': True,
+            'backend_scope_and_target_fingerprint_validation': 'retained',
+            'real_model_called_during_build': False})
+        self.assertTrue(manifest['same_account_history']['selected_conversations_only'])
+        self.assertFalse(manifest['same_account_history']['cross_account_copy'])
+        self.assertFalse(manifest['same_account_history']['ai_history_copy'])
         self.assertIn('prefer exactly one visible, unowned main-window candidate', manifest['process_selection'])
         self.assertIn('cached fixed states', manifest['connection_diagnostics'])
         self.assertEqual(manifest['account_process_family']['maximum_members'], 16)
@@ -106,6 +118,7 @@ class WindowsWebPackageTests(unittest.TestCase):
         self.assertIn('windows_account_probe.py', entries)
         self.assertIn('windows_process_detection.py', entries)
         self.assertIn('windows_mapped_files.py', entries)
+        self.assertIn('scope_history.py', entries)
         self.assertTrue({'web/connect.html', 'web/connect.js', 'web/connect.css'} <= entries.keys())
         self.assertTrue(all(b'SYNTHETIC_PRIVATE_DATA_MUST_NOT_SHIP' not in data for data in entries.values()))
         self.assertFalse(any('private' in Path(name).parts or 'collector-data' in Path(name).parts
@@ -122,6 +135,16 @@ class WindowsWebPackageTests(unittest.TestCase):
         with self.assertRaisesRegex(FileExistsError, 'output_already_exists'):
             package.build(self.root, self.output)
         self.assertEqual(self.output.read_bytes(), b'SYNTHETIC_EXISTING_RELEASE')
+
+    def test_real_release_identity_and_windows_only_runtime_surface(self):
+        text = (ROOT / 'scripts/windows-proof/README-WEB.txt').read_text(encoding='utf-8-sig')
+        self.assertIn(package.PACKAGE_REVISION, text)
+        self.assertIn('Windows', text)
+        self.assertIn('macOS', text)
+        shipped_sources = set(package.SOURCES) | set(package.AI_SOURCES) | set(package.WEB_FILES)
+        self.assertFalse(any(name.startswith('macos_') or name.endswith(('.command', '.dylib', '.swift'))
+                             for name in shipped_sources))
+        self.assertEqual(PRODUCTION_ARTIFACTS[0]['name'], 'python-3.14.10-embed-amd64.zip')
 
     def test_offline_cache_missing_does_not_attempt_download(self):
         (self.root / package.CACHE_DIRECTORY / self.artifacts[0]['name']).unlink()
@@ -194,6 +217,8 @@ class WindowsWebPackageTests(unittest.TestCase):
         self.assertIn('windows_account_probe', shipped)
         self.assertIn('windows_process_detection', shipped)
         self.assertIn('windows_mapped_files', shipped)
+        self.assertIn('scope_history', shipped)
+        self.assertIn('web_data', shipped)
         directory = ROOT / 'scripts/windows-proof'
         local_modules = {file.stem for file in directory.glob('*.py')}
         for name in collector_package.SOURCES:

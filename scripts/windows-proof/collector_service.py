@@ -301,13 +301,15 @@ def main():
             heartbeat.metadata = metadata
             heartbeat.emit('starting', report['total_messages'])
             metadata.ensure_catalog(scope['config'])
-            try:
-                metadata.refresh_catalog(driver, root, keys, scope['config'], store.sender_ids_by_alias(include_unknown=True))
-            except Exception:
-                metadata.failed = True
         signal.signal(signal.SIGINT, signal.SIG_IGN)  # Parent sends our local stop request.
         with NativeState(args.pid, str(exe), args.creation_time) as native:
             reader = ContinuousReader(driver, root, keys, scope['config'], store, native.sample)
+            report['restored_messages'] = report['total_messages'] = store.stats()['total_messages']
+            if metadata is not None:
+                try:
+                    metadata.refresh_catalog(driver, root, keys, scope['config'], store.sender_ids_by_alias(include_unknown=True))
+                except Exception:
+                    metadata.failed = True
             report['resumed_from_checkpoint'] = reader.resumed
             report['baseline_completed_at'] = reader.baseline_completed_at
             heartbeat.emit('collecting', report['total_messages'], resumed=reader.resumed)

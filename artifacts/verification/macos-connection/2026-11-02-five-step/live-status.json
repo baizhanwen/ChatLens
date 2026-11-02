@@ -1,0 +1,9 @@
+{
+  "recorded_at_utc": "2026-11-02T09:07:29.593222+00:00",
+  "http_status": 200,
+  "setup_stage": "running",
+  "collector_state": "collecting",
+  "total_messages": 2,
+  "scope_header_used": true,
+  "chat_or_identifiers_exported": false
+}

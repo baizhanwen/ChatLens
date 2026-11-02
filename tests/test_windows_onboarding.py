@@ -94,13 +94,18 @@ class OnboardingTests(unittest.TestCase):
         return {'state': 'ready', 'reason': 'windows_onboarding_reader_initialized'}
 
     def start_child(self, target, output):
+        from scope_history import apply_history_plan
         output.mkdir()
         scope, _, _, _, _, binding = collector_service.prepare_session(target)
         store = CollectorStore(target / 'private/store', binding)
-        if not store.resumed:
-            cursors = {'message/message_0.db': {row['alias']: {'local_id': 0, 'present': True}
-                                               for row in scope['config']['conversations']}}
-            store.initialize(cursors, {})
+        epochs = {relative: {'file_identity': [100, index + 1], 'salt_sha256': 'a' * 64,
+                             'key_sha256': 'b' * 64}
+                  for index, relative in enumerate(collector_service.RELATIVES) if relative.startswith('message/')}
+        cursors = store.snapshot()['cursors'] if store.resumed else {
+            relative: {row['alias']: {'local_id': 0, 'present': index == 0}
+                       for row in scope['config']['conversations']}
+            for index, relative in enumerate(epochs)}
+        apply_history_plan(store, cursors, epochs, initialize=not store.resumed)
         metadata = WebMetadata(target / 'private', store.binding_digest, '2026-11-01T00:00:00+00:00')
         metadata.ensure_catalog(scope['config'])
         metadata.status('collecting', store.stats()['total_messages'], 0, store.resumed)

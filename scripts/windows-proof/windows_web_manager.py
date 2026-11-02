@@ -306,6 +306,7 @@ class WindowsWebManager:
         self.scope = self.data_dir = None
         self.children_started, self.last_child_exit, self.cleanup_confirmed = 0, None, True
         self.child_started_at = None
+        self.pending_activation = None
         self.cloud_request_attempts = self.model_request_attempts = 0
         self.runtime_lock = None
 
@@ -692,6 +693,7 @@ class WindowsWebManager:
     def _stop_active(self):
         assistant, child, output = self.assistant, self.child, self.child_output
         self.assistant = self.provider = None
+        self.pending_activation = None
         try:
             if assistant is not None:
                 assistant.close()
@@ -713,6 +715,24 @@ class WindowsWebManager:
                 self.child = self.child_output = None
                 self._record_child('closed', output)
 
+    def _history_sources(self, target):
+        """Only saved stores inside this verified account's private workspace."""
+        result = []
+        for profile in self._saved_profiles():
+            source = self._profile_data(profile['id'])
+            if source == target:
+                continue
+            database = source / 'private/store/collector.sqlite3'
+            if not database.exists() and not database.is_symlink():
+                continue
+            # Donor history is already local: its old decryption keys are not
+            # needed. The shared importer validates its scope/store binding.
+            scope = read_private_json(source / 'private/scope.json')
+            if source_account_identity(scope) != self.account_identity:
+                raise ValueError('windows_scope_source_account_mismatch')
+            result.append(source)
+        return result
+
     def _activate(self, identifier, chats=None, names=None, *, initial=False):
         if not self.read_only and not self._verify_account(force=True):
             return
@@ -720,6 +740,7 @@ class WindowsWebManager:
             identifier = 'legacy'
         source_assistant = self._assistant_directory()
         hint = self._identity_hint()
+        continuity_source = self.data_dir
         self._stop_active()
         root = self._profile_root(identifier)
         target = self._profile_data(identifier)
@@ -756,6 +777,11 @@ class WindowsWebManager:
             raise ValueError('windows_scope_profile_config_mismatch')
         if not self.read_only:
             prepare_session(target)
+            sources = self._history_sources(target)
+            if sources:
+                from scope_history import write_history_plan
+                write_history_plan(target, sources,
+                                   continuity_source=continuity_source if continuity_source in sources else None)
             self.reader_config_ready = True
         self.active_scope_id, self.data_dir = identifier, target
         self.active_config = {'conversations': normalize_conversations(scope['config'])}
@@ -777,22 +803,35 @@ class WindowsWebManager:
             self.last_child_exit = None
             self.children_started += 1
             self._record_child('running', child_output)
-            atomic_private(self.private / 'active-scope.json', {'schema_version': 1,
-                           'account_identity': self.account_identity, 'profile_id': identifier})
+            self.pending_activation = identifier
+            self.switching = True
         self.stage = 'starting'
-        self.description = '正在恢复原采集位置。' if initial or chats is None else '正在建立本次所选范围的新消息起点。'
+        self.description = ('正在恢复原采集位置并核对已采历史。' if initial or chats is None else
+                            '正在保留所选会话的已采文字与进度；新增会话建立新消息起点。')
         self._refresh_provider()
 
     def _refresh_provider(self):
         if self.account_blocked or self.data_dir is None:
             return
         try:
+            if self.pending_activation is not None:
+                plan = self.data_dir / 'private/history-plan.json'
+                owned = self._owned_collector_status()
+                if plan.exists() or plan.is_symlink() or not owned['collector_running'] or owned['collector_stage'] not in ('collecting', 'paused'):
+                    if not owned['collector_running']:
+                        self.stage, self.reason = 'error', 'windows_scope_store_not_ready'
+                    return
             if self.provider is None:
                 candidate = CollectorWebData(self.data_dir)
                 candidate.status()
                 self.provider = candidate
+            if self.pending_activation is not None:
+                atomic_private(self.private / 'active-scope.json', {'schema_version': 1,
+                               'account_identity': self.account_identity, 'profile_id': self.pending_activation})
+                self.pending_activation = None
+                self.switching = False
             self.stage = 'running'
-            self.description = '已有消息保存在本机；当前关注范围独立保存。'
+            self.description = '所选会话的已采文字保存在本机，切换名单会保留重叠会话的历史和采集进度。'
         except WebDataError:
             if self.read_only or self.child is not None and self.child.poll() is not None:
                 self.stage, self.reason = 'error', 'windows_scope_store_not_ready'

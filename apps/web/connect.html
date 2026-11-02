@@ -17,9 +17,11 @@
       <a class="brand" href="./connect.html" aria-label="利明智耀 ChatLens 接入页"><img src="./assets/chatlens-mark.svg" alt="利明智耀品牌标识"><span><strong>利明智耀</strong><span>ChatLens 工作台</span></span></a>
       <div class="sidebar-group-label">开始使用</div>
       <ol class="connect-steps" id="setup-steps">
-        <li data-step="account" aria-current="step"><span class="step-number">1</span><div><strong>识别当前微信</strong><span>自动检测本机登录状态</span></div></li>
-        <li data-step="initialize"><span class="step-number">2</span><div><strong>准备读取能力</strong><span>在本机完成首次连接</span></div></li>
-        <li data-step="select"><span class="step-number">3</span><div><strong>选择关注会话</strong><span>由你决定阅读范围</span></div></li>
+        <li data-step="process" aria-current="step"><span class="step-number">1</span><div><strong>识别微信程序</strong><span>检测这台 Mac 上的微信</span></div></li>
+        <li data-step="account"><span class="step-number">2</span><div><strong>核验当前账号</strong><span>确认本次登录的读取依据</span></div></li>
+        <li data-step="initialize"><span class="step-number">3</span><div><strong>准备读取能力</strong><span>在本机完成首次连接</span></div></li>
+        <li data-step="select"><span class="step-number">4</span><div><strong>选择关注会话</strong><span>由你决定阅读范围</span></div></li>
+        <li data-step="collect"><span class="step-number">5</span><div><strong>开始采集</strong><span>查看本轮实际采集状态</span></div></li>
       </ol>
       <ol class="connect-steps" id="windows-sidebar-steps" hidden aria-label="Windows 连接流程">
         <li data-windows-sidebar-step="process_running"><span class="step-number">1</span><div><strong>微信程序</strong><span>检测这台电脑上的微信</span></div></li>
@@ -63,7 +65,15 @@
 
         <section class="card account-card" id="mac-account-card" aria-labelledby="account-title">
           <div class="account-heading"><span class="connect-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-3.8-.9L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5Z"></path><path d="M8 10h8M8 14h5"></path></svg></span><div><span class="eyebrow">CURRENT ACCOUNT</span><h2 id="account-title">正在识别当前登录的微信</h2><p id="account-description">请保持本机微信已登录。</p></div><span class="tag tag-waiting" id="setup-stage">正在连接</span></div>
-          <dl class="connect-checks"><div><dt><span class="check-dot" id="wechat-check-dot"></span>微信运行</dt><dd id="wechat-check">检查中</dd></div><div><dt><span class="check-dot" id="access-check-dot"></span>本机文件访问</dt><dd id="access-check">检查中</dd></div><div><dt><span class="check-dot" id="reader-check-dot"></span>文字读取能力</dt><dd id="reader-check">检查中</dd></div></dl>
+          <ol class="windows-connection-checks mac-connection-checks" id="mac-connection-checks" aria-label="Mac 实际连接进度">
+            <li data-mac-check="process"><span class="step-number">1</span><div><strong>识别微信程序</strong><span class="windows-check-detail" id="wechat-check">检查这台 Mac 上的微信</span></div><span class="windows-check-state">待检查</span><span class="check-dot" id="wechat-check-dot" hidden></span></li>
+            <li data-mac-check="account"><span class="step-number">2</span><div><strong>核验当前账号</strong><span class="windows-check-detail" id="access-check">核对当前登录账号与文件访问</span></div><span class="windows-check-state">待核验</span><span class="check-dot" id="access-check-dot" hidden></span></li>
+            <li data-mac-check="initialize"><span class="step-number">3</span><div><strong>准备读取能力</strong><span class="windows-check-detail" id="reader-check">首次连接由你确认初始化</span></div><span class="windows-check-state">待准备</span><span class="check-dot" id="reader-check-dot" hidden></span></li>
+            <li data-mac-check="select"><span class="step-number">4</span><div><strong>选择关注会话</strong><span class="windows-check-detail">选择关注的私聊与群聊</span></div><span class="windows-check-state">待选择</span></li>
+            <li data-mac-check="collect"><span class="step-number">5</span><div><strong>开始采集</strong><span class="windows-check-detail">选择范围后自动准备采集</span></div><span class="windows-check-state">尚未开始</span></li>
+          </ol>
+          <div class="mac-detection-actions"><button class="button" id="check-status" type="button">重新检查状态</button><p class="field-help">本页用于微信接入；完成后进入 AI 工作台。</p></div>
+          <details class="technical-details" id="mac-account-details" hidden><summary>查看状态原因</summary><p id="mac-account-reason"></p></details>
         </section>
 
         <section class="card initialization-card" id="initialization-card" aria-labelledby="initialization-title">
@@ -73,7 +83,7 @@
           <div class="connect-actions"><button class="button button-primary" id="initialize-button" type="button" disabled>等待本机连接</button><span id="initialize-help">连接就绪后可以继续。</span></div>
         </section>
 
-        <section class="card setup-error" id="setup-error" role="alert" hidden><span class="eyebrow">CONNECTION NEEDS ATTENTION</span><h2>这一步暂时没有完成</h2><p id="setup-error-description"></p><div class="connect-actions"><button class="button button-primary" id="retry-initialization" type="button">重新尝试初始化</button><button class="button" id="check-status" type="button">重新检查状态</button></div><details class="technical-details"><summary>查看状态详情</summary><p id="setup-reason"></p></details></section>
+        <section class="card setup-error" id="setup-error" role="alert" hidden><span class="eyebrow">CONNECTION NEEDS ATTENTION</span><h2>这一步暂时没有完成</h2><p id="setup-error-description"></p><div class="connect-actions"><button class="button button-primary" id="retry-initialization" type="button">重新尝试初始化</button></div><details class="technical-details"><summary>查看状态详情</summary><p id="setup-reason"></p></details></section>
 
         <p class="connect-notice" id="scope-capability-note" hidden>当前启动器未提供关注范围管理能力，请使用支持此功能的本机入口。</p>
 
@@ -87,16 +97,16 @@
 
         <section class="card selection-card" id="selection-card" aria-labelledby="selection-title" hidden>
           <div class="card-heading"><div><span class="eyebrow">YOUR FOCUS</span><h2 id="selection-title">选择要关注的会话</h2></div><span class="tag tag-neutral" id="selection-limit">可选 1–50 个会话</span></div>
-          <p class="selection-description">私聊与群聊均可多选，由你决定这次关注哪些沟通。新范围从启用后的新文字开始。</p>
+          <p class="selection-description">私聊与群聊均可多选。仍被关注的会话保留已采文字和进度；新加入的会话从本次启用起点开始。</p>
           <div class="connect-search-row"><label class="input-field search-field connect-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 4.5 4.5"></path></svg><input type="search" id="setup-conversation-search" placeholder="输入联系人或群名称" aria-label="搜索联系人或群名称" maxlength="256" autocomplete="off"></label><button class="button" id="search-conversations" type="button">搜索</button></div><p class="field-help">先搜索名称，再勾选并确认。这里只查询会话名称，不读取聊天正文；更换搜索词会保留已选会话。</p>
           <div class="connect-list-feedback" id="conversation-feedback" role="status" hidden><span id="conversation-feedback-text"></span><button class="text-button" id="retry-conversations" type="button" hidden>重新读取</button></div>
           <div class="connect-picker"><section class="picker-column" aria-labelledby="private-list-title"><div class="picker-heading"><h3 id="private-list-title">私聊</h3><span id="private-result-count">—</span></div><div class="picker-list" id="private-list" role="group" aria-label="选择私聊，可多选"></div><div class="picked-summary"><span>已选私聊</span><strong id="selected-private">尚未选择</strong></div></section><section class="picker-column" aria-labelledby="group-list-title"><div class="picker-heading"><h3 id="group-list-title">群聊</h3><span id="group-result-count">—</span></div><div class="picker-list" id="group-list" role="group" aria-label="选择群聊，可多选"></div><div class="picked-summary"><span>已选群聊</span><strong id="selected-group">尚未选择</strong></div></section></div>
           <div class="picker-pagination" id="conversation-pagination" hidden><span id="conversation-page-summary"></span><button class="button" id="load-more-conversations" type="button">继续加载会话</button></div>
           <div class="selected-conversations" id="selected-conversations" aria-label="已选会话"></div>
-          <div class="selection-footer"><div><strong id="selection-count">已选择 0 / 50</strong><p>每个范围独立保存消息、AI 历史和采集位置。</p></div><button class="button button-primary" id="start-selected" type="button" disabled>启用所选关注范围</button></div>
+          <div class="selection-footer"><div><strong id="selection-count">已选择 0 / 50</strong><p>已有会话的已采文字保留，AI 对话按范围分别保存。</p></div><button class="button button-primary" id="start-selected" type="button" disabled>启用所选关注范围</button></div>
         </section>
 
-        <section class="card profiles-card" id="profiles-card" aria-labelledby="profiles-title" hidden><div class="card-heading"><div><span class="eyebrow">SAVED FOCUS</span><h2 id="profiles-title">已保存的关注范围</h2></div></div><p class="selection-description">切回旧范围会续采原来的记录；不同范围的消息与 AI 对话分别保留，不会合并。</p><div class="saved-profiles" id="saved-profiles"></div></section>
+        <section class="card profiles-card" id="profiles-card" aria-labelledby="profiles-title" hidden><div class="card-heading"><div><span class="eyebrow">SAVED FOCUS</span><h2 id="profiles-title">已保存的关注范围</h2></div></div><p class="selection-description">可切回旧范围继续使用。当前名单内会话的已采文字保留，AI 对话按范围分别保存。</p><div class="saved-profiles" id="saved-profiles"></div></section>
 
         <section class="card starting-card" id="starting-card" role="status" hidden><span class="eyebrow">STARTING YOUR WORKSPACE</span><h2 id="starting-title">正在启动采集</h2><p id="starting-description">正在准备所选关注范围，请让微信保持后台并等待本机状态更新。</p><div class="connect-task"><span class="connect-spinner" aria-hidden="true"></span><div><strong id="starting-phase">等待本机采集就绪</strong><p id="starting-count"></p></div><span class="connect-elapsed" id="starting-elapsed"></span></div><button class="button button-primary" id="starting-button" type="button" disabled>正在启动采集</button></section>
         <p class="connect-footer-note"><span class="status-dot"></span>聊天内容保存在本机。当前不调用云端模型，也不会代发消息。</p>

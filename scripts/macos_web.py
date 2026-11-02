@@ -24,15 +24,47 @@ for directory in (PROJECT / 'scripts', PROJECT / 'scripts/windows-proof'):
     sys.path.insert(0, str(directory))
 
 from collector_private import ensure_private_dir, read_private_json, write_private_json_new
-from macos_active_account import detect_active_account
+from macos_active_account import ActiveAccountError, METADATA_ISSUES, detect_active_account
 from macos_collector import MacCollector, MacNativeProbe, prepare_session
 from macos_reader_setup import ReaderInitializer
 from macos_web_server import make_macos_server
 from web_data import CollectorWebData, WebDataError
 from windows_selected_engine import _open, ID
 from conversation_scope import alias_for, normalize_conversations, MAX_CONVERSATIONS
+from scope_history import write_history_plan
 
 PROFILE = re.compile(r'[0-9a-f]{64}\Z')
+ACTIVE_ACCOUNT_MESSAGES = {
+    'macos_active_process_not_running': '没有检测到本机微信程序。请打开微信并由你本人完成登录，本页会自动重新检查。',
+    'macos_active_process_ambiguous': '发现多个微信程序，暂时无法确认当前账号。请仅保留需要接入的微信后重新检查。',
+    'macos_active_process_metadata_invalid': '微信进程信息未能完整核验。请检查运行入口的本机权限后重新检查。',
+    'macos_active_process_probe_failed': '暂时无法取得微信运行状态。请检查运行入口的本机权限后重新检查。',
+    'macos_active_account_ambiguous': '检测到多个账号的活动资料，暂时无法唯一确认当前账号。请从微信菜单正常退出后重新打开当前账号，再重新检查。',
+    'macos_active_account_not_identified': '已找到微信，但暂时无法从已打开的资料确认当前账号。若刚切换账号，请等待微信完成登录后重新检查。',
+    'macos_active_open_files_unavailable': '已找到微信，但暂时无法核对活动资料。请检查当前运行入口的本机读取权限。',
+    'macos_active_path_unavailable': '暂时无法访问本机读取组件或微信资料目录。请检查当前运行入口的完全磁盘访问权限。',
+    'macos_active_process_changed': '微信进程发生变化，正在重新识别当前登录账号。',
+    'macos_active_process_rebind_unavailable': '已识别重新打开的微信，但采集状态核验暂未就绪，已暂停采集。请保持屏幕解锁后重新检查。',
+    'macos_active_client_version_changed': '当前微信版本与已有读取配置不一致，已暂停采集。请保留本机资料并反馈版本变化。',
+    'macos_active_account_root_changed': '微信资料目录发生变化，正在重新识别当前账号。',
+    'macos_active_open_file_limit': '微信活动资料数量超过本次核验上限，未能确认当前账号。请重新检查或反馈状态详情。',
+    'macos_active_open_file_process_mismatch': '微信活动资料的进程依据不一致，未能确认当前账号。请重新检查。',
+    'macos_active_open_file_path_invalid': '微信活动资料路径不符合核验条件，未能确认当前账号。请反馈状态详情。',
+    'macos_active_path_unsafe': '本机读取路径不符合安全核验条件。请反馈状态详情。',
+    'macos_active_path_redirected': '本机读取路径存在重定向，未通过安全核验。请反馈状态详情。',
+    'macos_active_directory_required': '本机资料目录类型不符合核验条件。请反馈状态详情。',
+    'macos_active_file_unsafe': '本机读取文件不符合安全核验条件。请反馈状态详情。',
+    'macos_active_local_volume_required': '微信资料需要位于本机磁盘，当前目录未通过核验。请反馈状态详情。',
+    'macos_active_mount_metadata_unavailable': '无法核验微信资料所在磁盘的元信息。请检查本机权限后重新检查。',
+    'macos_active_native_platform_required': '当前运行环境无法执行 macOS 本机磁盘核验。请使用本机 Mac 启动入口。',
+}
+METADATA_ISSUE_MESSAGES = {
+    'client_version': '检测到微信程序，但无法核验客户端版本。请检查实际启动终端对微信所在目录的访问权限后重新检查。',
+    'process_started_at': '检测到微信程序，但无法核验进程启动时间。请检查实际启动终端的本机权限后重新检查。',
+    'process_id': '检测到微信程序，但无法核验进程身份。请检查实际启动终端的本机权限后重新检查。',
+    'frontmost_state': '检测到微信程序，但无法核验前后台状态。请检查实际启动终端的本机权限后重新检查。',
+    'screen_state': '检测到微信程序，但无法核验屏幕状态。请检查实际启动终端的本机权限后重新检查。',
+}
 
 
 def atomic_private(path, value):
@@ -96,6 +128,30 @@ class MacWebManager:
         self.pending_identity_hint = None
         self.observed_account = None
         self.active_account_identity = None
+        self.current_account_detected = False
+        self.wechat_running = None
+        self.detection_reason = self.detection_metadata_issue = self.detection_description = None
+
+    def _record_detection_failure(self, error):
+        code = getattr(error, 'code', '')
+        known = isinstance(error, ActiveAccountError) and code in ACTIVE_ACCOUNT_MESSAGES
+        with self.lock:
+            self.current_account_detected = False
+            self.wechat_running = error.wechat_running if known and type(error.wechat_running) is bool else None
+            issue = error.metadata_issue if known and error.metadata_issue in METADATA_ISSUES else None
+            self.detection_metadata_issue = issue
+            self.detection_reason = code if known else 'macos_active_account_not_ready'
+            self.detection_description = ACTIVE_ACCOUNT_MESSAGES.get(code) if known else None
+            if known and code == 'macos_active_process_metadata_invalid' and self.wechat_running is True:
+                self.detection_description = METADATA_ISSUE_MESSAGES.get(issue, self.detection_description)
+            if self.detection_description is None:
+                self.detection_description = '暂时无法确认本机微信状态。请检查运行入口的本机权限后重新检查。'
+
+    def _record_detection_success(self):
+        with self.lock:
+            self.current_account_detected = True
+            self.wechat_running = True
+            self.detection_reason = self.detection_metadata_issue = self.detection_description = None
 
     def public_scope_context(self):
         with self.lock:
@@ -194,7 +250,7 @@ class MacWebManager:
         self.scope_generation = secrets.token_hex(16)
         self.switching = True
         self.queued, self.stage, self.reason = True, 'starting', None
-        self.description = '正在切换独立关注范围；原消息和采集位置保留。'
+        self.description = '正在修改关注范围；仍被关注会话的已采消息和进度会保留。'
 
     def _stop_active(self):
         # Hold the manager lock so an HTTP handler cannot obtain the old
@@ -218,6 +274,20 @@ class MacWebManager:
         ensure_private_dir(target, create=True)
         if not (target / 'provider.json').exists() and not (target / 'provider.json').is_symlink():
             write_private_json_new(target / 'provider.json', read_private_json(source / 'provider.json'))
+
+    def _prepare_history_plan(self, target, continuity_source=None):
+        """Only current-account saved profiles may donate collected text."""
+        sources = []
+        for profile in self._saved_profiles():
+            source = self._profile_data(profile['id'])
+            if source == target:
+                continue
+            database = source / 'private/store/collector.sqlite3'
+            if database.exists() or database.is_symlink():
+                sources.append(source)
+        if sources:
+            write_history_plan(target, sources,
+                               continuity_source=continuity_source if continuity_source in sources else None)
 
     def _capture_identity_hint(self):
         from wechat_identity import trusted_self_identity
@@ -252,6 +322,7 @@ class MacWebManager:
                         {'alias': alias_for(row['chat_id']), 'chat_id': row['chat_id']} for row in chats]})
                     identifier = self._scope_fingerprint(chats)
         source_assistant = self._assistant_directory()
+        continuity_source = self.data_dir
         identity_hint = self._capture_identity_hint()
         self._stop_active()
         self.account = current
@@ -271,6 +342,7 @@ class MacWebManager:
             raise ValueError('macos_profile_scope_mismatch')
         if chats is not None and self._scope_fingerprint(session.config['conversations']) != self._scope_fingerprint(chats):
             raise ValueError('macos_selected_profile_scope_mismatch')
+        self._prepare_history_plan(self.data_dir, continuity_source)
         self._copy_model_config(source_assistant, target_root / 'assistant')
         if identifier != 'legacy':
             manifest = target_root / 'profile.json'
@@ -299,17 +371,12 @@ class MacWebManager:
         try:
             self.account = detected if detected is not None else self.detector(self.probe)
         except Exception as error:
-            code = getattr(error, 'code', '')
-            messages = {
-                'macos_active_account_ambiguous': '发现多个活动账号，暂不能唯一确认。请仅保留要接入的微信账号后重试。',
-                'macos_active_open_files_unavailable': '暂时无法核对微信的活动账号，请检查当前运行应用的本机读取权限。',
-                'macos_active_path_unavailable': '暂时无法访问微信资料目录，请检查当前运行应用的完全磁盘访问权限。',
-                'macos_active_process_changed': '微信进程发生变化，正在重新识别当前登录账号。',
-            }
+            self._record_detection_failure(error)
             with self.lock:
-                self.reason = code if code in messages else 'macos_active_account_not_ready'
-                self.description = messages.get(code, '请先登录微信；本页会自动识别当前账号。')
+                self.reason = self.detection_reason
+                self.description = self.detection_description
             return
+        self._record_detection_success()
         self.last_detection = time.monotonic()
         self.active_account_identity = account_identity(self.account)
         self.directory = self.workspace / 'accounts' / self.active_account_identity[:24]
@@ -328,6 +395,9 @@ class MacWebManager:
             if (self.active_scope_id != 'legacy'
                     and self._scope_fingerprint(self.active_config['conversations']) != self.active_scope_id):
                 raise ValueError('macos_active_profile_scope_mismatch')
+            # Also repair already-created profiles from earlier builds: merge
+            # their selected chats' previously saved rows without rewinding.
+            self._prepare_history_plan(self.data_dir)
             self.pending_scope_id = self.active_scope_id
             if self.key_file is None:
                 self.key_file = self.data_dir / 'private/keys.json'
@@ -360,6 +430,9 @@ class MacWebManager:
                 # reports an error. Saved private files remain in their domain.
                 self.account = self.directory = self.data_dir = self.key_file = None
                 self.active_account_identity = None
+                self.current_account_detected = False
+                self.wechat_running = None
+                self.detection_reason = self.detection_metadata_issue = self.detection_description = None
                 self.contacts, self.catalog = [], {}
                 self.commands = SimpleQueue()
                 self.active_scope_id = 'legacy'
@@ -385,47 +458,84 @@ class MacWebManager:
         if current is None:
             now = time.monotonic()
             if not force and now - self.last_detection < 3:
-                return False
+                return not self.current_account_detected
             self.last_detection = now
             try:
                 current = self.detector(self.probe)
                 identity = account_identity(current)
-            except Exception:
-                return False
+            except Exception as error:
+                self._record_detection_failure(error)
+                return True
         else:
             identity = account_identity(current)
         if identity == self.active_account_identity:
+            session = self.pending_session or getattr(self.collector, 'session', None)
+            expected_version = getattr(session, 'client_version', None)
+            if expected_version is None and self.key_file is not None:
+                expected_version = self.account.client_version
+            if expected_version is not None and current.client_version != expected_version:
+                self._record_detection_failure(ActiveAccountError('macos_active_client_version_changed', wechat_running=True))
+                return True
+            if (self.collector is not None
+                    and (current.pid, current.started_at) != (self.account.pid, self.account.started_at)):
+                # Native probes pin one process. Recreate that pin only after a
+                # complete same-root detection and compatible saved version,
+                # then independently confirm its sample and root once more.
+                try:
+                    fresh_probe = MacNativeProbe(self.probe, expected_version=expected_version or current.client_version)
+                    sample = fresh_probe()
+                    if (sample.get('probe_succeeded') is not True
+                            or fresh_probe.process_identity != (current.pid, current.started_at, current.client_version)):
+                        raise ActiveAccountError('macos_active_process_rebind_unavailable', wechat_running=True)
+                    verified = self.detector(self.probe)
+                    if (account_identity(verified) != self.active_account_identity
+                            or (verified.pid, verified.started_at, verified.client_version)
+                            != (current.pid, current.started_at, current.client_version)):
+                        raise ActiveAccountError('macos_active_process_changed', wechat_running=True)
+                except Exception as error:
+                    self._record_detection_failure(error)
+                    return True
+                self.native_probe = fresh_probe
+            # A fresh complete detection pins the same source root to its new
+            # process after a normal restart; keep the source/version guards.
+            self.account = current
+            self._record_detection_success()
             return False
         self._change_account(current)
         return True
 
     def setup(self):
         with self.lock:
+            detected = self.account is not None and self.current_account_detected
+            detection_blocked = self.account is not None and not detected
+            stage = 'needs_initialization' if detection_blocked else self.stage
             init = self.initializer
-            phase = 'baseline' if self.stage == 'starting' else getattr(init, 'phase', None)
-            state = 'working' if self.queued or self.stage == 'starting' else getattr(init, 'state', 'idle')
+            phase = None if detection_blocked else 'baseline' if self.stage == 'starting' else getattr(init, 'phase', None)
+            state = 'idle' if detection_blocked else 'working' if self.queued or self.stage == 'starting' else getattr(init, 'state', 'idle')
             if state in ('ready', 'error'):
                 state = 'idle'
-            return {'stage': self.stage, 'reason': self.reason,
-                    'account': {'detected': self.account is not None, 'display_name': None},
-                    'checks': {'wechat_running': self.account is not None,
-                               'access_ready': self.account is not None,
-                               'reader_ready': self.key_file is not None or self.collector is not None},
+            return {'stage': stage, 'reason': self.detection_reason or self.reason,
+                    'account': {'detected': detected, 'display_name': None},
+                    'checks': {'wechat_running': self.wechat_running,
+                               'access_ready': detected,
+                               'reader_ready': detected and (self.key_file is not None or self.collector is not None)},
+                    'detection': {'metadata_issue': self.detection_metadata_issue,
+                                  'collector_paused': self.collector is not None and not detected},
                     'progress': {'phase': phase, 'completed': None, 'total': None,
                                  'elapsed_seconds': int(getattr(init, 'elapsed_seconds', 0))},
-                    'initialization': {'state': state, 'action': getattr(init, 'action', 'none'),
-                                       'description': self.description},
+                    'initialization': {'state': state, 'action': 'none' if detection_blocked else getattr(init, 'action', 'none'),
+                                       'description': self.detection_description or self.description},
                     'scope_limits': {'total': MAX_CONVERSATIONS, 'private': MAX_CONVERSATIONS, 'group': MAX_CONVERSATIONS},
                     'scope_generation': self.scope_generation, 'scope_id': self.active_scope_id,
                     'scope_switching': self.switching,
-                    'catalog': {'state': 'loading' if self.catalog_loading else 'ready' if self.catalog_ready else 'idle'},
-                    'active_scope': next((row for row in self._saved_profiles() if row['active']), None),
-                    'profiles': self._saved_profiles(), 'workspace_path': '/'}
+                    'catalog': {'state': 'idle' if not detected else 'loading' if self.catalog_loading else 'ready' if self.catalog_ready else 'idle'},
+                    'active_scope': next((row for row in self._saved_profiles() if row['active']), None) if detected else None,
+                    'profiles': self._saved_profiles() if detected else [], 'workspace_path': '/'}
 
     def request_initialize(self, expected_generation=None):
         with self.lock:
             self._check_generation(expected_generation)
-            if self.account is None:
+            if self.account is None or not self.current_account_detected:
                 return self.setup()
             if self.stage in ('ready_to_select', 'starting', 'running'):
                 return self.setup()
@@ -437,7 +547,7 @@ class MacWebManager:
     def list_conversations(self, q='', *, expected_generation=None):
         with self.lock:
             self._check_generation(expected_generation)
-            if self.stage != 'ready_to_select' and not self.catalog_ready:
+            if not self.current_account_detected or self.stage != 'ready_to_select' and not self.catalog_ready:
                 return {'conversations': [], 'selected_conversations': [], 'has_more': False}
             matches = [row for row in self.contacts if q.casefold() in row['name'].casefold()]
             if not q:
@@ -451,7 +561,7 @@ class MacWebManager:
     def request_catalog(self, expected_generation=None):
         with self.lock:
             self._check_generation(expected_generation)
-            if self.account is None or self.key_file is None or self.switching:
+            if self.account is None or not self.current_account_detected or self.key_file is None or self.switching:
                 raise ValueError('macos_selection_not_ready')
             if not self.catalog_loading:
                 self.catalog_loading = True
@@ -461,7 +571,7 @@ class MacWebManager:
     def select(self, private_id, group_id, *, expected_generation=None):
         with self.lock:
             self._check_generation(expected_generation)
-            if self.stage not in ('ready_to_select', 'running') or self.queued or self.switching:
+            if not self.current_account_detected or self.stage not in ('ready_to_select', 'running') or self.queued or self.switching:
                 raise ValueError('macos_selection_not_ready')
             private, group = self.catalog.get(private_id), self.catalog.get(group_id)
             if not private or not group or private['type'] != 'private' or group['type'] != 'group':
@@ -476,7 +586,7 @@ class MacWebManager:
     def select_many(self, conversation_ids, *, expected_generation=None):
         with self.lock:
             self._check_generation(expected_generation)
-            if (self.stage not in ('ready_to_select', 'running', 'error') or self.queued or self.switching
+            if (not self.current_account_detected or self.stage not in ('ready_to_select', 'running', 'error') or self.queued or self.switching
                     or not self.catalog_ready and self.stage != 'ready_to_select'):
                 raise ValueError('macos_selection_not_ready')
             if (not isinstance(conversation_ids, list) or not 1 <= len(conversation_ids) <= MAX_CONVERSATIONS
@@ -498,7 +608,7 @@ class MacWebManager:
     def restore_profile(self, identifier, *, expected_generation=None):
         with self.lock:
             self._check_generation(expected_generation)
-            if self.queued or self.switching or not any(row['id'] == identifier for row in self._saved_profiles()):
+            if not self.current_account_detected or self.queued or self.switching or not any(row['id'] == identifier for row in self._saved_profiles()):
                 raise ValueError('macos_profile_not_ready')
             self._begin_switch()
             self.commands.put(('profile', identifier))
@@ -561,6 +671,8 @@ class MacWebManager:
                 self.description = '读取能力已准备好。只会采集你接下来选定的会话新文字。'
 
     def _native(self):
+        if not self.current_account_detected:
+            return {'probe_succeeded': False, 'running': None, 'frontmost': None, 'screen_locked': None}
         source = self.native_probe()
         if not source.get('probe_succeeded'):
             return source
@@ -570,8 +682,11 @@ class MacWebManager:
                 self.observed_account = current
                 raise ValueError
             if current.pid != self.account.pid or current.started_at != self.account.started_at:
-                raise ValueError
-        except Exception:
+                raise ActiveAccountError('macos_active_process_changed', wechat_running=True)
+            if current.client_version != self.account.client_version:
+                raise ActiveAccountError('macos_active_client_version_changed', wechat_running=True)
+        except Exception as error:
+            self._record_detection_failure(error)
             return {'probe_succeeded': False, 'running': None, 'frontmost': None, 'screen_locked': None}
         return source
 
@@ -593,6 +708,12 @@ class MacWebManager:
                 self._detect_first()
             return
         if self._refresh_active_account(force=self.queued or self.pending_session is not None):
+            if (self.collector is not None and not self.current_account_detected
+                    and time.monotonic() - self.last_poll >= 1):
+                # Publish a paused heartbeat through the collector's existing
+                # native-state guard. No account or source-read rule is relaxed.
+                self.collector.poll()
+                self.last_poll = time.monotonic()
             return
         try:
             command, value = self.commands.get_nowait()
@@ -698,7 +819,10 @@ class MacWebManager:
 
     def status(self, *, expected_generation=None):
         with self.lock:
-            return self._data(expected_generation).status() | self.public_scope_context()
+            result = self._data(expected_generation).status() | self.public_scope_context()
+            if not self.current_account_detected and result.get('state') in ('starting', 'collecting', 'paused'):
+                result.update(state='paused', reason=self.detection_reason or 'macos_active_account_not_ready')
+            return result
 
     def close(self):
         with self.lock:

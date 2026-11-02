@@ -26,6 +26,22 @@ import web_runtime
 from windows_web_server import make_windows_server
 
 
+def synthetic_epochs():
+    return {relative: {'file_identity': [100, index + 1], 'salt_sha256': 'a' * 64,
+                       'key_sha256': 'b' * 64}
+            for index, relative in enumerate(collector_service.RELATIVES) if relative.startswith('message/')}
+
+
+def synthetic_event(chat, serial, body='合成数据不含真实聊天'):
+    relative = 'message/message_0.db'
+    identity = [relative, chat['chat_id'], serial, synthetic_epochs()[relative]]
+    source_key = hashlib.sha256(json.dumps(identity, ensure_ascii=False, sort_keys=True,
+                                           separators=(',', ':')).encode()).hexdigest()
+    return {'source_key': source_key, 'alias': chat['alias'], 'source_local_id': serial,
+            'sent_at': 1793491200, 'sender_id': 'synthetic-peer', 'body': body,
+            'observed_at': '2026-11-01T00:00:00+00:00'}
+
+
 class Child:
     def __init__(self, store):
         self.store, self.code = store, None
@@ -53,6 +69,7 @@ class WindowsManagerTests(unittest.TestCase):
         write_private_json_new(self.data / 'private/scope.json', self.scope)
         write_private_json_new(self.data / 'private/keys.json', keys)
         self.children = []
+        self.source_serials = {'synthetic-peer': 1, 'synthetic-group@chatroom': 1}
         self.seed(self.data)
         self.package = self.root / 'package'; self.package.mkdir()
         self.output = self.root / 'results'; self.output.mkdir()
@@ -73,16 +90,21 @@ class WindowsManagerTests(unittest.TestCase):
         self.temp.cleanup()
 
     def seed(self, target):
+        from scope_history import apply_history_plan
         scope, _, _, _, _, binding = collector_service.prepare_session(target)
         store = CollectorStore(target / 'private/store', binding)
-        if not store.resumed:
-            cursors = {'message/message_0.db': {row['alias']:{'local_id':0,'present':True} for row in scope['config']['conversations']}}
-            store.initialize(cursors, {})
-            row = scope['config']['conversations'][0]
-            event = {'source_key': hashlib.sha256((str(target)+row['alias']).encode()).hexdigest(),
-                     'alias': row['alias'], 'source_local_id':1, 'sent_at':1793491200,
-                     'sender_id':'synthetic-peer', 'body':'合成数据不含真实聊天', 'observed_at':'2026-11-01T00:00:00+00:00'}
-            store.commit(cursors, cursors, [event], {})
+        fresh = {relative: {row['alias']: {'local_id': self.source_serials.get(row['chat_id'], 0) if index == 0 else 0,
+                                         'present': index == 0}
+                            for row in scope['config']['conversations']}
+                 for index, relative in enumerate(synthetic_epochs())}
+        cursors = store.snapshot()['cursors'] if store.resumed else fresh
+        state = apply_history_plan(store, cursors, synthetic_epochs(), initialize=not store.resumed)
+        if target == self.data and not store.stats()['total_messages']:
+            before = state['cursors']
+            after = json.loads(json.dumps(before))
+            for row in scope['config']['conversations']:
+                after['message/message_0.db'][row['alias']]['local_id'] = 1
+            store.commit(before, after, [synthetic_event(row, 1) for row in scope['config']['conversations']], synthetic_epochs())
         metadata = WebMetadata(target / 'private', store.binding_digest, '2026-11-01T00:00:00+00:00')
         metadata.ensure_catalog(scope['config'])
         metadata.status('collecting',store.stats()['total_messages'],0,store.resumed)
@@ -163,6 +185,52 @@ class WindowsManagerTests(unittest.TestCase):
         manager.restore_profile(identifier,expected_generation=manager.scope_generation);manager.tick()
         self.assertTrue(read_private_json(target/'provider.json')['synthetic_new_config'])
         self.assertTrue(read_private_json(assistant/'threads.json')['synthetic_original_history'])
+
+    def test_selected_group_history_and_continuous_cursor_survive_add_remove_other_chats(self):
+        manager = self.manager()
+        original = manager.messages('group_test')['messages'][0]
+        legacy_database = self.data / 'private/store/collector.sqlite3'
+        legacy_bytes = legacy_database.read_bytes()
+        first = self.select(manager)
+        group_alias = alias_for('synthetic-group@chatroom')
+        rows = manager.messages(group_alias)['messages']
+        self.assertEqual([row['body'] for row in rows], [original['body']])
+        before = manager.child.store.snapshot()['cursors']
+        self.assertEqual(before['message/message_0.db'][group_alias]['local_id'], 1)
+        after = json.loads(json.dumps(before)); after['message/message_0.db'][group_alias]['local_id'] = 2
+        chat = next(row for row in manager.active_config['conversations'] if row['alias'] == group_alias)
+        manager.child.store.commit(before, after, [synthetic_event(chat, 2, '合成后续文字')], synthetic_epochs())
+        self.source_serials[chat['chat_id']] = 2
+        first_database = manager.data_dir / 'private/store/collector.sqlite3'
+        first_bytes = first_database.read_bytes()
+        choices = self.ready_catalog(manager)
+        selected = [row['id'] for row in choices if row['name'] in ('合成群聊', '合成私聊二')]
+        manager.select_many(selected, expected_generation=manager.scope_generation); manager.tick()
+        self.assertNotEqual(manager.active_scope_id, first)
+        self.assertEqual([row['body'] for row in manager.messages(group_alias)['messages']],
+                         [original['body'], '合成后续文字'])
+        self.assertEqual(manager.child.store.snapshot()['cursors']['message/message_0.db'][group_alias]['local_id'], 2)
+        self.assertEqual(manager.messages(alias_for('synthetic-other-peer'))['messages'], [])
+        with self.assertRaises(WebDataError): manager.messages(alias_for('synthetic-peer'))
+        self.assertEqual(legacy_database.read_bytes(), legacy_bytes)
+        self.assertEqual(first_database.read_bytes(), first_bytes)
+
+    def test_active_pointer_does_not_publish_a_history_plan_before_child_is_ready(self):
+        manager = self.manager(); choices = self.ready_catalog(manager)
+        pointer = self.data / 'private/active-scope.json'; before = pointer.read_bytes()
+        def pending(target, output):
+            output.mkdir()
+            collector_service.Heartbeat(output).emit('starting')
+            return Child(None)
+        manager.start_collector = pending
+        manager.stop_collector = lambda child, output: (setattr(child, 'code', 0) or 0, True)
+        manager.select_many([row['id'] for row in choices], expected_generation=manager.scope_generation)
+        manager.tick()
+        self.assertEqual(manager.stage, 'starting')
+        self.assertTrue(manager.switching)
+        self.assertIsNone(manager.provider)
+        self.assertTrue((manager.data_dir / 'private/history-plan.json').is_file())
+        self.assertEqual(pointer.read_bytes(), before)
 
     def test_active_pointer_restores_new_profile_without_legacy_changes(self):
         manager=self.manager();identifier=self.select(manager)
